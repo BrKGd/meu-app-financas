@@ -1,0 +1,233 @@
+/* src/styles/Lancamento.css */
+
+.lancamento-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  padding-bottom: 50px;
+}
+
+.lancamento-header {
+  margin-bottom: 30px;
+}
+
+.lancamento-header h2 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.lancamento-header p {
+  color: #64748b;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+.lancamento-card {
+  background: #fff;
+  padding: 30px;
+  border-radius: 24px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03);
+  border: 1px solid #f1f5f9;
+}
+
+/* Grid para Descrição e Categoria lado a lado */
+.form-grid-desc-cat {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+/* Grid superior (Data, Loja, Responsável) */
+.form-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.form-row-top > .input-group {
+  flex: 1 1 200px;
+}
+
+/* ÁREA FINANCEIRA (Valor, Pagamento, Cartão) */
+
+.form-row-bottom, .form-row-credito {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: flex-end;
+  /* Removido o background cinza */
+  background: transparent; 
+  /* Removido o preenchimento e bordas para não parecer um bloco separado */
+  padding: 10px 0; 
+  border: none;
+  margin-top: 10px;
+}
+
+/* Removendo as regras de arredondamento que não são mais necessárias sem o fundo */
+.form-row-credito, .form-row-bottom {
+    border-radius: 0;
+    margin-top: 0;
+    border-top: none;
+}
+
+.form-row-credito {
+    margin-top: 0;
+    border-top: none;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.form-row-bottom {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+/* Controle de largura dos itens */
+.flex-item-valor { flex: 1 1 160px; }
+.flex-item-forma { flex: 1 1 180px; }
+.flex-item-cartao { flex: 1 1 180px; }
+.flex-item-parcela { flex: 0 1 90px; }
+
+/* Grupo de Input com Prefixo R$ */
+.input-with-prefix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prefix-icon {
+  position: absolute;
+  left: 14px;
+  font-weight: 800;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.input-with-prefix input {
+  padding-left: 45px !important;
+}
+
+/* Estilos de Label e Input */
+.input-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #64748b;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-control {
+  width: 100%;
+  height: 52px;
+  background: #ffffff;
+  border: 2px solid #f1f5f9;
+  border-radius: 14px;
+  padding: 0 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #4361ee;
+  box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.08);
+}
+
+.select-pagamento, .select-categoria {
+  font-weight: 700 !important;
+  color: #4361ee !important;
+  border-color: #dbeafe !important;
+}
+
+/* Badges de Fechamento de Fatura */
+.info-fechamento-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  margin-top: 15px;
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.info-fechamento-badge.current-month {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #dcfce7;
+}
+
+.info-fechamento-badge.next-month {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #ffedd5;
+}
+
+/* Botão de Envio */
+.btn-submit {
+  width: 100%;
+  height: 58px;
+  margin-top: 25px;
+  border-radius: 16px;
+  background: #4361ee;
+  color: white;
+  border: none;
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 20px rgba(67, 97, 238, 0.2);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: #3752d5;
+  transform: translateY(-2px);
+}
+
+/* CORREÇÃO DO Z-INDEX PARA MODAL FEEDBACK */
+/* Garante que o feedback de erro/sucesso apareça sobre tudo */
+.modal-feedback-overlay {
+  z-index: 9999 !important;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .lancamento-container { padding: 15px; }
+  .lancamento-card { padding: 20px; }
+  
+  .form-grid-desc-cat {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row-bottom, .form-row-credito { padding: 15px; gap: 12px; }
+
+  .flex-item-valor, .flex-item-forma, .flex-item-cartao, .flex-item-parcela {
+    flex: 1 1 100%; 
+  }
+}
+
+/* Animações */
+.fade-in { animation: fadeIn 0.4s ease-out; }
+.animate-in { animation: slideDown 0.3s ease-out; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideDown { 
+  from { opacity: 0; transform: translateY(-10px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}

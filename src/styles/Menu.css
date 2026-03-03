@@ -1,0 +1,254 @@
+/* Menu.css - Versão Otimizada com 3 Colunas */
+
+.menu-container {
+    padding: 20px; /* Reduzi levemente para ganhar espaço nas bordas */
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: 100px;
+    font-family: 'Inter', sans-serif;
+}
+
+.menu-header {
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-subtitle {
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+}
+
+.header-title {
+    font-size: 1.8rem; /* Ajustado para não quebrar em telas menores */
+    margin: 5px 0 0 0;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -1px;
+}
+
+.trending-icon-box {
+    background: #eef2ff;
+    padding: 10px;
+    border-radius: 15px;
+}
+
+/* Card Principal de Dívida */
+.main-card {
+    background: linear-gradient(135deg, #0f172a 0%, #3f37c9 100%);
+    border-radius: 30px;
+    padding: 30px;
+    color: white;
+    margin-bottom: 30px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.4);
+}
+
+.main-card-content {
+    position: relative;
+    z-index: 2;
+}
+
+.card-label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.8;
+    margin-bottom: 10px;
+}
+
+.total-value {
+    font-size: 2.5rem; /* Leve redução para melhor leitura mobile */
+    margin: 0;
+    font-weight: 900;
+    letter-spacing: -1.5px;
+    margin-bottom: 20px;
+}
+
+/* Mini Cards por Usuário dentro do Card Principal */
+.mini-cards-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.mini-card {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(10px);
+    padding: 10px 14px;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    min-width: 100px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mini-card-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+.mini-card-value {
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+/* Pills de Resumo */
+.pills-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 15px;
+}
+
+.pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 6px 12px;
+    border-radius: 10px;
+}
+
+.pill-label {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    font-weight: 600;
+}
+
+.card-decoration {
+    position: absolute;
+    bottom: -60px;
+    right: -30px;
+    width: 200px;
+    height: 200px;
+    background: #4361ee;
+    filter: blur(80px);
+    opacity: 0.4;
+}
+
+/* Grid de Ações - OTIMIZADA PARA 3 COLUNAS */
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 colunas fixas */
+    gap: 12px;
+    margin-bottom: 30px;
+}
+
+.section-title {
+    margin-bottom: 15px;
+    color: #0f172a;
+    font-weight: 800;
+    font-size: 1.1rem;
+    letter-spacing: -0.5px;
+}
+
+/* Quick Action Card - Compacto */
+.quick-action-card {
+    padding: 15px 10px; /* Padding reduzido para caber conteúdo */
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centraliza ícone e texto */
+    text-align: center;
+    gap: 10px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+    text-decoration: none;
+}
+
+.quick-action-card:active {
+    transform: scale(0.95);
+}
+
+.quick-action-card.primary {
+    background: #4361ee;
+    box-shadow: 0 10px 20px rgba(67, 97, 238, 0.2);
+    border: none;
+}
+
+.quick-action-card.secondary {
+    background: white;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+    border: 1px solid #f1f5f9;
+}
+
+.action-icon-wrapper {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Textos dentro do Quick Action Card */
+.quick-action-card span:first-of-type {
+    display: block;
+    font-weight: 800;
+    font-size: 0.85rem !important; /* Fonte menor para evitar quebra */
+    color: inherit;
+}
+
+.quick-action-card span:last-of-type {
+    font-size: 0.65rem !important; /* Subtítulo bem discreto */
+    font-weight: 600;
+    opacity: 0.7;
+}
+
+/* Footer / Perfil */
+.footer-action {
+    background: #fff;
+    padding: 18px;
+    border-radius: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+}
+
+.footer-icon-box {
+    background: #f8fafc;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+/* Animações */
+.fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ajustes Mobile Específicos */
+@media (max-width: 480px) {
+    .menu-container {
+        padding: 15px;
+    }
+    
+    .total-value {
+        font-size: 2.2rem;
+    }
+
+    .actions-grid {
+        gap: 8px; /* Menos espaço entre os cards no celular */
+    }
+
+    .quick-action-card {
+        padding: 12px 5px;
+    }
+}

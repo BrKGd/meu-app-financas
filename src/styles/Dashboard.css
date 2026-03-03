@@ -1,0 +1,131 @@
+/* --- Estrutura Geral --- */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 10px;
+  }
+  
+  .person-card {
+    background-color: white;
+    padding: 15px;
+    border-radius: 24px;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+    border: 1px solid #f1f5f9;
+    transition: transform 0.2s ease;
+    position: relative; /* Necessário para os badges flutuarem dentro do card */
+  }
+  
+  .person-card:hover {
+    transform: translateY(-5px);
+  }
+  
+  /* --- Cabeçalho do Card (Onde os Badges Flutuam) --- */
+  .card-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px; /* Espaço fixo para o conteúdo abaixo não subir demais */
+    position: relative;
+    min-height: 32px; /* Mantém a altura mesmo sem badges */
+  }
+  
+  .person-name-tag {
+    background: rgba(67, 97, 238, 0.1);
+    color: #4361ee;
+    padding: 6px 14px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  
+  /* --- Wrapper dos Badges (Configuração Flutuante) --- */
+  .badges-right-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge-pay {
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Sombra para destacar a flutuação */
+  }
+  
+  .badge-status-ok {
+    background-color: #dcfce7;
+    color: #16a34a;
+    border: 1px solid rgba(22, 163, 74, 0.1);
+  }
+  
+  .badge-status-alert {
+    background-color: #fee2e2;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.1);
+  }
+  
+  /* --- Conteúdo Inferior (Fixo, não é empurrado) --- */
+  .mini-stat-grid {
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 10px; 
+    margin-top: 15px;
+  }
+  
+  .mini-stat-box {
+    padding: 10px; 
+    background: #f8fafc; 
+    border-radius: 12px;
+    border: 1px solid #f1f5f9;
+  }
+  
+  .fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  /* --- Responsividade Mobile --- */
+  @media (max-width: 720px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr !important;
+    }
+  
+    .card-top-row {
+      margin-bottom: 5px !important; /* Aumenta o espaço para os badges flutuantes no mobile */
+    }
+  
+    .person-name-tag {
+      font-size: 0.7rem;
+      padding: 5px 10px;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .badges-right-wrapper {
+    position: absolute; /* Torna os badges flutuantes */
+    right: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column; /* Empilha um sobre o outro */
+    align-items: flex-end;
+    gap: 4px;
+    z-index: 5;
+    }
+  
+    .badge-pay {
+      font-size: 0.6rem;
+      padding: 3px 8px;
+    }
+
+  }

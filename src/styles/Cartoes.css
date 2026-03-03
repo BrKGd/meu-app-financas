@@ -1,0 +1,160 @@
+/* Cartoes.css - Estética Minimalista & Sofisticada */
+.cartoes-container {
+  padding: 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.cartoes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.cartoes-header h1 {
+  margin: 0;
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #1e293b;
+  letter-spacing: -0.04em;
+}
+
+.cartoes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 30px;
+}
+
+/* Card Estilo Apple/Nubank */
+.card-cartao {
+  padding: 32px;
+  border-radius: 28px;
+  cursor: pointer;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #ffffff; 
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.card-cartao:hover {
+  transform: translateY(-8px);
+  filter: brightness(1.1);
+}
+
+.card-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #ffffff;
+  opacity: 0.85;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-bank-name {
+  font-weight: 800;
+  font-size: 1.6rem;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
+.limit-info-wrapper { margin-top: auto; }
+
+.limit-available-label {
+  color: #ffffff;
+  opacity: 0.85;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: block;
+}
+
+.limit-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.progress-bar-bg {
+  background: rgba(255, 255, 255, 0.25);
+  height: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.progress-bar-fill {
+  background: #ffffff;
+  height: 100%;
+  transition: width 1s ease-out;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* Modal Estilizado */
+.modal-details-header { padding: 35px; color: white; }
+
+.fatura-resumo {
+  margin-top: 20px;
+  padding: 24px;
+  border-radius: 24px;
+  background: #f1f5f9;
+  border: 1px dashed #cbd5e1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #1e293b;
+}
+
+.fatura-valor { font-size: 1.5rem; font-weight: 900; }
+
+.listagem-lancamentos {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 8px;
+  margin-top: 15px;
+}
+
+/* BOTÕES DE EDIÇÃO MELHORADOS */
+.edit-actions-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn-modal-save, .btn-modal-cancel, .btn-modal-delete {
+  height: 54px;
+  border-radius: 16px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn-modal-save { background: #4361ee; color: white; }
+.btn-modal-save:hover { background: #3046c8; transform: translateY(-2px); }
+
+.btn-modal-cancel { background: #f1f5f9; color: #64748b; }
+.btn-modal-cancel:hover { background: #e2e8f0; color: #1e293b; }
+
+.btn-modal-delete { background: #fff1f2; color: #f43f5e; border: 1px solid #ffe4e6; }
+.btn-modal-delete:hover { background: #f43f5e; color: white; transform: translateY(-2px); }
+
+/* Scrollbar fina */
+.listagem-lancamentos::-webkit-scrollbar { width: 4px; }
+.listagem-lancamentos::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+@media (max-width: 600px) {
+  .cartoes-header { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .cartoes-container { padding: 20px; }
+  .edit-actions-grid { grid-template-columns: 1fr 1fr 1fr; }
+}
