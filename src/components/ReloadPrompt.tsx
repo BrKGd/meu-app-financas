@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import '../styles/ReloadPrompt.css'; // Importando o novo estilo
+import '../styles/ReloadPrompt.css'; 
 
 const ReloadPrompt: React.FC = () => {
   const {
@@ -8,13 +8,23 @@ const ReloadPrompt: React.FC = () => {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegistered(r) {
-      console.log('PWA registrado');
+    onRegistered(r: ServiceWorkerRegistration | undefined) {
+      console.log('PWA registrado com sucesso');
     },
-    onRegisterError(error) {
-      console.error('Erro no PWA', error);
+    onRegisterError(error: any) {
+      console.error('Erro no registro do PWA', error);
     },
   });
+
+  // Fecha o alerta automaticamente após 5 segundos se for apenas aviso de Offline
+  useEffect(() => {
+    if (offlineReady) {
+      const timer = setTimeout(() => {
+        setOfflineReady(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [offlineReady, setOfflineReady]);
 
   const close = () => {
     setOfflineReady(false);
