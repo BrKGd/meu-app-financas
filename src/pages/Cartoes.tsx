@@ -268,7 +268,7 @@ const Cartoes: React.FC = () => {
                         return infoMes && (
                           <div key={idx} className="fatura-item">
                             <div>
-                              <div className="fatura-item-desc">{item.loja || item.descricao}</div>
+                              <div className="fatura-item-desc">{item.descricao ||item.loja }</div>
                               <div className="fatura-item-sub">{item.num_parcelas > 1 ? `Parcela ${infoMes.atual}/${infoMes.total}` : 'À Vista'}</div>
                             </div>
                             <div className="fatura-item-valor">{formatMoney(infoMes.valor)}</div>
