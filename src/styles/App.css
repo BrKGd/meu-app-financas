@@ -402,3 +402,25 @@ tr.clickable-row:hover {
   background: var(--primary-light);
   border-color: var(--primary);
 }
+
+.reload-prompt-container {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  margin: 16px;
+  padding: 16px;
+  border: 1px solid #888;
+  border-radius: 8px;
+  z-index: 1000;
+  background-color: white;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.reload-button {
+  background: #6366f1;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 8px;
+}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from './services/supabaseClient'; // Corrigido nome e removido .ts
+import { supabase } from './services/supabaseClient'; 
 import { Session } from '@supabase/supabase-js';
 
 // Estilos
@@ -20,12 +20,14 @@ import Orcamento from './pages/Orcamento';
 import Proventos from './pages/Proventos';
 import Despesas from './pages/Despesas';
 import CategoriasMetas from './pages/CategoriasMetas';
+import ReloadPrompt from './components/ReloadPrompt'; // Componente de atualização de Cache
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    // Busca sessão inicial
     const getInitialSession = async () => {
       const { data: { session: initialSession } } = await supabase.auth.getSession();
       setSession(initialSession);
@@ -34,6 +36,7 @@ const App: React.FC = () => {
 
     getInitialSession();
 
+    // Escuta mudanças na autenticação (Login/Logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession);
       setLoading(false);
@@ -60,6 +63,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Registro />} />
+            {/* Redireciona qualquer rota não autenticada para o login */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         ) : (
@@ -67,9 +71,9 @@ const App: React.FC = () => {
             <Sidebar />
             <main className="content-area">
               <Routes>
+                {/* Rotas Privadas */}
                 <Route path="/" element={<Menu />} />
                 <Route path="/menu" element={<Navigate to="/" replace />} />
-                
                 <Route path="/lancamento" element={<Lancamento />} />
                 <Route path="/listagem" element={<Listagem />} />
                 <Route path="/categoriasMetas" element={<CategoriasMetas />} /> 
@@ -80,12 +84,16 @@ const App: React.FC = () => {
                 <Route path="/cartoes" element={<Cartoes />} />
                 <Route path="/perfil" element={<Perfil />} />
                 
+                {/* Se estiver logado e tentar ir para o login, volta para o menu */}
                 <Route path="/login" element={<Navigate to="/" replace />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
           </div>
         )}
+        
+        {/* Componente que gerencia o PWA e avisa sobre novas versões para evitar cache */}
+        <ReloadPrompt />
       </div>
     </Router>
   );
