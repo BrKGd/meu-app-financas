@@ -3,7 +3,7 @@ import { supabase } from '../services/supabaseClient';
 import { 
   ChevronLeft, ChevronRight, Trash2, X, Save, 
   Hash, Receipt, CreditCard, User, Calendar, 
-  Tag
+  Tag, ShoppingBag, Landmark
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
@@ -23,7 +23,6 @@ interface ItemCompra {
   cartao: string | null;
   forma_pagamento: string;
   categoria_id: string;
-  // Propriedades calculadas para exibição
   parcelaAtual?: number;
   valorParcela?: number;
   nomeResponsavel?: string;
@@ -39,7 +38,6 @@ const Listagem: React.FC = () => {
   const [perfilLogado, setPerfilLogado] = useState<any>(null);
   const [itemParaEditar, setItemParaEditar] = useState<ItemCompra | null>(null);
   
-  // Ajuste no tipo do modal para evitar erro 2322 (onConfirm)
   const [modal, setModal] = useState<{
     isOpen: boolean;
     type: 'success' | 'error' | 'warning' | 'danger';
@@ -75,15 +73,13 @@ const Listagem: React.FC = () => {
   };
 
   const completarNF = (valor: any) => {
-    if (!valor) return '';
+    if (!valor) return '-';
     const apenasNumeros = valor.toString().replace(/\D/g, '');
-    if (!apenasNumeros) return '';
+    if (!apenasNumeros) return '-';
     return apenasNumeros.padStart(9, '0').replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
   };
 
-  // --- Lógica de Busca e Processamento ---
   const fetchDespesas = useCallback(async (perfil: any, mapaNomes: any, listaCartoes: any[], mapaCats: any) => {
-    // Casting (as any) para evitar erro 'never' na query
     let query = (supabase.from('compras') as any).select('*').order('data_compra', { ascending: false });
     
     if (perfil?.tipo_usuario !== 'proprietario') {
@@ -110,7 +106,6 @@ const Listagem: React.FC = () => {
       }
 
       for (let i = 0; i < numParcelas; i++) {
-        // Usamos dia 15 para evitar bugs de virada de mês/fevereiro
         const dataReferenciaParcela = new Date(anoC, (mesC - 1) + delayMes + i, 15);
         
         if (dataReferenciaParcela.getMonth() === filtroData.mes && dataReferenciaParcela.getFullYear() === filtroData.ano) {
@@ -141,7 +136,6 @@ const Listagem: React.FC = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Resolvendo Erros 2339 e 2698 com casting explícito
     const [pRes, cRes, cartRes, meuPerfilRes] = await Promise.all([
       (supabase.from('profiles') as any).select('id, nome'),
       (supabase.from('categorias') as any).select('id, nome').eq('tipo', 'despesa').order('nome'),
@@ -160,8 +154,6 @@ const Listagem: React.FC = () => {
     const meuPerfil = meuPerfilRes.data as any;
     const isMaster = user.email === 'gleidson.fig@gmail.com';
     const tipoFinal = isMaster ? 'proprietario' : (meuPerfil?.tipo_usuario || 'comum');
-    
-    // Erro 2698 resolvido: Criando objeto a partir de tipo conhecido
     const perfilAtualizado = { ...meuPerfil, tipo_usuario: tipoFinal };
     
     setPerfilLogado(perfilAtualizado);
@@ -174,14 +166,12 @@ const Listagem: React.FC = () => {
     carregarDadosIniciais(); 
   }, [carregarDadosIniciais]);
 
-  // --- Handlers de Ações ---
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isProprietario || !itemParaEditar) return;
 
     const isCredito = itemParaEditar.forma_pagamento === 'Crédito';
     
-    // Erro 2345 resolvido com casting (as any) no .from()
     const { error } = await (supabase.from('compras') as any).update({
       descricao: itemParaEditar.descricao,
       loja: itemParaEditar.loja,
@@ -256,8 +246,10 @@ const Listagem: React.FC = () => {
               <th>Categoria</th>
               <th>Descrição</th>
               <th>Loja</th>
-              <th>NF / Pedido</th>
+              <th>NF</th>
+              <th>Pedido</th>
               <th>Pagamento</th>
+              <th>Cartão</th>
               <th>Parcela</th>
               <th style={{ textAlign: 'right' }}>Valor</th>
             </tr>
@@ -271,14 +263,10 @@ const Listagem: React.FC = () => {
                   <td className="cell-category"><span className="cat-badge">{item.nomeCategoria}</span></td>
                   <td className="cell-main">{item.descricao}</td>
                   <td className="cell-sub">{item.loja || '-'}</td>
-                  <td className="cell-nf">
-                    <div className="main-text">{completarNF(item.nota_fiscal) || '-'}</div>
-                    <div className="sub-text">{item.pedido && `#${item.pedido}`}</div>
-                  </td>
-                  <td>
-                      <div className="main-text">{item.forma_pagamento}</div>
-                      <div className="sub-text">{item.cartao}</div>
-                  </td>
+                  <td className="cell-nf">{completarNF(item.nota_fiscal)}</td>
+                  <td className="cell-nf">{item.pedido ? `#${item.pedido}` : '-'}</td>
+                  <td>{item.forma_pagamento}</td>
+                  <td>{item.cartao || '-'}</td>
                   <td>
                     <span className={`badge-parcela ${item.parcelado ? 'is-parcelado' : 'is-avista'}`}>
                       {item.parcelado ? `${item.parcelaAtual}/${item.num_parcelas}` : 'À Vista'}
@@ -291,7 +279,7 @@ const Listagem: React.FC = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                   Nenhum lançamento encontrado para este mês.
                 </td>
               </tr>
@@ -340,12 +328,16 @@ const Listagem: React.FC = () => {
                       {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
                     </select>
                   </div>
-                  <div className="form-group full-width">
+                  <div className="form-group">
                     <label><Tag size={12}/> Categoria</label>
                     <select className="form-control" disabled={!isProprietario} value={itemParaEditar.categoria_id} onChange={e => setItemParaEditar({...itemParaEditar, categoria_id: e.target.value})}>
                       <option value="">Selecione...</option>
                       {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label><ShoppingBag size={12}/> Loja</label>
+                    <input className="form-control" disabled={!isProprietario} value={itemParaEditar.loja || ''} onChange={e => setItemParaEditar({...itemParaEditar, loja: e.target.value})} />
                   </div>
                   <div className="form-group full-width">
                     <label>Descrição</label>
@@ -369,8 +361,35 @@ const Listagem: React.FC = () => {
                     />
                   </div>
                   <div className="form-group">
+                    <label><Landmark size={12}/> Pagamento</label>
+                    <select className="form-control" disabled={!isProprietario} value={itemParaEditar.forma_pagamento} onChange={e => setItemParaEditar({...itemParaEditar, forma_pagamento: e.target.value})}>
+                      {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+
+                  {itemParaEditar.forma_pagamento === 'Crédito' && (
+                    <>
+                      <div className="form-group">
+                        <label><CreditCard size={12}/> Cartão</label>
+                        <select className="form-control" disabled={!isProprietario} value={itemParaEditar.cartao || ''} onChange={e => setItemParaEditar({...itemParaEditar, cartao: e.target.value})}>
+                          <option value="">Selecione o cartão...</option>
+                          {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>N° de Parcelas</label>
+                        <input type="number" min="1" className="form-control" disabled={!isProprietario} value={itemParaEditar.num_parcelas} onChange={e => setItemParaEditar({...itemParaEditar, num_parcelas: Number(e.target.value)})} />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="form-group">
                     <label><Receipt size={12}/> Nota Fiscal</label>
                     <input className="form-control" disabled={!isProprietario} value={itemParaEditar.nota_fiscal || ''} onChange={e => setItemParaEditar({...itemParaEditar, nota_fiscal: e.target.value})} />
+                  </div>
+                  <div className="form-group">
+                    <label><Hash size={12}/> Pedido</label>
+                    <input className="form-control" disabled={!isProprietario} value={itemParaEditar.pedido || ''} onChange={e => setItemParaEditar({...itemParaEditar, pedido: e.target.value})} />
                   </div>
                 </div>
               </form>
