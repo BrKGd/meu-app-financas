@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { Plus, Calendar, Tag, Trash2, X, Save, User, ShoppingCart, Loader2 } from 'lucide-react';
+import { Plus, Calendar, Tag, Trash2, X, Save, User, ShoppingCart, Loader2, Filter } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
 
@@ -176,13 +176,11 @@ const Despesas: React.FC = () => {
         <main className="desp-panel desp-list-panel" style={{padding: 0, overflow: 'hidden'}}>
           <div className="list-header" style={{padding: '25px 30px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <h3 style={{fontWeight: 800, color: '#475569', margin: 0}}>Movimentações</h3>
-            <input 
-              type="text" 
-              placeholder="Filtrar..." 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)}
-              className="desp-search-mini"
-            />
+            <div className="list-actions">
+                <button className="btn-filter-icon" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
+                    <Filter size={18} color="#ef4444" />
+                </button>
+            </div>
           </div>
 
           <div className="desp-list">

@@ -287,8 +287,8 @@
   position: fixed;
   bottom: 40px;
   right: 40px;
-  width: 60px;
-  height: 60px;
+  width: 55px;
+  height: 55px;
   border-radius: 20px;
   background: #ef4444;
   color: white;
@@ -299,6 +299,7 @@
   align-items: center;
   justify-content: center;
   z-index: 100;
+  animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -321,7 +322,7 @@
 @media (max-width: 768px) {
   .desp-top-layout { grid-template-columns: 1fr; }
   .desp-premium-wrapper { padding: 20px 15px; }
-  .desp-fab { bottom: 30px; right: 20px; width: 55px; height: 55px; }
+  .desp-fab { bottom: 90px; right: 20px; }
   .desp-item-row { padding: 15px 20px; }
   .desp-icon-column { margin-right: 15px; }
   .desp-icon-box { width: 42px; height: 42px; }
