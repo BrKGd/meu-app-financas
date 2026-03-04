@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-// No Vite, usamos import.meta.env em vez de process.env
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Erro: Variáveis de ambiente do Supabase não encontradas!")
-}
+// Substitua as strings abaixo pelos valores REAIS que estão no seu arquivo .env
+const supabaseUrl = 'https://egoayzgmjvttshwiggaa.supabase.co'
+const supabaseAnonKey = 'sb_publishable_Wlni1gs7jgN6DVy79l2Jig_OscvYzCX'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
