@@ -380,7 +380,7 @@ const Listagem: React.FC = () => {
                   <Trash2 size={18} /> Excluir
                 </button>
                 <button type="submit" form="edit-form" className="btn-footer-save">
-                  <Save size={18} /> Salvar Alterações
+                  <Save size={18} /> Salvar
                 </button>
               </div>
             )}

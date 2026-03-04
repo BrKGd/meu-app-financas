@@ -340,7 +340,7 @@
 @media (max-width: 768px) {
   .listagem-container { padding: 20px; }
   .grid-form { grid-template-columns: 1fr; }
-  .modal-fixed-footer-dual { grid-template-columns: 1fr; gap: 12px; }
+  .modal-fixed-footer-dual { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .nav-info { min-width: 100px; }
   .custom-table { min-width: 900px; }
   .total-geral-wrapper { justify-content: center; } /* Centraliza no mobile */
