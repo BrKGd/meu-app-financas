@@ -1,25 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
-import { 
-  Cartao, Categoria, Compra, Profile, 
-  Provento, Meta, Parcela 
-} from '../types/database';
+import { createClient } from '@supabase/supabase-js'
 
-// Definição do Schema do Banco para o Supabase
-export interface Database {
-  public: {
-    Tables: {
-      cartoes: { Row: Cartao };
-      categorias: { Row: Categoria };
-      compras: { Row: Compra };
-      profiles: { Row: Profile };
-      proventos: { Row: Provento };
-      metas: { Row: Meta };
-      parcelas: { Row: Parcela };
-    }
-  }
+// No Vite, usamos import.meta.env em vez de process.env
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("Erro: Variáveis de ambiente do Supabase não encontradas!")
 }
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
