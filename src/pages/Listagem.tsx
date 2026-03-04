@@ -403,16 +403,16 @@ const Listagem: React.FC = () => {
 
             {isProprietario && (
               <div className="modal-footer-icons">
-                <button type="button" className="btn-icon-action btn-delete" onClick={() => confirmDelete(itemParaEditar.id)}>
+                <button type="button" className="btn-icon-action btn-delete" title='Excluir Registro' onClick={() => confirmDelete(itemParaEditar.id)}>
                   <img src={iconExcluir} alt="Excluir" />
                 </button>
                 
                 <div className="footer-right-actions">
-                <button type="button" className="btn-icon-action" onClick={() => setItemParaEditar(null)}>
+                <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
                   <img src={iconCancelar} alt="Cancelar" />
                 </button>
 
-                <button type="submit" form="edit-form" className="btn-icon-action">
+                <button type="submit" form="edit-form" className="btn-icon-action" title='Salvar'>
                   <img src={iconConfirme} alt="Salvar" />
                 </button>
                 </div>
