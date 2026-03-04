@@ -1,19 +1,24 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { 
-  CreditCard, Plus, Trash2, X, Save, ShoppingCart, Settings2, RotateCcw 
-} from 'lucide-react';
+import { CreditCard, Plus } from 'lucide-react';
 import '../styles/Cartoes.css';
 
-// --- Interfaces de Tipagem ---
+// Importação das imagens
+import iconConfirme from '../assets/confirme.png';
+import iconExcluir from '../assets/excluir.png';
+import iconCancelar from '../assets/cancelar.png';
+import iconFechar from '../assets/fechar.png';
+import iconAjustar from '../assets/ajustar.png'; // Novo ícone importado
+import iconEditar from '../assets/editar.png'; // Novo ícone importado
+
+// --- Interfaces ---
 interface Cartao {
   id: number;
   nome: string;
-  limite: number | string; // Aceita string por causa do retorno do banco
+  limite: number | string;
   dia_fechamento: number;
   dia_vencimento: number;
   cor: string;
-  created_at?: string;
 }
 
 interface Compra {
@@ -36,11 +41,7 @@ const Cartoes: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   
   const [formCartao, setFormCartao] = useState({
-    nome: '', 
-    limite: '', 
-    dia_fechamento: '', 
-    dia_vencimento: '', 
-    cor: '#6366f1'
+    nome: '', limite: '', dia_fechamento: '', dia_vencimento: '', cor: '#4361ee'
   });
 
   const mesAtual = new Date().getMonth();
@@ -50,7 +51,7 @@ const Cartoes: React.FC = () => {
     setShowModalCadastro(false);
     setSelectedCartao(null);
     setIsEditing(false);
-    setFormCartao({ nome: '', limite: '', dia_fechamento: '', dia_vencimento: '', cor: '#6366f1' });
+    setFormCartao({ nome: '', limite: '', dia_fechamento: '', dia_vencimento: '', cor: '#4361ee' });
   }, []);
 
   useEffect(() => {
@@ -62,26 +63,23 @@ const Cartoes: React.FC = () => {
     try {
       const { data: cData } = await supabase.from('cartoes').select('*').order('nome');
       const { data: compData } = await supabase.from('compras').select('*');
-      
       setCartoes((cData as any[]) || []);
       setCompras((compData as any[]) || []);
     } catch (error) {
-      console.error("Erro ao buscar dados:", error);
+      console.error("Erro:", error);
     } finally {
       setLoading(false);
     }
   }
 
+  // --- Cálculos ---
   const getMesInicioCobranca = (item: Compra, cartoesReferencia: Cartao[]) => {
     const [anoC, mesC, diaC] = item.data_compra.split('-').map(Number);
     let mesInicio = mesC - 1; 
     let anoInicio = anoC;
-
     if (item.forma_pagamento === 'Crédito') {
       const info = cartoesReferencia.find(c => c.nome === item.cartao);
-      if (info && diaC > info.dia_fechamento) {
-        mesInicio += 1;
-      }
+      if (info && diaC > info.dia_fechamento) mesInicio += 1;
     }
     return { mesInicio, anoInicio };
   };
@@ -91,17 +89,11 @@ const Cartoes: React.FC = () => {
     const totalComprometido = compras.reduce((acc, item) => {
       if (item.cartao !== cartao.nome) return acc;
       const { mesInicio, anoInicio } = getMesInicioCobranca(item, cartoes);
-      const numParcelas = item.num_parcelas || 1;
-      
-      const dataUltimaParcela = new Date(anoInicio, mesInicio + (numParcelas - 1), 1);
-      const dataFronteiraMesAtual = new Date(anoAtual, mesAtual, 1);
-      
-      if (dataUltimaParcela >= dataFronteiraMesAtual) {
-        return acc + Number(item.valor_total);
-      }
+      const dataUltimaParcela = new Date(anoInicio, mesInicio + ((item.num_parcelas || 1) - 1), 1);
+      if (dataUltimaParcela >= new Date(anoAtual, mesAtual, 1)) return acc + Number(item.valor_total);
       return acc;
     }, 0);
-    return parseFloat((limNum - totalComprometido).toFixed(2));
+    return Number((limNum - totalComprometido).toFixed(2));
   };
 
   const calcularTotalMes = (cartaoNome: string) => {
@@ -109,23 +101,20 @@ const Cartoes: React.FC = () => {
       if (item.cartao !== cartaoNome) return acc;
       const { mesInicio, anoInicio } = getMesInicioCobranca(item, cartoes);
       const numParcelas = item.num_parcelas || 1;
-      let valorNoMes = 0;
-      
       for (let i = 0; i < numParcelas; i++) {
         const dP = new Date(anoInicio, mesInicio + i, 1);
         if (dP.getMonth() === mesAtual && dP.getFullYear() === anoAtual) {
-          valorNoMes = Number(item.valor_total) / numParcelas;
+          return acc + (Number(item.valor_total) / numParcelas);
         }
       }
-      return acc + valorNoMes;
+      return acc;
     }, 0);
-    return parseFloat(total.toFixed(2));
+    return Number(total.toFixed(2));
   };
 
+  // --- Ações ---
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    
-    // Objeto limpo para o banco
     const payload = { 
       nome: formCartao.nome,
       limite: parseFloat(formCartao.limite) || 0,
@@ -136,41 +125,36 @@ const Cartoes: React.FC = () => {
 
     try {
       if (isEditing && selectedCartao) {
-        // O segredo está no 'as any' aqui para evitar o erro de 'never'
-        const { error } = await (supabase.from('cartoes') as any)
-          .update(payload)
-          .eq('id', selectedCartao.id);
-        
-        if (error) throw error;
+        await (supabase.from('cartoes') as any).update(payload).eq('id', selectedCartao.id);
       } else {
-        const { error } = await (supabase.from('cartoes') as any)
-          .insert([payload]);
-        
-        if (error) throw error;
+        await (supabase.from('cartoes') as any).insert([payload]);
       }
-      
       fetchDados();
       fecharModais();
-    } catch (error: any) {
-      alert("Erro ao salvar: " + error.message);
-    }
+    } catch (error: any) { alert(error.message); }
   }
 
   async function handleDelete(id: number) {
-    if (window.confirm('Excluir este cartão?')) {
+    if (window.confirm('Excluir este cartão permanentemente?')) {
       const { error } = await supabase.from('cartoes').delete().eq('id', id);
       if (!error) { fetchDados(); fecharModais(); }
     }
   }
 
-  const formatMoney = (v: number | string) => `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Helper para garantir 2 casas decimais e pontuação BR
+  const formatMoney = (v: number | string) => {
+    return `R$ ${Number(v).toLocaleString('pt-BR', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })}`;
+  };
 
   return (
     <div className="cartoes-container fade-in">
       <header className="cartoes-header">
         <div>
           <h1>Minha Carteira</h1>
-          <p style={{ color: '#64748b' }}>Gestão de limites e fechamento de faturas.</p>
+          <p style={{ color: '#94a3b8', fontWeight: 600 }}>Gestão inteligente de crédito.</p>
         </div>
         <button className="btn-primary" onClick={() => setShowModalCadastro(true)}>
           <Plus size={20} /> Novo Cartão
@@ -189,19 +173,19 @@ const Cartoes: React.FC = () => {
               
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <div>
-                   <span className="card-label">Crédito</span>
+                   <span className="card-label">Crédito Gold</span>
                    <div className="card-bank-name">{cartao.nome}</div>
                 </div>
-                <CreditCard size={32} opacity={0.5} />
+                <CreditCard size={35} opacity={0.4} strokeWidth={1.5} />
               </div>
 
               <div className="limit-info-wrapper">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                    <div>
-                      <small className="limit-available-label">DISPONÍVEL</small>
+                      <small className="limit-available-label">DISPONÍVEL AGORA</small>
                       <div className="limit-value">{formatMoney(disponivel)}</div>
                    </div>
-                   <div className="limit-perc-badge">{Math.round(perc)}%</div>
+                   <div style={{ fontWeight: 900, fontSize: '0.9rem', opacity: 0.8 }}>{Math.round(perc)}%</div>
                 </div>
                 <div className="progress-bar-bg">
                   <div className="progress-bar-fill" style={{ width: `${perc}%` }} />
@@ -212,62 +196,68 @@ const Cartoes: React.FC = () => {
         })}
       </div>
 
-      {selectedCartao && (
+      {(selectedCartao || showModalCadastro) && (
         <div className="modal-overlay" onClick={fecharModais}>
-          <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ padding: 0, maxWidth: '520px' }}>
-            <div className="modal-details-header" style={{ background: isEditing ? '#1e293b' : selectedCartao.cor }}>
+          <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ padding: 0, maxWidth: '520px', borderRadius: '45px' }}>
+            
+            <div className="modal-details-header" style={{ background: isEditing || showModalCadastro ? '#1e293b' : selectedCartao?.cor }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 style={{ margin: 0, color: '#fff' }}>{isEditing ? 'Editar Cartão' : selectedCartao.nome}</h2>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {!isEditing && (
+                  <h2 style={{ margin: 0 }}>
+                    {showModalCadastro ? 'Novo Cartão' : isEditing ? 'Editar Configurações' : selectedCartao?.nome}
+                  </h2>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {!isEditing && !showModalCadastro && (
                       <button onClick={() => { 
                           setIsEditing(true); 
                           setFormCartao({
-                              nome: selectedCartao.nome,
-                              limite: selectedCartao.limite.toString(),
-                              dia_fechamento: selectedCartao.dia_fechamento.toString(),
-                              dia_vencimento: selectedCartao.dia_vencimento.toString(),
-                              cor: selectedCartao.cor
+                              nome: selectedCartao!.nome,
+                              limite: selectedCartao!.limite.toString(),
+                              dia_fechamento: selectedCartao!.dia_fechamento.toString(),
+                              dia_vencimento: selectedCartao!.dia_vencimento.toString(),
+                              cor: selectedCartao!.cor
                           }); 
-                      }} className="btn-close-round"><Settings2 size={18}/></button>
+                      }} className="btn-icon-action">
+                        {/* TROCADO: Settings2 por ajustar.png */}
+                        <img src={iconAjustar} alt="Ajustar" style={{ width: '32px', height: '32px' }} />
+                      </button>
                     )}
-                    <button onClick={fecharModais} className="btn-close-round"><X size={18}/></button>
+                    <button onClick={fecharModais} className="btn-icon-action">
+                      <img src={iconFechar} alt="Fechar" style={{ width: '32px', height: '32px' }} />
+                    </button>
                   </div>
                </div>
-               {!isEditing && <div style={{ color: '#fff', opacity: 0.9 }}>Limite: {formatMoney(selectedCartao.limite)}</div>}
+               {!isEditing && !showModalCadastro && (
+                 <div style={{ marginTop: '10px', fontWeight: 700, opacity: 0.9 }}>
+                   Limite Total: {formatMoney(selectedCartao!.limite)}
+                 </div>
+               )}
             </div>
 
-            <div style={{ padding: '30px' }}>
-              {isEditing ? (
-                <form onSubmit={handleSave}>
+            <div style={{ padding: '35px' }}>
+              {isEditing || showModalCadastro ? (
+                <form id="card-form" onSubmit={handleSave}>
                   <FormFields form={formCartao} setForm={setFormCartao} />
-                  <div className="edit-actions-grid" style={{ marginTop: '20px' }}>
-                    <button type="submit" className="btn-modal-save"><Save size={18} /> Salvar</button>
-                    <button type="button" onClick={() => setIsEditing(false)} className="btn-modal-cancel"><RotateCcw size={18} /> Voltar</button>
-                    <button type="button" onClick={() => handleDelete(selectedCartao.id)} className="btn-modal-delete"><Trash2 size={18} /></button>
-                  </div>
                 </form>
               ) : (
                 <>
                   <div className="listagem-lancamentos">
+                    <h4 style={{ color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.1em' }}>Lançamentos do Mês</h4>
                     {compras
-                      .filter(c => c.cartao === selectedCartao.nome)
+                      .filter(c => c.cartao === selectedCartao?.nome)
                       .map((item, idx) => {
                         const { mesInicio, anoInicio } = getMesInicioCobranca(item, cartoes);
-                        const numParcelas = item.num_parcelas || 1;
                         let infoMes = null;
-                        for (let i = 0; i < numParcelas; i++) {
+                        for (let i = 0; i < (item.num_parcelas || 1); i++) {
                           const dP = new Date(anoInicio, mesInicio + i, 1);
                           if (dP.getMonth() === mesAtual && dP.getFullYear() === anoAtual) {
-                            infoMes = { atual: i + 1, total: numParcelas, valor: Number(item.valor_total) / numParcelas };
+                            infoMes = { atual: i + 1, total: item.num_parcelas, valor: item.valor_total / (item.num_parcelas || 1) };
                           }
                         }
-                        if (!infoMes) return null;
-                        return (
+                        return infoMes && (
                           <div key={idx} className="fatura-item">
                             <div>
                               <div className="fatura-item-desc">{item.loja || item.descricao}</div>
-                              <div className="fatura-item-sub">{item.num_parcelas > 1 ? `${infoMes.atual}/${infoMes.total}` : 'À Vista'}</div>
+                              <div className="fatura-item-sub">{item.num_parcelas > 1 ? `Parcela ${infoMes.atual}/${infoMes.total}` : 'À Vista'}</div>
                             </div>
                             <div className="fatura-item-valor">{formatMoney(infoMes.valor)}</div>
                           </div>
@@ -276,28 +266,35 @@ const Cartoes: React.FC = () => {
                   </div>
                   <div className="fatura-resumo">
                     <div>
-                      <span className="resumo-label">TOTAL NO MÊS</span>
-                      <span className="resumo-sub">Vencimento dia {selectedCartao.dia_vencimento}</span>
+                      <span className="resumo-label">TOTAL DA FATURA</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Vence dia {selectedCartao?.dia_vencimento}</span>
                     </div>
-                    <div className="fatura-valor" style={{ color: selectedCartao.cor }}>
-                      {formatMoney(calcularTotalMes(selectedCartao.nome))}
+                    <div className="fatura-valor" style={{ color: selectedCartao?.cor }}>
+                      {formatMoney(calcularTotalMes(selectedCartao!.nome))}
                     </div>
                   </div>
                 </>
               )}
             </div>
-          </div>
-        </div>
-      )}
 
-      {showModalCadastro && (
-        <div className="modal-overlay" onClick={fecharModais}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3>Novo Cartão</h3>
-            <form onSubmit={handleSave}>
-                <FormFields form={formCartao} setForm={setFormCartao} />
-                <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '20px' }}>Criar Cartão</button>
-            </form>
+            {(isEditing || showModalCadastro) && (
+              <div className="modal-footer-icons">
+                {isEditing ? (
+                  <button type="button" className="btn-icon-action" onClick={() => handleDelete(selectedCartao!.id)}>
+                    <img src={iconExcluir} alt="Excluir" title="Excluir Cartão" />
+                  </button>
+                ) : <div />}
+                
+                <div className="footer-right-actions">
+                  <button type="button" className="btn-icon-action" onClick={() => isEditing ? setIsEditing(false) : fecharModais()}>
+                    <img src={iconCancelar} alt="Cancelar" title="Cancelar" />
+                  </button>
+                  <button type="submit" form="card-form" className="btn-icon-action">
+                    <img src={iconConfirme} alt="Salvar" title="Salvar Cartão" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -305,29 +302,30 @@ const Cartoes: React.FC = () => {
   );
 };
 
+// --- Subcomponente de Campos ---
 const FormFields = ({ form, setForm }: any) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
     <div className="form-group">
-      <label>Banco</label>
-      <input className="form-control" required value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} />
+      <label>Instituição Financeira</label>
+      <input className="form-control" placeholder="Ex: Nubank, Inter..." required value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} />
     </div>
     <div className="form-group">
-      <label>Limite Total</label>
+      <label>Limite de Crédito</label>
       <input className="form-control" type="number" step="0.01" required value={form.limite} onChange={e => setForm({...form, limite: e.target.value})} />
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
       <div className="form-group">
          <label>Dia Fechamento</label>
-         <input className="form-control" type="number" value={form.dia_fechamento} onChange={e => setForm({...form, dia_fechamento: e.target.value})} />
+         <input className="form-control" type="number" min="1" max="31" value={form.dia_fechamento} onChange={e => setForm({...form, dia_fechamento: e.target.value})} />
       </div>
       <div className="form-group">
          <label>Dia Vencimento</label>
-         <input className="form-control" type="number" value={form.dia_vencimento} onChange={e => setForm({...form, dia_vencimento: e.target.value})} />
+         <input className="form-control" type="number" min="1" max="31" value={form.dia_vencimento} onChange={e => setForm({...form, dia_vencimento: e.target.value})} />
       </div>
     </div>
     <div className="form-group">
-      <label>Cor</label>
-      <input type="color" className="form-control" value={form.cor} onChange={e => setForm({...form, cor: e.target.value})} style={{ height: '40px' }} />
+      <label>Cor de Identificação</label>
+      <input type="color" className="form-control" value={form.cor} onChange={e => setForm({...form, cor: e.target.value})} style={{ height: '50px', padding: '5px' }} />
     </div>
   </div>
 );
