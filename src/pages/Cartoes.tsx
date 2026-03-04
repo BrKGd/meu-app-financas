@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { CreditCard, Plus } from 'lucide-react';
+import { CreditCard, Plus, Settings2 } from 'lucide-react'; 
 import '../styles/Cartoes.css';
 
 // Importação das imagens
@@ -8,8 +8,6 @@ import iconConfirme from '../assets/confirme.png';
 import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
-import iconAjustar from '../assets/ajustar.png'; // Novo ícone importado
-import iconEditar from '../assets/editar.png'; // Novo ícone importado
 
 // --- Interfaces ---
 interface Cartao {
@@ -46,6 +44,18 @@ const Cartoes: React.FC = () => {
 
   const mesAtual = new Date().getMonth();
   const anoAtual = new Date().getFullYear();
+
+  // --- FUNÇÃO EXCLUSIVA PARA O SETTINGS2 ---
+  const getSettingsColor = (hexcolor: string) => {
+    if (!hexcolor) return '#ffffff';
+    const hex = hexcolor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    // Fórmula YIQ para decidir se o ícone deve ser preto ou branco
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 128 ? '#000000' : '#ffffff';
+  };
 
   const fecharModais = useCallback(() => {
     setShowModalCadastro(false);
@@ -141,7 +151,6 @@ const Cartoes: React.FC = () => {
     }
   }
 
-  // Helper para garantir 2 casas decimais e pontuação BR
   const formatMoney = (v: number | string) => {
     return `R$ ${Number(v).toLocaleString('pt-BR', { 
       minimumFractionDigits: 2, 
@@ -217,8 +226,11 @@ const Cartoes: React.FC = () => {
                               cor: selectedCartao!.cor
                           }); 
                       }} className="btn-icon-action">
-                        {/* TROCADO: Settings2 por ajustar.png */}
-                        <img src={iconAjustar} alt="Ajustar" style={{ width: '32px', height: '32px' }} />
+                        {/* UNICO ELEMENTO MANIPULADO DINAMICAMENTE */}
+                        <Settings2 
+                          size={32} 
+                          color={getSettingsColor(selectedCartao!.cor)} 
+                        />
                       </button>
                     )}
                     <button onClick={fecharModais} className="btn-icon-action">
