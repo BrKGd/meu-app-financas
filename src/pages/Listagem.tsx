@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
-  ChevronLeft, ChevronRight, Trash2, X, Save, 
+  ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
   Tag, ShoppingBag, Landmark
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
+import iconConfirme from '../assets/confirme.png';
+import iconExcluir from '../assets/excluir.png';
+import iconCancelar from '../assets/cancelar.png';
+import iconFechar from '../assets/fechar.png';
 
 // --- Interfaces para Tipagem ---
 interface ItemCompra {
@@ -167,7 +171,7 @@ const Listagem: React.FC = () => {
   }, [carregarDadosIniciais]);
 
   const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!isProprietario || !itemParaEditar) return;
 
     const isCredito = itemParaEditar.forma_pagamento === 'Crédito';
@@ -312,7 +316,9 @@ const Listagem: React.FC = () => {
           <div className="edit-modal-content">
             <div className="modal-fixed-header">
               <h3>{isProprietario ? 'Editar Gasto' : 'Detalhes do Gasto'}</h3>
-              <button onClick={() => setItemParaEditar(null)} className="btn-close-round"><X size={20}/></button>
+              <button onClick={() => setItemParaEditar(null)} className="btn-icon-action">
+                  <img src={iconFechar} alt="Fechar" title="Fechar" />
+              </button>
             </div>
 
             <div className="modal-scrollable-body">
@@ -396,13 +402,20 @@ const Listagem: React.FC = () => {
             </div>
 
             {isProprietario && (
-              <div className="modal-fixed-footer-dual">
-                <button type="button" className="btn-footer-delete" onClick={() => confirmDelete(itemParaEditar.id)}>
-                  <Trash2 size={18} /> Excluir
+              <div className="modal-footer-icons">
+                <button type="button" className="btn-icon-action btn-delete" onClick={() => confirmDelete(itemParaEditar.id)}>
+                  <img src={iconExcluir} alt="Excluir" />
                 </button>
-                <button type="submit" form="edit-form" className="btn-footer-save">
-                  <Save size={18} /> Salvar
+                
+                <div className="footer-right-actions">
+                <button type="button" className="btn-icon-action" onClick={() => setItemParaEditar(null)}>
+                  <img src={iconCancelar} alt="Cancelar" />
                 </button>
+
+                <button type="submit" form="edit-form" className="btn-icon-action">
+                  <img src={iconConfirme} alt="Salvar" />
+                </button>
+                </div>
               </div>
             )}
           </div>
