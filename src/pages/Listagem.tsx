@@ -310,9 +310,11 @@ const Listagem: React.FC = () => {
               </div>
             ))}
           </div>
+          <div className="resumo-badges-list">
           <div className="total-geral-badge">
             <span className="badge-nome">Total Geral:</span>
             <span className="badge-valor">{formatarMoedaVisual(totalGeralMes)}</span>
+          </div>
           </div>
         </div>
       )}

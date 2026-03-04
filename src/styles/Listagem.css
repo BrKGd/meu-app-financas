@@ -198,8 +198,9 @@
 .total-geral-badge {
   background: #4361ee;
   border-color: #4361ee;
-  padding: 10px 22px; /* Destaque maior no preenchimento do total */
+  padding: 6px 16px; /* Destaque maior no preenchimento do total */
   box-shadow: 0 10px 25px rgba(67, 97, 238, 0.25);
+  border-radius: 100px;
 }
 
 .total-geral-badge .badge-nome {
@@ -340,7 +341,7 @@
 @media (max-width: 768px) {
   .listagem-container { padding: 20px; }
   .grid-form { grid-template-columns: 1fr; }
-  .modal-fixed-footer-dual { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .modal-fixed-footer-dual { grid-template-columns: 1fr; gap: 12px; }
   .nav-info { min-width: 100px; }
   .custom-table { min-width: 900px; }
   .total-geral-wrapper { justify-content: center; } /* Centraliza no mobile */
