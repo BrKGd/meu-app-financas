@@ -1,5 +1,6 @@
-import React from 'react'
-import { useRegisterSW } from 'virtual:pwa-register/react'
+import React from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
+import '../styles/ReloadPrompt.css'; // Importando o novo estilo
 
 const ReloadPrompt: React.FC = () => {
   const {
@@ -8,39 +9,44 @@ const ReloadPrompt: React.FC = () => {
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r) {
-      console.log('SW Registered: ' + r)
+      console.log('PWA registrado');
     },
     onRegisterError(error) {
-      console.log('SW registration error', error)
+      console.error('Erro no PWA', error);
     },
-  })
+  });
 
   const close = () => {
-    setOfflineReady(false)
-    setNeedRefresh(false)
-  }
+    setOfflineReady(false);
+    setNeedRefresh(false);
+  };
+
+  if (!offlineReady && !needRefresh) return null;
 
   return (
-    <div className="reload-prompt-container">
-      {(offlineReady || needRefresh) && (
-        <div className="reload-prompt">
-          <div className="message">
-            {offlineReady ? (
-              <span>App pronto para uso offline!</span>
-            ) : (
-              <span>Nova versão disponível! Clique no botão para atualizar.</span>
-            )}
-          </div>
+    <div className="reload-prompt-wrapper">
+      <div className="reload-prompt-badge">
+        <div className="reload-prompt-message">
+          {offlineReady ? (
+            "🚀 App pronto para uso offline!"
+          ) : (
+            "✨ Nova versão disponível com melhorias!"
+          )}
+        </div>
+        
+        <div className="reload-prompt-actions">
           {needRefresh && (
-            <button className="reload-button" onClick={() => updateServiceWorker(true)}>
-              Atualizar Agora
+            <button className="btn-update" onClick={() => updateServiceWorker(true)}>
+              Atualizar
             </button>
           )}
-          <button className="close-button" onClick={() => close()}>Fechar</button>
+          <button className="btn-close" onClick={close}>
+            {offlineReady ? "Entendi" : "Depois"}
+          </button>
         </div>
-      )}
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default ReloadPrompt
+export default ReloadPrompt;
