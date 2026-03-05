@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Filter, X, Calendar, Tag, Landmark, Save, Trash2, User,
-  ChevronLeft, ChevronRight, Loader2, Target, TrendingUp
+  ChevronLeft, ChevronRight, Loader2, Target, TrendingUp, Lock
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Proventos.css';
@@ -46,9 +46,11 @@ const Proventos: React.FC = () => {
   const [tetoMetas, setTetoMetas] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editandoItem, setEditandoItem] = useState<Provento | null>(null);
+  
+  const [userRole, setUserRole] = useState<'comum' | 'administrador' | 'proprietario'>('comum');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Estados de Filtro
   const [dataFiltro, setDataFiltro] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -81,11 +83,31 @@ const Proventos: React.FC = () => {
   const buscarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const mesAlvo = dataFiltro.getMonth() + 1; // Supabase/JS Date alignment
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      setCurrentUserId(user.id);
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tipo_usuario')
+        .eq('id', user.id)
+        .single();
+      
+      const role = profile?.tipo_usuario || 'comum';
+      setUserRole(role);
+
+      const mesAlvo = dataFiltro.getMonth() + 1;
       const anoAlvo = dataFiltro.getFullYear();
 
+      let queryProventos = (supabase.from('proventos') as any).select('*');
+      
+      if (role === 'comum') {
+        queryProventos = queryProventos.eq('user_id', user.id);
+      }
+
       const [resProvs, resCats, resProfs, resMetas] = await Promise.all([
-        (supabase.from('proventos') as any).select('*').order('data_recebimento', { ascending: false }),
+        queryProventos.order('data_recebimento', { ascending: false }),
         (supabase.from('categorias') as any).select('*').eq('tipo', 'provento').order('nome'),
         (supabase.from('profiles') as any).select('id, nome').order('nome'),
         (supabase.from('metas') as any).select('valor_meta, tipo_meta').eq('mes_referencia', mesAlvo).eq('ano_referencia', anoAlvo)
@@ -94,7 +116,6 @@ const Proventos: React.FC = () => {
       setCategorias(resCats.data || []);
       setResponsaveis(resProfs.data || []);
 
-      // Cálculo do teto baseado nas metas de provento
       const somaMetas = (resMetas.data as Meta[] || [])
         .filter(m => m.tipo_meta === 'provento')
         .reduce((acc, cur) => acc + parseFloat(cur.valor_meta), 0);
@@ -149,7 +170,7 @@ const Proventos: React.FC = () => {
 
   const abrirModalNovo = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    setEditandoId(null);
+    setEditandoItem(null);
     setForm({ 
       descricao: '', 
       valor_exibicao: 'R$ 0,00', 
@@ -161,7 +182,14 @@ const Proventos: React.FC = () => {
   };
 
   const abrirModalEditar = (item: Provento) => {
-    setEditandoId(item.id);
+    // NOVA TRAVA: Se for administrador mas não for o dono do registro, impede a edição
+    const isOwner = item.user_id === currentUserId;
+    if (userRole === 'administrador' && !isOwner) {
+      alertar('warning', 'Acesso Negado', 'Administradores só podem editar seus próprios lançamentos.');
+      return;
+    }
+
+    setEditandoItem(item);
     setForm({
       descricao: item.descricao,
       valor_exibicao: formatMoney(item.valor),
@@ -177,6 +205,7 @@ const Proventos: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
       const valorLimpo = Number(form.valor_exibicao.replace(/\D/g, '')) / 100;
 
       const dadosProvento = {
@@ -184,12 +213,12 @@ const Proventos: React.FC = () => {
         descricao: form.descricao,
         valor: valorLimpo,
         categoria: form.categoria_nome,
-        responsavel_id: form.responsavel_id,
+        responsavel_id: userRole === 'administrador' ? user.id : form.responsavel_id,
         data_recebimento: form.data
       };
 
-      const { error } = editandoId 
-        ? await (supabase.from('proventos') as any).update(dadosProvento).eq('id', editandoId)
+      const { error } = editandoItem 
+        ? await (supabase.from('proventos') as any).update(dadosProvento).eq('id', editandoItem.id)
         : await (supabase.from('proventos') as any).insert([dadosProvento]);
 
       if (error) throw error;
@@ -201,12 +230,14 @@ const Proventos: React.FC = () => {
 
   const confirmarExclusao = () => {
     alertar('danger', 'Excluir Registro?', 'Esta ação não pode ser desfeita.', async () => {
-      if (!editandoId) return;
-      const { error } = await (supabase.from('proventos') as any).delete().eq('id', editandoId);
+      if (!editandoItem) return;
+      const { error } = await (supabase.from('proventos') as any).delete().eq('id', editandoItem.id);
       if (!error) {
         setShowModal(false);
         setFeedback(prev => ({ ...prev, isOpen: false }));
         buscarDados();
+      } else {
+        alertar('error', 'Erro ao excluir', 'Você não tem permissão para excluir este registro.');
       }
     });
   };
@@ -257,6 +288,10 @@ const Proventos: React.FC = () => {
         .form-group input:focus, .form-group select:focus {
           border-color: #10b981; background: white;
         }
+        
+        .form-group select:disabled {
+          cursor: not-allowed; opacity: 0.7; background: #f1f5f9;
+        }
 
         .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -268,6 +303,16 @@ const Proventos: React.FC = () => {
             box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.2);
             position: relative;
             overflow: hidden;
+        }
+
+        /* Estilo para itens bloqueados */
+        .prov-item-row.locked {
+          cursor: not-allowed;
+          opacity: 0.8;
+        }
+        .prov-item-row.locked:hover {
+          background: #f8fafc;
+          transform: none;
         }
 
         @media (max-width: 480px) {
@@ -282,14 +327,13 @@ const Proventos: React.FC = () => {
           <header className="prov-panel prov-header-area">
             <div className="prov-title-area">
               <h1>Central de Proventos</h1>
-              <p>Gestão de Entradas e Rendas</p>
+              <p>{userRole === 'comum' ? 'Meus Recebimentos' : 'Gestão Geral de Entradas'}</p>
             </div>
           </header>
 
-          {/* Card Estilo Imagem - Identidade Verde */}
           <section className="card-progresso-container">
             <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Total Recebido no Mês
+                Total {userRole === 'comum' ? 'Meu' : 'Lançado'} no Mês
             </span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0' }}>
                 <h2 style={{ fontSize: '2.4rem', fontWeight: 900, margin: 0 }}>
@@ -307,7 +351,6 @@ const Proventos: React.FC = () => {
           </section>
         </div>
 
-        {/* Barra de Filtros */}
         <div className="filter-container-premium" style={{ margin: '20px 0' }}>
           <div className="search-wrapper" style={{ display: 'flex', gap: '10px', background: 'white', padding: '10px 15px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
             <input type="text" placeholder="Pesquisar provento..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem' }} />
@@ -338,7 +381,6 @@ const Proventos: React.FC = () => {
           )}
         </div>
 
-        {/* Main List */}
         <main className="prov-panel" style={{padding: 0, background: 'transparent', boxShadow: 'none'}}>
           {loading ? (
             <div className="prov-panel" style={{padding: '40px', textAlign: 'center', background: 'white', borderRadius: '24px'}}>
@@ -352,33 +394,43 @@ const Proventos: React.FC = () => {
                   <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#10b981'}}>{formatMoney(itens.reduce((acc, curr) => acc + (curr.valor || 0), 0))}</span>
                 </div>
                 <div className="prov-panel-list" style={{borderRadius: '0 0 16px 16px', background: 'white'}}>
-                  {itens.map((item, idx) => (
-                    <div key={`${item.id}-${idx}`} className="prov-item-row" onClick={() => abrirModalEditar(item)}>
-                      <div className="prov-icon-column">
-                        <div className="prov-icon-box" style={{ background: '#10b98115', color: '#10b981' }}><Landmark size={20} /></div>
-                      </div>
-                      <div className="prov-main-content">
-                        <div className="prov-top-line">
-                          <span className="prov-desc">{item.descricao}</span>
-                          <span className="prov-value value-positive" style={{ color: '#10b981' }}>{formatMoney(item.valor)}</span>
+                  {itens.map((item, idx) => {
+                    const isOwner = item.user_id === currentUserId;
+                    const canEdit = userRole !== 'administrador' || isOwner;
+
+                    return (
+                      <div 
+                        key={`${item.id}-${idx}`} 
+                        className={`prov-item-row ${!canEdit ? 'locked' : ''}`}
+                        onClick={() => canEdit ? abrirModalEditar(item) : abrirModalEditar(item)} // O alert interno lidará com o aviso
+                      >
+                        <div className="prov-icon-column">
+                          <div className="prov-icon-box" style={{ background: isOwner ? '#10b98115' : '#f1f5f9', color: isOwner ? '#10b981' : '#94a3b8' }}>
+                            {canEdit ? <Landmark size={20} /> : <Lock size={18} />}
+                          </div>
                         </div>
-                        <div className="prov-meta-line">
-                          <span className="meta-tag"><Calendar size={12} /> {item.data_recebimento.split('-').reverse().slice(0,2).join('/')}</span>
-                          <span className="meta-divider">•</span>
-                          <span className="meta-tag"><Tag size={12} /> {item.categoria}</span>
-                          <span className="meta-divider">•</span>
-                          <span className="meta-tag"><User size={12} /> {responsaveis.find(r => r.id === item.responsavel_id)?.nome.split(' ')[0]}</span>
+                        <div className="prov-main-content">
+                          <div className="prov-top-line">
+                            <span className="prov-desc">{item.descricao}</span>
+                            <span className="prov-value value-positive" style={{ color: '#10b981' }}>{formatMoney(item.valor)}</span>
+                          </div>
+                          <div className="prov-meta-line">
+                            <span className="meta-tag"><Calendar size={12} /> {item.data_recebimento.split('-').reverse().slice(0,2).join('/')}</span>
+                            <span className="meta-divider">•</span>
+                            <span className="meta-tag"><Tag size={12} /> {item.categoria}</span>
+                            <span className="meta-divider">•</span>
+                            <span className="meta-tag"><User size={12} /> {responsaveis.find(r => r.id === item.responsavel_id)?.nome.split(' ')[0] || 'N/A'}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))
           )}
         </main>
 
-        {/* Modal de Edição */}
         {showModal && (
           <div className="modal-overlay" onClick={() => setShowModal(false)} style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -387,7 +439,7 @@ const Proventos: React.FC = () => {
           }}>
             <form className="prov-edit-modal" onClick={e => e.stopPropagation()} onSubmit={handleSalvar}>
               <div className="modal-header-actions">
-                <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.2rem'}}>{editandoId ? 'Editar Provento' : 'Novo Recebimento'}</h2>
+                <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.2rem'}}>{editandoItem ? 'Editar Provento' : 'Novo Recebimento'}</h2>
                 <button type="button" onClick={() => setShowModal(false)} className="btn-png-action">
                   <img src={iconFechar} alt="Fechar" />
                 </button>
@@ -419,16 +471,35 @@ const Proventos: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label>Responsável</label>
-                    <select value={form.responsavel_id} onChange={e => setForm({...form, responsavel_id: e.target.value})} required>
-                      <option value="">Selecione...</option>
-                      {responsaveis.map(resp => <option key={resp.id} value={resp.id}>{resp.nome}</option>)}
+                    <select 
+                      value={form.responsavel_id} 
+                      onChange={e => setForm({...form, responsavel_id: e.target.value})} 
+                      required
+                      disabled={userRole === 'administrador'}
+                    >
+                      {userRole === 'administrador' ? (
+                        <option value={currentUserId || ''}>
+                          {responsaveis.find(r => r.id === currentUserId)?.nome || 'Eu mesmo'}
+                        </option>
+                      ) : (
+                        <>
+                          <option value="">Selecione...</option>
+                          {responsaveis.map(resp => <option key={resp.id} value={resp.id}>{resp.nome}</option>)}
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>
               </div>
 
               <div className="modal-footer-btns">
-                <button type="button" className="btn-png-action" onClick={confirmarExclusao} style={{ visibility: editandoId ? 'visible' : 'hidden' }}>
+                {/* Botão de excluir só aparece se for o dono do registro */}
+                <button 
+                  type="button" 
+                  className="btn-png-action" 
+                  onClick={confirmarExclusao} 
+                  style={{ visibility: (editandoItem && editandoItem.user_id === currentUserId) ? 'visible' : 'hidden' }}
+                >
                   <img src={iconExcluir} alt="Excluir" />
                 </button>
                 <div style={{display: 'flex', gap: '20px'}}>
