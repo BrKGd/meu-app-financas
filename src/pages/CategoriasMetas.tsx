@@ -1,10 +1,19 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
-  Plus, X, Tag, Palette, Edit2, Target, Loader2, Save,
-  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star, Trash2 
+  Plus, Tag, Edit2, Target, Loader2,
+  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star
 } from 'lucide-react';
+
+// Componentes e Estilos
+import ModalFeedback, { ModalType } from '../components/ModalFeedback';
 import '../styles/CategoriasMetas.css';
+
+// Assets PNG
+import iconConfirme from '../assets/confirme.png';
+import iconExcluir from '../assets/excluir.png';
+import iconCancelar from '../assets/cancelar.png';
+import iconFechar from '../assets/fechar.png';
 
 // --- Interfaces ---
 interface Categoria {
@@ -20,7 +29,7 @@ interface Meta {
   user_id: string;
   categoria_id: string;
   nome_meta: string;
-  valor_meta: string | number;
+  valor_meta: number;
   tipo_meta: string;
   mes_referencia: number;
   ano_referencia: number;
@@ -36,17 +45,28 @@ const CategoriasMetas: React.FC = () => {
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
   const [ano, setAno] = useState<number>(new Date().getFullYear());
 
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [editMode, setEditMode] = useState<boolean>(false);
-  
-  // Tipagem explícita para o estado
-  const [selectedItem, setSelectedItem] = useState<Meta | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
   
   const [form, setForm] = useState({ 
     nome: '', 
     cor: '#4361ee', 
     valor_meta: '' as string | number
   });
+
+  // --- ESTADO PARA O MODAL FEEDBACK ---
+  const [feedback, setFeedback] = useState<{
+    isOpen: boolean;
+    type: ModalType;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({ isOpen: false, type: 'success', title: '', message: '' });
+
+  // Função auxiliar para disparar o feedback
+  const alertar = (type: ModalType, title: string, message: string, onConfirm?: () => void) => {
+    setFeedback({ isOpen: true, type, title, message, onConfirm });
+  };
 
   const buscarDados = useCallback(async () => {
     setLoading(true);
@@ -75,29 +95,35 @@ const CategoriasMetas: React.FC = () => {
     buscarDados();
   }, [buscarDados]);
 
-  const itemsFiltrados = useMemo(() => {
-    return metasMes.filter(m => m.tipo_meta === activeTab);
-  }, [metasMes, activeTab]);
+  const cardsParaExibir = useMemo(() => {
+    const categoriasFiltradas = categorias.filter(c => c.tipo === activeTab);
+    return categoriasFiltradas.map(cat => {
+      const metaEncontrada = metasMes.find(m => m.categoria_id === cat.id);
+      return {
+        categoria_id: cat.id,
+        id_meta: metaEncontrada?.id || null,
+        nome: cat.nome,
+        cor: cat.cor,
+        valor_meta: metaEncontrada?.valor_meta || 0,
+        existe_meta: !!metaEncontrada
+      };
+    });
+  }, [categorias, metasMes, activeTab]);
 
-  const openModal = (meta: Meta | null = null) => {
-    if (meta) {
-      setEditMode(true);
-      setSelectedItem(meta);
+  const openModal = (item: any = null) => {
+    if (item) {
+      setSelectedItem(item);
       setForm({
-        nome: meta.nome_meta || '',
-        cor: meta.cor_meta || (activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee'),
-        valor_meta: meta.valor_meta
+        nome: item.nome,
+        cor: item.cor,
+        valor_meta: item.existe_meta ? item.valor_meta : ''
       });
     } else {
-      setEditMode(false);
       setSelectedItem(null);
-      setForm({ 
-        nome: '', 
-        cor: activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee', 
-        valor_meta: ''
-      });
+      const corPadrao = activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee';
+      setForm({ nome: '', cor: corPadrao, valor_meta: '' });
     }
-    setShowModal(true);
+    setIsModalOpen(true);
   };
 
   async function handleSalvar(e: React.FormEvent) {
@@ -107,42 +133,19 @@ const CategoriasMetas: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Usamos uma variável auxiliar para evitar problemas de escopo/tipo
-      let categoriaId = '';
-      
-      // Criamos uma referência tipada para o selectedItem
-      const itemAtual = selectedItem as Meta | null;
+      let currentCatId = selectedItem?.categoria_id;
 
-      if (!editMode || (editMode && itemAtual && form.nome !== itemAtual.nome_meta)) {
-        const { data: catExistente } = await supabase
-          .from('categorias')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('nome', form.nome)
-          .eq('tipo', activeTab === 'pessoal' ? 'despesa' : activeTab)
-          .maybeSingle() as { data: { id: string } | null };
-
-        if (catExistente) {
-          categoriaId = catExistente.id;
-        } else {
-          const { data: newCat, error: catErr } = await (supabase.from('categorias') as any)
-            .insert({ 
-              nome: form.nome, 
-              tipo: activeTab === 'pessoal' ? 'despesa' : activeTab, 
-              cor: form.cor, 
-              user_id: user.id 
-            })
-            .select().single();
-          if (catErr) throw catErr;
-          categoriaId = newCat.id;
-        }
-      } else if (itemAtual) {
-        categoriaId = itemAtual.categoria_id;
+      if (!currentCatId) {
+        const { data: newCat, error: catErr } = await (supabase.from('categorias') as any)
+          .insert({ nome: form.nome, tipo: activeTab, cor: form.cor, user_id: user.id })
+          .select().single();
+        if (catErr) throw catErr;
+        currentCatId = newCat.id;
       }
 
       const metaPayload: any = {
         user_id: user.id,
-        categoria_id: categoriaId,
+        categoria_id: currentCatId,
         valor_meta: parseFloat(form.valor_meta.toString()) || 0,
         tipo_meta: activeTab,
         mes_referencia: mes,
@@ -151,163 +154,194 @@ const CategoriasMetas: React.FC = () => {
         cor_meta: form.cor
       };
 
-      // CORREÇÃO DEFINITIVA DO ERRO NA LINHA 122
-      // Forçamos o TypeScript a entender que itemAtual tem a propriedade id
-      if (editMode && itemAtual && (itemAtual as any).id) {
-        metaPayload.id = (itemAtual as any).id;
-      }
+      if (selectedItem?.id_meta) metaPayload.id = selectedItem.id_meta;
 
       const { error: metaErr } = await (supabase.from('metas') as any).upsert(metaPayload);
       if (metaErr) throw metaErr;
 
-      setShowModal(false);
+      setIsModalOpen(false);
       buscarDados();
+      // Feedback de Sucesso ao salvar
+      alertar('success', 'Tudo pronto!', 'Seu planejamento foi atualizado com sucesso.');
     } catch (error: any) {
-      alert("Erro ao salvar: " + error.message);
+      alertar('error', 'Ops!', 'Erro ao salvar: ' + error.message);
     } finally {
       setLoading(false);
     }
   }
 
-  async function excluirMeta() {
-    const itemParaExcluir = selectedItem as Meta | null;
-    if (itemParaExcluir?.id && window.confirm("Deseja remover este planejamento do mês?")) {
-      try {
-        await (supabase.from('metas') as any).delete().eq('id', itemParaExcluir.id);
-        setShowModal(false);
-        buscarDados();
-      } catch (error) {
-        console.error("Erro ao excluir:", error);
-      }
-    }
-  }
+  const handleExcluirCascata = () => {
+    if (!selectedItem?.categoria_id) return;
 
-  const formatCurrency = (val: number | string) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val) || 0);
+    // Uso do ModalFeedback para confirmação de exclusão (Danger)
+    alertar(
+      'danger', 
+      'Confirmar Exclusão', 
+      `Isso apagará permanentemente a categoria "${selectedItem.nome}" e todas as metas relacionadas a ela. Deseja continuar?`,
+      async () => {
+        setLoading(true);
+        try {
+          // Exclui metas primeiro (integridade referencial)
+          await supabase.from('metas').delete().eq('categoria_id', selectedItem.categoria_id);
+          // Exclui a categoria
+          const { error: catErr } = await supabase.from('categorias').delete().eq('id', selectedItem.categoria_id);
+          
+          if (catErr) throw catErr;
+
+          setIsModalOpen(false);
+          buscarDados();
+          // Alerta opcional de sucesso após excluir
+          alertar('success', 'Excluído', 'A categoria e seus dados foram removidos.');
+        } catch (error: any) {
+          alertar('error', 'Erro', 'Não foi possível excluir: ' + error.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    );
   };
 
   return (
-    <div className="cat-page-wrapper metas-container">
-      <button className="cat-fab" onClick={() => openModal()} title="Novo Planejamento">
-        <Plus size={30} />
-      </button>
+    <>
+      <style>{`
+        .edit-modal {
+          width: 95%; max-width: 500px; background: white; border-radius: 28px;
+          padding: 24px; position: relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+          z-index: 1001; display: flex; flex-direction: column;
+        }
+        .edit-form-grid { display: flex; flex-direction: column; gap: 16px; }
+        .form-group label {
+          font-size: 0.65rem; font-weight: 800; color: #64748b;
+          margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .form-group input {
+          width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px;
+          font-size: 0.95rem; outline: none; background: #f8fafc; transition: all 0.2s;
+        }
+        .form-group input:focus { border-color: #4361ee; background: white; }
+        .modal-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .modal-footer-btns {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;
+        }
+        .btn-png-action { background: none; border: none; cursor: pointer; padding: 0; transition: transform 0.2s; }
+        .btn-png-action img { width: 38px; height: 38px; object-fit: contain; }
+        .btn-png-action:hover { transform: scale(1.1); }
+        .color-preview-wrapper {
+          display: flex; align-items: center; gap: 12px; background: #f8fafc;
+          padding: 8px 12px; border-radius: 12px; border: 1.5px solid #e2e8f0;
+        }
+        .input-color-circle { width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer; }
+        @media (max-width: 480px) {
+          .edit-modal { width: 100%; border-radius: 24px 24px 0 0; position: fixed; bottom: 0; }
+          .modal-overlay { align-items: flex-end; }
+        }
+      `}</style>
 
-      <header className="metas-header">
-        <div className="cat-title-area">
-          <div className="titulo-secao">
-            <Target size={28} color="#4361ee" />
-            <h1>Planejamento</h1>
+      <div className="cat-page-wrapper metas-container">
+        <button className="cat-fab" onClick={() => openModal()} title="Nova Categoria"><Plus size={30} /></button>
+
+        <header className="metas-header">
+          <div className="cat-title-area">
+            <div className="titulo-secao"><Target size={28} color="#4361ee" /><h1>Planejamento</h1></div>
+            <p>Gerencie suas metas de {activeTab === 'despesa' ? 'gastos' : activeTab === 'provento' ? 'receitas' : 'objetivos'}</p>
           </div>
-          <p>Gerencie metas de {activeTab === 'despesa' ? 'Gastos' : activeTab === 'provento' ? 'Receitas' : 'Objetivos'}</p>
-        </div>
-        
-        <div className="seletor-periodo">
-          <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}><ChevronLeft size={20}/></button>
-          <span>
-            {new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(ano, mes - 1))} {ano}
-          </span>
-          <button onClick={() => setMes(m => m === 12 ? 1 : m + 1)}><ChevronRight size={20}/></button>
-        </div>
-      </header>
+          <div className="seletor-periodo">
+            <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}><ChevronLeft size={20}/></button>
+            <span>{new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(ano, mes - 1))} {ano}</span>
+            <button onClick={() => setMes(m => m === 12 ? 1 : m + 1)}><ChevronRight size={20}/></button>
+          </div>
+        </header>
 
-      <nav className="metas-tabs">
-        <button className={activeTab === 'despesa' ? 'active' : ''} onClick={() => setActiveTab('despesa')}>
-          <TrendingDown size={18} /> Gastos
-        </button>
-        <button className={activeTab === 'provento' ? 'active' : ''} onClick={() => setActiveTab('provento')}>
-          <DollarSign size={18} /> Receitas
-        </button>
-        <button className={activeTab === 'pessoal' ? 'active' : ''} onClick={() => setActiveTab('pessoal')}>
-          <Star size={18} /> Objetivos
-        </button>
-      </nav>
+        <nav className="metas-tabs">
+          <button className={activeTab === 'despesa' ? 'active' : ''} onClick={() => setActiveTab('despesa')}><TrendingDown size={18} /> Gastos</button>
+          <button className={activeTab === 'provento' ? 'active' : ''} onClick={() => setActiveTab('provento')}><DollarSign size={18} /> Receitas</button>
+          <button className={activeTab === 'pessoal' ? 'active' : ''} onClick={() => setActiveTab('pessoal')}><Star size={18} /> Objetivos</button>
+        </nav>
 
-      <div className="cat-list-container metas-content">
-        {loading ? (
-          <div className="cat-status"><Loader2 className="spinner" /> Sincronizando dados...</div>
-        ) : itemsFiltrados.length > 0 ? (
-          <div className="grid-metas-cats">
-            {itemsFiltrados.map(meta => {
-              const cor = meta.cor_meta || '#4361ee';
-              return (
-                <div key={meta.id} className="cat-item-row" onClick={() => openModal(meta)}>
+        <div className="cat-list-container metas-content">
+          {loading ? (
+            <div className="cat-status"><Loader2 className="spinner" /> Carregando...</div>
+          ) : (
+            <div className="grid-metas-cats">
+              {cardsParaExibir.map((item) => (
+                <div key={item.categoria_id} className="cat-item-row" onClick={() => openModal(item)}>
                   <div className="cat-item-main">
-                    <div className="cat-status-dot" style={{ backgroundColor: cor }}></div>
+                    <div className="cat-status-dot" style={{ backgroundColor: item.cor }}></div>
                     <div className="cat-info-text">
-                      <span className="cat-item-name" style={{ color: cor }}>{meta.nome_meta}</span>
+                      <span className="cat-item-name" style={{ color: item.cor }}>{item.nome}</span>
                       <span className="cat-item-meta">
-                        Meta: <strong>{formatCurrency(meta.valor_meta)}</strong>
+                        {item.existe_meta 
+                          ? <strong>{Number(item.valor_meta).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+                          : <span className="txt-pendente">Definir meta</span>
+                        }
                       </span>
                     </div>
                   </div>
                   <Edit2 size={16} className="cat-edit-icon" />
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="cat-empty">Nenhuma meta definida para este mês.</div>
-        )}
-      </div>
-
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="cat-modal fade-in" onClick={e => e.stopPropagation()}>
-            <div className="cat-modal-header">
-              <h3>{editMode ? 'Editar' : 'Nova'} Meta</h3>
-              <button onClick={() => setShowModal(false)}><X size={20}/></button>
+              ))}
             </div>
+          )}
+        </div>
 
-            <form onSubmit={handleSalvar} className="cat-modal-form">
-              <div className="cat-input-box">
-                <label><Tag size={14}/> Nome</label>
-                <input 
-                  type="text" required value={form.nome} 
-                  onChange={e => setForm({...form, nome: e.target.value})} 
-                  placeholder="Ex: Alimentação, Viagem, Reserva..."
-                />
+        {/* Modal de Edição */}
+        {isModalOpen && (
+          <div className="modal-overlay" onClick={() => setIsModalOpen(false)} style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+          }}>
+            <form className="edit-modal" onClick={e => e.stopPropagation()} onSubmit={handleSalvar}>
+              <div className="modal-header-actions">
+                <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.2rem'}}>
+                  {selectedItem?.categoria_id ? 'Editar Detalhes' : 'Novo Registro'}
+                </h2>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="btn-png-action"><img src={iconFechar} alt="Fechar" /></button>
               </div>
 
-              <div className="cat-input-box">
-                <label><Target size={14}/> Valor da Meta</label>
-                <div className="cat-money-input-wrapper">
-                  <span className="prefix">R$</span>
-                  <input 
-                    type="number" step="0.01" required
-                    value={form.valor_meta} 
-                    onChange={e => setForm({...form, valor_meta: e.target.value})} 
-                  />
+              <div className="edit-form-grid">
+                <div className="form-group">
+                  <label>Nome / Categoria</label>
+                  <input type="text" value={form.nome} disabled={!!selectedItem?.categoria_id} onChange={e => setForm({...form, nome: e.target.value})} required />
+                </div>
+                <div className="form-group">
+                  <label>Valor da Meta</label>
+                  <input type="number" step="0.01" value={form.valor_meta} onChange={e => setForm({...form, valor_meta: e.target.value})} required />
+                </div>
+                <div className="form-group">
+                  <label>Cor</label>
+                  <div className="color-preview-wrapper">
+                    <input type="color" className="input-color-circle" value={form.cor} onChange={e => setForm({...form, cor: e.target.value})} />
+                    <span style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 600}}>{form.cor.toUpperCase()}</span>
+                  </div>
                 </div>
               </div>
-              
-              <div className="cat-input-box">
-                <label><Palette size={14}/> Cor de Identificação</label>
-                <div className="cat-color-picker-container">
-                  <input 
-                    type="color" 
-                    className="cat-color-input" 
-                    value={form.cor} 
-                    onChange={e => setForm({...form, cor: e.target.value})} 
-                  />
-                </div>
-              </div>
 
-              <div className="cat-modal-actions">
-                {editMode && (
-                  <button type="button" className="btn-cat-delete" onClick={excluirMeta}>
-                    <Trash2 size={20} /> Excluir
-                  </button>
-                )}
-                <button type="submit" className="btn-cat-save" disabled={loading}>
-                  <Save size={18} />
-                  {loading ? 'Processando...' : editMode ? 'Salvar' : 'Criar Meta'}
-                </button>
+              <div className="modal-footer-btns">
+                {selectedItem?.categoria_id ? (
+                  <button type="button" className="btn-png-action" onClick={handleExcluirCascata}><img src={iconExcluir} alt="Excluir" /></button>
+                ) : <div />}
+                <div style={{display: 'flex', gap: '20px'}}>
+                  <button type="button" className="btn-png-action" onClick={() => setIsModalOpen(false)}><img src={iconCancelar} alt="Cancelar" /></button>
+                  <button type="submit" className="btn-png-action"><img src={iconConfirme} alt="Confirmar" /></button>
+                </div>
               </div>
             </form>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Modal de Feedback (Sucesso/Erro/Exclusão) */}
+        <ModalFeedback 
+          isOpen={feedback.isOpen} 
+          type={feedback.type} 
+          title={feedback.title} 
+          message={feedback.message} 
+          onClose={() => setFeedback(prev => ({ ...prev, isOpen: false }))} 
+          onConfirm={feedback.onConfirm} 
+        />
+      </div>
+    </>
   );
 };
 
