@@ -220,188 +220,129 @@
   padding: 20px;
 }
 
-.cat-modal {
+/* MODAL ATUALIZADO PARA CORREÇÃO DE BORDAS E ESPAÇOS */
+.edit-modal {
   background: white;
-  width: 100%;
-  max-width: 420px;
-  border-radius: 24px;
-  padding: 30px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
-  animation: modalScaleUp 0.3s ease-out;
-}
-
-.cat-modal-header {
+  width: 95%;
+  max-width: 500px;
+  border-radius: 40px;
+  position: relative;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
+  flex-direction: column;
+  overflow: hidden !important; /* Corta o conteúdo nas bordas redondas */
+  padding: 0 !important;      /* Remove qualquer espaço interno do modal branco */
+  border: none !important;
 }
 
-.cat-modal-header h3 {
-  font-weight: 900;
-  color: #1e293b;
-  font-size: 1.3rem;
+.modal-header-premium {
+  margin: 0 !important;
+  padding: 30px !important;
+  color: white;
+  width: 100% !important;
+  min-width: 100% !important;
+  box-sizing: border-box !important;
+  align-self: stretch;
+}
+
+.modal-header-premium h2 {
   margin: 0;
+  font-weight: 800;
+  font-size: 1.5rem;
 }
 
-.cat-modal-header button {
-  background: #f1f5f9;
-  border: none;
-  padding: 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  color: #64748b;
-  display: flex;
-  transition: 0.2s;
-}
-
-.cat-modal-header button:hover {
-  background: #e2e8f0;
-  color: #ef4444;
+/* Ajuste específico para o container dos títulos dentro do header */
+.modal-header-premium > div {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin: 0 !important;
 }
 
 /* --- FORMULÁRIO --- */
-.cat-modal-form {
+.edit-form-grid {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  padding: 30px;
 }
 
-.cat-input-box label {
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.cat-input-box input[type="text"],
-.cat-input-box input[type="number"] {
-  padding: 14px;
-  border-radius: 12px;
-  border: 1.5px solid #e2e8f0;
-  background: #f8fafc;
-  font-weight: 700;
-  outline: none;
-  transition: 0.2s;
-  width: 100%;
-}
-
-.cat-input-box input:focus {
-    border-color: #4361ee;
-    background: white;
-}
-
-.cat-money-input-wrapper {
-  display: flex;
-  align-items: center;
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 0 15px;
-}
-
-.cat-money-input-wrapper .prefix {
+.form-group label {
+  font-size: 0.65rem;
   font-weight: 800;
-  color: #94a3b8;
-  margin-right: 8px;
+  color: #64748b;
+  margin-bottom: 6px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.cat-money-input-wrapper input {
-  border: none !important;
-  background: transparent !important;
+.form-group input {
   width: 100%;
-  padding: 14px 0 !important;
+  padding: 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  outline: none;
+  background: #f8fafc;
+  transition: all 0.2s;
 }
+
+.form-group input:disabled { opacity: 0.6; cursor: not-allowed; }
+.form-group input:focus:not(:disabled) { border-color: #4361ee; background: white; }
 
 /* COLOR PICKER UNIFICADO */
-.cat-color-picker-container {
+.color-input-container {
   display: flex;
+  gap: 10px;
   align-items: center;
-  gap: 12px;
   background: #f8fafc;
-  padding: 8px 12px;
+  padding: 5px 12px;
   border-radius: 12px;
   border: 1.5px solid #e2e8f0;
 }
 
-.cat-color-input {
-  width: 40px;
-  height: 40px;
-  border: none;
-  cursor: pointer;
-  background: none;
-}
-
-.cat-color-input::-webkit-color-swatch {
-  border-radius: 8px;
-  border: 1.5px solid #e2e8f0;
-}
-
-.cat-hex-input {
-  flex: 1;
+.hex-input {
+  font-family: monospace;
+  font-weight: 600;
+  text-transform: uppercase;
   border: none !important;
   background: transparent !important;
-  font-family: monospace;
-  font-weight: 800;
-  text-transform: uppercase;
 }
 
 /* --- AÇÕES DO MODAL --- */
-.cat-modal-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-top: 15px;
+.modal-footer-btns {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 30px 30px;
 }
 
-.btn-cat-save {
-  background: #006837;
-  color: white;
+.btn-png-action {
+  background: none;
   border: none;
-  height: 56px;
-  border-radius: 18px;
-  font-weight: 800;
-  font-size: 1rem;
   cursor: pointer;
+  padding: 0;
+  transition: transform 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  transition: all 0.2s;
-  margin-top: 30px;
+  margin: 0 !important;
+  line-height: 0;
 }
 
-.btn-cat-save:hover {
-  background: #3651d1;
-  box-shadow: 0 8px 20px rgba(67, 97, 238, 0.3);
+.btn-png-action img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
 }
 
-.btn-cat-delete {
-  background: #ef4444;
-  color: white;
-  border: none;
-  height: 56px;
-  border-radius: 18px;
-  font-weight: 800;
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: all 0.2s;
-  margin-top: 30px;
-}
-
-.btn-cat-delete:hover {
-  background: #fecaca;
+.btn-png-action:hover {
+  transform: scale(1.1);
 }
 
 /* --- HELPERS E ANIMAÇÕES --- */
-.cat-status, .loading-state {
+.cat-status {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -409,13 +350,6 @@
   color: #64748b;
   font-weight: 600;
   gap: 10px;
-}
-
-.cat-empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: #94a3b8;
-  font-weight: 600;
 }
 
 .spinner {
@@ -433,40 +367,22 @@
   to { opacity: 1; transform: scale(1); }
 }
 
-@keyframes modalScaleUp {
-  from { opacity: 0; transform: scale(0.9) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
 @keyframes rotate {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
 /* ---- RESPONSIVIDADE ---- */
-@media (max-width: 768px) {
-  .metas-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
-  }
-
-  .seletor-periodo {
+@media (max-width: 480px) {
+  .edit-modal {
     width: 100%;
-    justify-content: space-between;
+    border-radius: 30px 30px 0 0;
+    position: fixed;
+    bottom: 0;
   }
-
-  .grid-metas-cats {
-    grid-template-columns: 1fr;
-  }
-
+  
   .cat-fab {
     bottom: 90px;
     right: 20px;
-  }
-
-  .cat-modal {
-    padding: 20px;
-    max-width: 95%;
   }
 }

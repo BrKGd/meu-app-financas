@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
-  Plus, Tag, Edit2, Target, Loader2,
+  Plus, Edit2, Target, Loader2,
   ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star, Settings2
 } from 'lucide-react';
 
@@ -46,7 +46,7 @@ const CategoriasMetas: React.FC = () => {
   const [ano, setAno] = useState<number>(new Date().getFullYear());
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [isEditing, setIsEditing] = useState<boolean>(false); // Novo estado para controlar edição
+  const [isEditing, setIsEditing] = useState<boolean>(false); 
   const [selectedItem, setSelectedItem] = useState<any>(null);
   
   const [form, setForm] = useState({ 
@@ -67,7 +67,6 @@ const CategoriasMetas: React.FC = () => {
     setFeedback({ isOpen: true, type, title, message, onConfirm });
   };
 
-  // Função para cor contrastante do ícone Settings2
   const getSettingsColor = (hexcolor: string) => {
     if (!hexcolor) return '#ffffff';
     const hex = hexcolor.replace('#', '');
@@ -123,12 +122,12 @@ const CategoriasMetas: React.FC = () => {
         cor: item.cor,
         valor_meta: item.existe_meta ? item.valor_meta : ''
       });
-      setIsEditing(false); // Abre apenas para visualização/preenchimento da meta
+      setIsEditing(false);
     } else {
       setSelectedItem(null);
       const corPadrao = activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee';
       setForm({ nome: '', cor: corPadrao, valor_meta: '' });
-      setIsEditing(true); // Se for novo, já abre editável
+      setIsEditing(true);
     }
     setIsModalOpen(true);
   };
@@ -142,7 +141,6 @@ const CategoriasMetas: React.FC = () => {
 
       let currentCatId = selectedItem?.categoria_id;
 
-      // Se estiver editando a categoria ou for nova
       if (!currentCatId || isEditing) {
         const catPayload = { nome: form.nome, tipo: activeTab, cor: form.cor, user_id: user.id };
         if (currentCatId) {
@@ -200,49 +198,13 @@ const CategoriasMetas: React.FC = () => {
 
   return (
     <>
-      <style>{`
-        .edit-modal {
-          width: 95%; max-width: 500px; background: white; border-radius: 40px;
-          padding: 0; position: relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-          z-index: 1001; display: flex; flex-direction: column; overflow: hidden;
-        }
-        .modal-header-premium {
-          padding: 30px; transition: background 0.3s; color: white;
-        }
-        .edit-form-grid { display: flex; flex-direction: column; gap: 16px; padding: 30px; }
-        .form-group label {
-          font-size: 0.65rem; font-weight: 800; color: #64748b;
-          margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        .form-group input {
-          width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px;
-          font-size: 0.95rem; outline: none; background: #f8fafc; transition: all 0.2s;
-        }
-        .form-group input:disabled { opacity: 0.6; cursor: not-allowed; }
-        .form-group input:focus:not(:disabled) { border-color: #4361ee; background: white; }
-        .modal-footer-btns {
-          display: flex; justify-content: space-between; align-items: center;
-          padding: 20px 30px 30px;
-        }
-        .btn-png-action { background: none; border: none; cursor: pointer; padding: 0; transition: transform 0.2s; }
-        .btn-png-action img { width: 38px; height: 38px; object-fit: contain; }
-        .btn-png-action:hover { transform: scale(1.1); }
-        .color-input-container {
-          display: flex; gap: 10px; align-items: center;
-        }
-        .hex-input { font-family: monospace; font-weight: 600; text-transform: uppercase; }
-        @media (max-width: 480px) {
-          .edit-modal { width: 100%; border-radius: 30px 30px 0 0; position: fixed; bottom: 0; }
-        }
-      `}</style>
-
-      <div className="cat-page-wrapper metas-container">
+      <div className="cat-page-wrapper metas-container fade-in">
         <button className="cat-fab" onClick={() => openModal()} title="Nova Categoria"><Plus size={30} /></button>
 
         <header className="metas-header">
           <div className="cat-title-area">
             <div className="titulo-secao"><Target size={28} color="#4361ee" /><h1>Planejamento</h1></div>
-            <p>Gerencie suas metas de {activeTab === 'despesa' ? 'gastos' : activeTab === 'provento' ? 'receitas' : 'objetivos'}</p>
+            <p style={{ color: '#94a3b8', fontWeight: 600 }}>Gerencie suas metas de {activeTab === 'despesa' ? 'gastos' : activeTab === 'provento' ? 'receitas' : 'objetivos'}</p>
           </div>
           <div className="seletor-periodo">
             <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}><ChevronLeft size={20}/></button>
@@ -284,90 +246,114 @@ const CategoriasMetas: React.FC = () => {
         </div>
 
         {isModalOpen && (
-          <div className="modal-overlay" onClick={() => setIsModalOpen(false)} style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
-            display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-          }}>
-            <form className="edit-modal" onClick={e => e.stopPropagation()} onSubmit={handleSalvar}>
+          <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+            <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ padding: 0, maxWidth: '520px', borderRadius: '45px', overflow: 'hidden' }}>
               
-              <div className="modal-header-premium" style={{ background: isEditing ? '#1e293b' : form.cor }}>
+              {/* HEADER DO MODAL - ESTILO IGUAL AO DE CARTÕES */}
+              <div className="modal-details-header" style={{ background: isEditing ? '#1e293b' : form.cor, padding: '30px', color: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 style={{ margin: 0, fontWeight: 800 }}>
+                  <h2 style={{ margin: 0 }}>
                     {!selectedItem ? 'Nova Categoria' : isEditing ? 'Editar Configuração' : form.nome}
                   </h2>
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '10px' }}>
                     {selectedItem && !isEditing && (
-                      <button type="button" className="btn-png-action" onClick={() => setIsEditing(true)}>
-                        <Settings2 size={30} color={getSettingsColor(form.cor)} />
+                      <button type="button" className="btn-icon-action" onClick={() => setIsEditing(true)}>
+                        <Settings2 size={32} color={getSettingsColor(form.cor)} />
                       </button>
                     )}
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="btn-png-action">
-                      <img src={iconFechar} alt="Fechar" />
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="btn-icon-action">
+                      <img src={iconFechar} alt="Fechar" style={{ width: '32px', height: '32px' }} />
                     </button>
                   </div>
                 </div>
-              </div>
-
-              <div className="edit-form-grid">
-                <div className="form-group">
-                  <label>Nome da Categoria</label>
-                  <input 
-                    type="text" 
-                    value={form.nome} 
-                    disabled={!isEditing} 
-                    onChange={e => setForm({...form, nome: e.target.value})} 
-                    required 
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Valor da Meta</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    value={form.valor_meta} 
-                    onChange={e => setForm({...form, valor_meta: e.target.value})} 
-                    required 
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Cor de Identificação</label>
-                  <div className="color-input-container">
-                    <input 
-                      type="color" 
-                      style={{ width: '50px', height: '45px', padding: '2px', cursor: isEditing ? 'pointer' : 'default' }} 
-                      value={form.cor} 
-                      disabled={!isEditing}
-                      onChange={e => setForm({...form, cor: e.target.value})} 
-                    />
-                    <input 
-                      type="text" 
-                      className="hex-input"
-                      value={form.cor} 
-                      disabled={!isEditing}
-                      onChange={e => setForm({...form, cor: e.target.value})}
-                      maxLength={7}
-                    />
+                {selectedItem && !isEditing && (
+                  <div style={{ marginTop: '10px', fontWeight: 700, opacity: 0.9 }}>
+                    Planejamento Mensal
                   </div>
-                </div>
+                )}
               </div>
 
-              <div className="modal-footer-btns">
+              {/* CONTEÚDO DO MODAL */}
+              <div style={{ padding: '35px' }}>
+                <form id="meta-form" onSubmit={handleSalvar}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div className="form-group">
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                        Nome da Categoria
+                      </label>
+                      <input 
+                        className="form-control"
+                        type="text" 
+                        value={form.nome} 
+                        disabled={!isEditing} 
+                        onChange={e => setForm({...form, nome: e.target.value})} 
+                        required 
+                        placeholder="Ex: Alimentação, Lazer..."
+                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0' }}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                        Valor da Meta (R$)
+                      </label>
+                      <input 
+                        className="form-control"
+                        type="number" 
+                        step="0.01" 
+                        value={form.valor_meta} 
+                        onChange={e => setForm({...form, valor_meta: e.target.value})} 
+                        required 
+                        placeholder="0,00"
+                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0' }}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                        Cor de Identificação
+                      </label>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input 
+                          type="color" 
+                          value={form.cor} 
+                          disabled={!isEditing}
+                          onChange={e => setForm({...form, cor: e.target.value})} 
+                          style={{ width: '60px', height: '50px', padding: '5px', borderRadius: '10px', border: '1.5px solid #e2e8f0', cursor: isEditing ? 'pointer' : 'default' }}
+                        />
+                        <input 
+                          type="text" 
+                          value={form.cor.toUpperCase()} 
+                          disabled={!isEditing}
+                          onChange={e => setForm({...form, cor: e.target.value})}
+                          maxLength={7}
+                          style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', fontFamily: 'monospace', fontWeight: 'bold' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              {/* FOOTER DO MODAL - ESTILO IGUAL AO DE CARTÕES */}
+              <div className="modal-footer-icons" style={{ padding: '0 35px 35px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {selectedItem && isEditing ? (
-                  <button type="button" className="btn-png-action" onClick={handleExcluirCascata}>
-                    <img src={iconExcluir} alt="Excluir" />
+                  <button type="button" className="btn-icon-action" onClick={handleExcluirCascata}>
+                    <img src={iconExcluir} alt="Excluir" style={{ width: '38px', height: '38px' }} />
                   </button>
                 ) : <div />}
+                
                 <div style={{ display: 'flex', gap: '15px' }}>
-                  <button type="button" className="btn-png-action" onClick={() => setIsModalOpen(false)}>
-                    <img src={iconCancelar} alt="Cancelar" />
+                  <button type="button" className="btn-icon-action" onClick={() => isEditing && selectedItem ? setIsEditing(false) : setIsModalOpen(false)}>
+                    <img src={iconCancelar} alt="Cancelar" style={{ width: '38px', height: '38px' }} />
                   </button>
-                  <button type="submit" className="btn-png-action">
-                    <img src={iconConfirme} alt="Confirmar" />
+                  <button type="submit" form="meta-form" className="btn-icon-action">
+                    <img src={iconConfirme} alt="Confirmar" style={{ width: '38px', height: '38px' }} />
                   </button>
                 </div>
               </div>
-            </form>
+
+            </div>
           </div>
         )}
 
