@@ -216,16 +216,12 @@ const Despesas: React.FC = () => {
 
   return (
     <>
-      <div className="desp-premium-wrapper theme-red">
+      <div className="desp-premium-wrapper">
         <div className="desp-top-layout">
           <header className="desp-panel desp-header-area">
             <div className="desp-title-area">
               <h1>Central de Dívidas</h1>
-              <div className="mes-selector-premium" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px', background: '#f8fafc', padding: '5px 15px', borderRadius: '12px', width: 'fit-content' }}>
-                <button onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() - 1, 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><ChevronLeft size={20} /></button>
-                <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#ef4444' }}>{dataFiltro.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}</span>
-                <button onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() + 1, 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><ChevronRight size={20} /></button>
-              </div>
+              <p>Gestão de gastos e projeções</p>
             </div>
           </header>
 
@@ -237,21 +233,47 @@ const Despesas: React.FC = () => {
           </div>
         </div>
 
-        {/* Barra de Filtros */}
+        {/* Barra de Filtros + Seletor Badge */}
         <div className="filter-container-premium" style={{ marginBottom: '20px' }}>
           <div className="search-wrapper" style={{ display: 'flex', gap: '10px', background: 'white', padding: '10px 15px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
             <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem' }} />
             <button onClick={() => setShowFilters(!showFilters)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showFilters ? '#ef4444' : '#64748b' }}><Filter size={20} /></button>
           </div>
+
+          {/* Seletor de Mês como Badge Alinhado à Direita */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+            <div className="mes-selector-badge" style={{ 
+              display: 'flex', alignItems: 'center', gap: '8px', background: '#ffffff', 
+              padding: '6px 14px', borderRadius: '100px', border: '1px solid #e2e8f0',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+            }}>
+              <button 
+                onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() - 1, 1))} 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span style={{ fontWeight: 800, fontSize: '0.75rem', color: '#1e293b', textTransform: 'uppercase', minWidth: '90px', textAlign: 'center' }}>
+                {dataFiltro.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '')}
+              </span>
+              <button 
+                onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() + 1, 1))} 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+
           {showFilters && (
-            <div className="advanced-filters-row" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.8rem' }}>
+            <div className="advanced-filters-row" style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+              <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.8rem', background: 'white' }}>
                 <option value="">Todas as Categorias</option>
                 {[...categorias].sort((a, b) => a.nome.localeCompare(b.nome)).map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.nome}</option>
                 ))}
               </select>
-              <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.8rem' }}>
+              <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.8rem', background: 'white' }}>
                 <option value="">Todos Responsáveis</option>
                 {[...responsaveis].sort((a, b) => a.nome.localeCompare(b.nome)).map(r => (
                   <option key={r.id} value={r.id}>{r.nome}</option>
@@ -266,17 +288,17 @@ const Despesas: React.FC = () => {
             <div className="desp-panel" style={{padding: '40px', textAlign: 'center'}}><Loader2 className="spinner" /></div>
           ) : (
             Object.entries(secoesAgrupadas).map(([titulo, itens]) => (
-              <div key={titulo} className="desp-section-container" style={{marginBottom: '30px'}}>
+              <div key={titulo} className="desp-section-container" style={{marginBottom: '25px'}}>
                 <div className="section-header" style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 25px', background: '#ffffff', borderRadius: '16px 16px 0 0',
-                  borderBottom: '2px solid #f1f5f9'
+                  padding: '12px 20px', background: '#ffffff', borderRadius: '16px 16px 0 0',
+                  borderBottom: '1px solid #f1f5f9'
                 }}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
                     {getIconForSection(titulo)}
-                    <h3 style={{fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 900, color: '#1e293b', margin: 0}}>{titulo}</h3>
+                    <h3 style={{fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800, color: '#475569', margin: 0}}>{titulo}</h3>
                   </div>
-                  <span style={{fontSize: '0.8rem', fontWeight: 700, color: '#ef4444', background: '#fef2f2', padding: '4px 10px', borderRadius: '8px'}}>
+                  <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>
                     {formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}
                   </span>
                 </div>
@@ -320,7 +342,7 @@ const Despesas: React.FC = () => {
         {isModalOpen && itemEditando && (
           <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
             <div className="edit-modal" onClick={e => e.stopPropagation()}>
-              <div className="modal-header-flex">
+              <div className="modal-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{margin: 0, fontWeight: 900}}>Detalhes</h2>
                 <button onClick={() => setIsModalOpen(false)} className="close-btn-desp"><X size={20} /></button>
               </div>
@@ -329,11 +351,11 @@ const Despesas: React.FC = () => {
                   <label>DESCRIÇÃO</label>
                   <input type="text" value={itemEditando.descricao || ''} onChange={e => setItemEditando({...itemEditando, descricao: e.target.value})} required />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{marginTop: '15px'}}>
                   <label>LOJA</label>
                   <input type="text" value={itemEditando.loja || ''} onChange={e => setItemEditando({...itemEditando, loja: e.target.value})} />
                 </div>
-                <div className="form-row">
+                <div className="form-row" style={{display: 'flex', gap: '15px', marginTop: '15px'}}>
                     <div className="form-group" style={{flex: 1}}>
                         <label>CATEGORIA</label>
                         <select value={itemEditando.categoria_id || ''} onChange={e => setItemEditando({...itemEditando, categoria_id: e.target.value})}>
@@ -341,19 +363,19 @@ const Despesas: React.FC = () => {
                         </select>
                     </div>
                 </div>
-                <div className="form-row">
-                  <div className="form-group">
+                <div className="form-row" style={{display: 'flex', gap: '15px', marginTop: '15px'}}>
+                  <div className="form-group" style={{flex: 1}}>
                     <label>VALOR TOTAL</label>
                     <input type="text" value={itemEditando.valor_exibicao || ''} onChange={e => setItemEditando({...itemEditando, valor_exibicao: e.target.value})} required />
                   </div>
-                  <div className="form-group">
+                  <div className="form-group" style={{flex: 1}}>
                     <label>DATA COMPRA</label>
                     <input type="date" value={itemEditando.data_compra || ''} onChange={e => setItemEditando({...itemEditando, data_compra: e.target.value})} required />
                   </div>
                 </div>
 
-                <div className="form-row">
-                   <div className="form-group">
+                <div className="form-row" style={{display: 'flex', gap: '15px', marginTop: '15px'}}>
+                   <div className="form-group" style={{flex: 1}}>
                       <label>FORMA PAGAMENTO</label>
                       <select value={itemEditando.forma_pagamento} onChange={e => setItemEditando({...itemEditando, forma_pagamento: e.target.value})}>
                          <option value="Boleto">Boleto</option>
@@ -363,7 +385,7 @@ const Despesas: React.FC = () => {
                       </select>
                    </div>
                    {itemEditando.forma_pagamento === 'Crédito' && (
-                     <div className="form-group">
+                     <div className="form-group" style={{flex: 1}}>
                         <label>PARCELAS</label>
                         <input type="number" value={itemEditando.num_parcelas} onChange={e => setItemEditando({...itemEditando, num_parcelas: e.target.value})} />
                      </div>
@@ -372,7 +394,7 @@ const Despesas: React.FC = () => {
 
                 <div className="modal-footer-actions">
                   <button type="button" className="btn-delete-full" onClick={handleExcluir}><Trash2 size={18} /> Excluir</button>
-                  <button type="submit" className="btn-save-full"><Save size={18} /> Salvar Alterações</button>
+                  <button type="submit" className="btn-save-full"><Save size={18} /> Salvar</button>
                 </div>
               </form>
             </div>
