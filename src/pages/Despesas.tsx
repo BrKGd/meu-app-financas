@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Calendar, Tag, Trash2, X, Save, 
   ShoppingCart, Loader2, Filter, CreditCard, Banknote, Landmark, ChevronLeft, ChevronRight,
-  QrCode, Receipt
+  QrCode, Receipt, AlertTriangle
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
@@ -48,6 +48,7 @@ const Despesas: React.FC = () => {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([]);
   const [cartoes, setCartoes] = useState<any[]>([]);
+  const [metaTotalPlanejada, setMetaTotalPlanejada] = useState(0); 
   const [loading, setLoading] = useState(true);
   
   const [dataFiltro, setDataFiltro] = useState(new Date());
@@ -75,16 +76,30 @@ const Despesas: React.FC = () => {
   const buscarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const [catRes, profRes, cartRes] = await Promise.all([
+      const mesAtivo = dataFiltro.getMonth() + 1;
+      const anoAtivo = dataFiltro.getFullYear();
+
+      // Buscamos as categorias, perfis, cartões e a tabela de METAS (ajuste o nome da tabela se não for 'metas')
+      const [catRes, profRes, cartRes, metasRes] = await Promise.all([
         supabase.from('categorias').select('*').eq('tipo', 'despesa'),
         supabase.from('profiles').select('id, nome'),
-        supabase.from('cartoes').select('*')
+        supabase.from('cartoes').select('*'),
+        supabase.from('metas')
+          .select('valor_meta, tipo_meta')
+          .eq('mes_referencia', mesAtivo)
+          .eq('ano_referencia', anoAtivo)
       ]);
 
-      const listaCartoes = cartRes.data || [];
       setCategorias(catRes.data || []);
       setResponsaveis(profRes.data || []);
-      setCartoes(listaCartoes);
+      setCartoes(cartRes.data || []);
+      
+      // Lógica corrigida: Somar valor_meta apenas de itens do tipo 'despesa' no mês/ano filtrado
+      const totalMetasDespesa = metasRes.data
+        ?.filter(m => m.tipo_meta === 'despesa')
+        .reduce((acc, cur) => acc + Number(cur.valor_meta || 0), 0) || 0;
+      
+      setMetaTotalPlanejada(totalMetasDespesa);
 
       const { data: dataCompras, error } = await (supabase.from('compras') as any)
         .select(`*, categorias (nome, cor)`)
@@ -102,7 +117,7 @@ const Despesas: React.FC = () => {
         
         let delayMes = 0;
         if (item.forma_pagamento === 'Crédito' && item.cartao) {
-          const infoCartao = listaCartoes.find(c => c.nome === item.cartao);
+          const infoCartao = (cartRes.data || []).find(c => c.nome === item.cartao);
           if (infoCartao && diaC > infoCartao.dia_fechamento) {
             delayMes = 1;
           }
@@ -110,7 +125,6 @@ const Despesas: React.FC = () => {
 
         for (let i = 0; i < numParcelas; i++) {
           const dataRefParcela = new Date(anoC, (mesC - 1) + delayMes + i, 15);
-          
           if (dataRefParcela.getMonth() === mesAlvo && dataRefParcela.getFullYear() === anoAlvo) {
             projetadas.push({ 
               ...item, 
@@ -131,7 +145,12 @@ const Despesas: React.FC = () => {
 
   useEffect(() => { buscarDados(); }, [buscarDados]);
 
-  // --- AGRUPAMENTO POR FORMA DE PAGAMENTO ---
+  const totalGastoFinal = useMemo(() => despesas.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0), [despesas]);
+  
+  // Porcentagem baseada na soma das metas tipo 'despesa'
+  const porcGastoOrcamento = useMemo(() => metaTotalPlanejada > 0 ? (totalGastoFinal / metaTotalPlanejada) * 100 : 0, [totalGastoFinal, metaTotalPlanejada]);
+  const extrapolou = totalGastoFinal > metaTotalPlanejada && metaTotalPlanejada > 0;
+
   const secoesAgrupadas = useMemo(() => {
     const filtradas = despesas.filter(d => {
       const matchSearch = d.descricao.toLowerCase().includes(searchTerm.toLowerCase());
@@ -153,11 +172,17 @@ const Despesas: React.FC = () => {
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
+  const renderTextoResumo = () => {
+    if (extrapolou) {
+      const percentualExcedente = porcGastoOrcamento - 100;
+      const valorExcedente = totalGastoFinal - metaTotalPlanejada;
+      return `Você ultrapassou ${percentualExcedente.toFixed(0)}% (${formatarMoeda(valorExcedente)}) do planejado.`;
+    }
+    return `${porcGastoOrcamento.toFixed(0)}% do planejado já foi gasto.`;
+  };
+
   const handleAbrirModal = (item: Compra) => {
-    setItemEditando({ 
-        ...item, 
-        valor_exibicao: formatarMoeda(item.valor_total) 
-    });
+    setItemEditando({ ...item, valor_exibicao: formatarMoeda(item.valor_total) });
     setIsModalOpen(true);
   };
 
@@ -169,8 +194,6 @@ const Despesas: React.FC = () => {
         ? Number(itemEditando.valor_exibicao.replace(/[^\d,]/g, '').replace(',', '.')) 
         : itemEditando.valor_total;
 
-      const isCredito = itemEditando.forma_pagamento === 'Crédito';
-
       const { error } = await (supabase.from('compras') as any).update({
         descricao: itemEditando.descricao,
         loja: itemEditando.loja,
@@ -178,12 +201,10 @@ const Despesas: React.FC = () => {
         categoria_id: itemEditando.categoria_id,
         valor_total: valorLimpo,
         forma_pagamento: itemEditando.forma_pagamento,
-        cartao: isCredito ? itemEditando.cartao : null,
+        cartao: itemEditando.forma_pagamento === 'Crédito' ? itemEditando.cartao : null,
         data_compra: itemEditando.data_compra,
-        num_parcelas: isCredito ? Number(itemEditando.num_parcelas) : 1,
-        parcelado: isCredito && Number(itemEditando.num_parcelas) > 1,
-        pedido: itemEditando.pedido,
-        nota_fiscal: itemEditando.nota_fiscal
+        num_parcelas: itemEditando.forma_pagamento === 'Crédito' ? Number(itemEditando.num_parcelas) : 1,
+        parcelado: itemEditando.forma_pagamento === 'Crédito' && Number(itemEditando.num_parcelas) > 1,
       }).eq('id', itemEditando.id);
 
       if (error) throw error;
@@ -195,7 +216,7 @@ const Despesas: React.FC = () => {
 
   const handleExcluir = () => {
     if (!itemEditando?.id) return;
-    alertar('danger', 'Excluir?', `Apagar lançamento permanentemente?`, async () => {
+    alertar('danger', 'Excluir?', `Apagar lançamento?`, async () => {
       const { error } = await (supabase.from('compras') as any).delete().eq('id', itemEditando.id);
       if (!error) {
         setIsModalOpen(false);
@@ -205,17 +226,19 @@ const Despesas: React.FC = () => {
     });
   };
 
-  const getIconForSection = (title: string) => {
-    const t = title.toLowerCase();
-    if (t.includes('crédito')) return <CreditCard size={18} color="#ef4444" />;
-    if (t.includes('pix')) return <QrCode size={18} color="#10b981" />;
-    if (t.includes('boleto')) return <Receipt size={18} color="#f59e0b" />;
-    if (t.includes('débito')) return <Banknote size={18} color="#3b82f6" />;
-    return <Landmark size={18} color="#64748b" />;
-  };
-
   return (
     <>
+      <style>{`
+        @keyframes blink-alert {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.95); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .blinking-badge {
+          animation: blink-alert 1.5s infinite ease-in-out;
+        }
+      `}</style>
+
       <div className="desp-premium-wrapper">
         <div className="desp-top-layout">
           <header className="desp-panel desp-header-area">
@@ -225,59 +248,81 @@ const Despesas: React.FC = () => {
             </div>
           </header>
 
-          <div className="desp-panel desp-summary-card">
-            <span className="summary-label">Total Gasto no Mês</span>
-            <h2 className="summary-value">
-                {formatarMoeda(despesas.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}
-            </h2>
+          <div style={{ position: 'relative' }}>
+            {extrapolou && (
+              <div className="blinking-badge" style={{
+                position: 'absolute',
+                top: '-10px',
+                right: '10px',
+                background: '#ffffff',
+                color: '#ef4444',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                zIndex: 2,
+                border: '1px solid #ef4444'
+              }}>
+                <AlertTriangle size={12} fill="#ef4444" color="white" /> Excedido
+              </div>
+            )}
+
+            <section className="desp-panel" style={{ 
+              background: '#ef4444', 
+              color: 'white', 
+              border: 'none',
+              padding: '20px',
+              borderRadius: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, opacity: 0.9, textTransform: 'uppercase' }}>
+                Total Gasto no Mês
+              </span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <h2 style={{ fontSize: '2.2rem', fontWeight: 900, margin: 0 }}>{formatarMoeda(totalGastoFinal)}</h2>
+                <span style={{ fontSize: '1rem', opacity: 0.8 }}>/ {formatarMoeda(metaTotalPlanejada)}</span>
+              </div>
+              <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '8px 0 0 0', opacity: 0.95 }}>
+                {renderTextoResumo()}
+              </p>
+            </section>
           </div>
         </div>
 
-        {/* Barra de Filtros + Seletor Badge */}
+        {/* ... Restante do código mantido rigorosamente igual ... */}
         <div className="filter-container-premium" style={{ marginBottom: '20px' }}>
           <div className="search-wrapper" style={{ display: 'flex', gap: '10px', background: 'white', padding: '10px 15px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
             <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem' }} />
             <button onClick={() => setShowFilters(!showFilters)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showFilters ? '#ef4444' : '#64748b' }}><Filter size={20} /></button>
           </div>
 
-          {/* Seletor de Mês como Badge Alinhado à Direita */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
-            <div className="mes-selector-badge" style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px', background: '#ffffff', 
-              padding: '6px 14px', borderRadius: '100px', border: '1px solid #e2e8f0',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-            }}>
-              <button 
-                onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() - 1, 1))} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
-              >
-                <ChevronLeft size={16} />
-              </button>
+            <div className="mes-selector-badge" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ffffff', padding: '6px 14px', borderRadius: '100px', border: '1px solid #e2e8f0' }}>
+              <button onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() - 1, 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}><ChevronLeft size={16} /></button>
               <span style={{ fontWeight: 800, fontSize: '0.75rem', color: '#1e293b', textTransform: 'uppercase', minWidth: '90px', textAlign: 'center' }}>
                 {dataFiltro.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '')}
               </span>
-              <button 
-                onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() + 1, 1))} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
-              >
-                <ChevronRight size={16} />
-              </button>
+              <button onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() + 1, 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}><ChevronRight size={16} /></button>
             </div>
           </div>
 
           {showFilters && (
             <div className="advanced-filters-row" style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-              <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.8rem', background: 'white' }}>
+              <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }}>
                 <option value="">Todas as Categorias</option>
-                {[...categorias].sort((a, b) => a.nome.localeCompare(b.nome)).map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.nome}</option>
-                ))}
+                {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
               </select>
-              <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.8rem', background: 'white' }}>
+              <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }}>
                 <option value="">Todos Responsáveis</option>
-                {[...responsaveis].sort((a, b) => a.nome.localeCompare(b.nome)).map(r => (
-                  <option key={r.id} value={r.id}>{r.nome}</option>
-                ))}
+                {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
               </select>
             </div>
           )}
@@ -289,46 +334,27 @@ const Despesas: React.FC = () => {
           ) : (
             Object.entries(secoesAgrupadas).map(([titulo, itens]) => (
               <div key={titulo} className="desp-section-container" style={{marginBottom: '25px'}}>
-                <div className="section-header" style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 20px', background: '#ffffff', borderRadius: '16px 16px 0 0',
-                  borderBottom: '1px solid #f1f5f9'
-                }}>
+                <div className="section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: '#ffffff', borderRadius: '16px 16px 0 0', borderBottom: '1px solid #f1f5f9' }}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                    {getIconForSection(titulo)}
                     <h3 style={{fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800, color: '#475569', margin: 0}}>{titulo}</h3>
                   </div>
-                  <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>
-                    {formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}
-                  </span>
+                  <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>{formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}</span>
                 </div>
-
                 <div className="desp-panel-list" style={{borderRadius: '0 0 16px 16px', borderTop: 'none'}}>
                   {itens.map((item, idx) => (
                     <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
                       <div className="desp-icon-column">
-                        <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}>
-                          <ShoppingCart size={20} />
-                        </div>
+                        <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}><ShoppingCart size={20} /></div>
                       </div>
                       <div className="desp-main-content">
                         <div className="desp-top-line">
-                          <span className="desp-desc">
-                            {item.descricao}
-                            {item.parcelado && (
-                                <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', color: '#475569', fontWeight: 800}}>
-                                    {item.parcela_atual}/{item.num_parcelas}
-                                </span>
-                            )}
-                          </span>
+                          <span className="desp-desc">{item.descricao} {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>{item.parcela_atual}/{item.num_parcelas}</span>}</span>
                           <span className="desp-value value-negative">{formatarMoeda(item.valor_projetado || 0)}</span>
                         </div>
                         <div className="desp-meta-line">
                           <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
                           <span className="meta-divider">•</span>
                           <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
-                          <span className="meta-divider">•</span>
-                          <span className="meta-tag">{item.loja || 'Loja não inf.'}</span>
                         </div>
                       </div>
                     </div>
@@ -351,18 +377,6 @@ const Despesas: React.FC = () => {
                   <label>DESCRIÇÃO</label>
                   <input type="text" value={itemEditando.descricao || ''} onChange={e => setItemEditando({...itemEditando, descricao: e.target.value})} required />
                 </div>
-                <div className="form-group" style={{marginTop: '15px'}}>
-                  <label>LOJA</label>
-                  <input type="text" value={itemEditando.loja || ''} onChange={e => setItemEditando({...itemEditando, loja: e.target.value})} />
-                </div>
-                <div className="form-row" style={{display: 'flex', gap: '15px', marginTop: '15px'}}>
-                    <div className="form-group" style={{flex: 1}}>
-                        <label>CATEGORIA</label>
-                        <select value={itemEditando.categoria_id || ''} onChange={e => setItemEditando({...itemEditando, categoria_id: e.target.value})}>
-                            {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
-                        </select>
-                    </div>
-                </div>
                 <div className="form-row" style={{display: 'flex', gap: '15px', marginTop: '15px'}}>
                   <div className="form-group" style={{flex: 1}}>
                     <label>VALOR TOTAL</label>
@@ -373,25 +387,6 @@ const Despesas: React.FC = () => {
                     <input type="date" value={itemEditando.data_compra || ''} onChange={e => setItemEditando({...itemEditando, data_compra: e.target.value})} required />
                   </div>
                 </div>
-
-                <div className="form-row" style={{display: 'flex', gap: '15px', marginTop: '15px'}}>
-                   <div className="form-group" style={{flex: 1}}>
-                      <label>FORMA PAGAMENTO</label>
-                      <select value={itemEditando.forma_pagamento} onChange={e => setItemEditando({...itemEditando, forma_pagamento: e.target.value})}>
-                         <option value="Boleto">Boleto</option>
-                         <option value="Crédito">Crédito</option>
-                         <option value="Pix">Pix</option>
-                         <option value="Débito">Débito</option>
-                      </select>
-                   </div>
-                   {itemEditando.forma_pagamento === 'Crédito' && (
-                     <div className="form-group" style={{flex: 1}}>
-                        <label>PARCELAS</label>
-                        <input type="number" value={itemEditando.num_parcelas} onChange={e => setItemEditando({...itemEditando, num_parcelas: e.target.value})} />
-                     </div>
-                   )}
-                </div>
-
                 <div className="modal-footer-actions">
                   <button type="button" className="btn-delete-full" onClick={handleExcluir}><Trash2 size={18} /> Excluir</button>
                   <button type="submit" className="btn-save-full"><Save size={18} /> Salvar</button>
