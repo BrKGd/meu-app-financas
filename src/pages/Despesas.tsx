@@ -9,13 +9,12 @@ import {
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
 
-// --- Importação dos Ícones de Imagem ---
+// --- Assets (Ícones PNG) ---
 import iconConfirme from '../assets/confirme.png';
 import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
 
-// --- Interfaces ---
 interface Categoria {
   id: string;
   nome: string;
@@ -204,8 +203,6 @@ const Despesas: React.FC = () => {
         ? Number(itemEditando.valor_exibicao.replace(/\D/g, '')) / 100 
         : itemEditando.valor_total;
 
-      if (isNaN(valorLimpo)) throw new Error("Valor inválido");
-
       const { error } = await (supabase.from('compras') as any).update({
         descricao: itemEditando.descricao,
         loja: itemEditando.loja,
@@ -250,28 +247,21 @@ const Despesas: React.FC = () => {
           50% { opacity: 0.5; transform: scale(0.95); }
           100% { opacity: 1; transform: scale(1); }
         }
-        .blinking-badge {
-          animation: blink-alert 1.5s infinite ease-in-out;
-        }
+        .blinking-badge { animation: blink-alert 1.5s infinite ease-in-out; }
         
         .edit-modal {
           width: 95%;
           max-width: 550px;
           max-height: 90vh;
-          overflow: hidden; /* Mudado para permitir cabeçalho/rodape fixos se desejar */
           background: white;
           border-radius: 28px;
-          display: flex;
-          flex-direction: column;
+          padding: 24px;
           position: relative;
           box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
           z-index: 1001;
-        }
-
-        .modal-scrollable-body {
-          padding: 0 24px 24px 24px;
           overflow-y: auto;
-          flex: 1;
+          display: flex;
+          flex-direction: column;
         }
 
         .edit-form-grid {
@@ -297,14 +287,12 @@ const Despesas: React.FC = () => {
           border-radius: 12px;
           font-size: 0.95rem;
           outline: none;
-          transition: all 0.2s;
           background: #f8fafc;
         }
 
         .form-group input:focus, .form-group select:focus {
           border-color: #ef4444;
           background: white;
-          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
         }
 
         .form-row-2 {
@@ -313,39 +301,37 @@ const Despesas: React.FC = () => {
           gap: 12px;
         }
 
-        .modal-footer-icons {
+        .modal-header-actions {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 15px 24px;
-          border-top: 1px solid #e2e8f0;
-          background: #f8fafc;
+          margin-bottom: 24px;
         }
 
-        .footer-right-actions {
+        .modal-footer-btns {
           display: flex;
-          gap: 15px;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 30px;
+          padding-top: 20px;
+          border-top: 1px solid #f1f5f9;
         }
 
-        .btn-icon-action {
+        .btn-png-action {
           background: none;
           border: none;
           cursor: pointer;
-          padding: 5px;
+          padding: 0;
           transition: transform 0.2s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
         }
 
-        .btn-icon-action img {
-          width: 32px;
-          height: 32px;
+        .btn-png-action img {
+          width: 38px;
+          height: 38px;
           object-fit: contain;
         }
 
-        .btn-icon-action:hover { transform: scale(1.1); }
-        .btn-icon-action:active { transform: scale(0.95); }
+        .btn-png-action:hover { transform: scale(1.1); }
 
         .parcela-preview-box {
           background: #f1f5f9;
@@ -411,19 +397,14 @@ const Despesas: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
-              position: 'relative',
-              overflow: 'hidden'
+              position: 'relative'
             }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, opacity: 0.9, textTransform: 'uppercase' }}>
-                Total Gasto no Mês
-              </span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, opacity: 0.9, textTransform: 'uppercase' }}>Total Gasto no Mês</span>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                 <h2 style={{ fontSize: '2.2rem', fontWeight: 900, margin: 0 }}>{formatarMoeda(totalGastoFinal)}</h2>
                 <span style={{ fontSize: '1rem', opacity: 0.8 }}>/ {formatarMoeda(metaTotalPlanejada)}</span>
               </div>
-              <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '8px 0 0 0', opacity: 0.95 }}>
-                {renderTextoResumo()}
-              </p>
+              <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '8px 0 0 0', opacity: 0.95 }}>{renderTextoResumo()}</p>
             </section>
           </div>
         </div>
@@ -465,40 +446,34 @@ const Despesas: React.FC = () => {
               <p style={{ marginTop: '10px', color: '#64748b', fontSize: '0.8rem' }}>Sincronizando dados...</p>
             </div>
           ) : (
-            Object.keys(secoesAgrupadas).length > 0 ? (
-              Object.entries(secoesAgrupadas).map(([titulo, itens]) => (
-                <div key={titulo} className="desp-section-container" style={{marginBottom: '25px'}}>
-                  <div className="section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: '#ffffff', borderRadius: '16px 16px 0 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                      <h3 style={{fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800, color: '#475569', margin: 0}}>{titulo}</h3>
-                    </div>
-                    <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>{formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}</span>
-                  </div>
-                  <div className="desp-panel-list" style={{borderRadius: '0 0 16px 16px', borderTop: 'none', background: 'white'}}>
-                    {itens.map((item, idx) => (
-                      <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
-                        <div className="desp-icon-column">
-                          <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}><ShoppingCart size={20} /></div>
+            Object.entries(secoesAgrupadas).map(([titulo, itens]) => (
+              <div key={titulo} className="desp-section-container" style={{marginBottom: '25px'}}>
+                <div className="section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: '#ffffff', borderRadius: '16px 16px 0 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <h3 style={{fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 800, color: '#475569', margin: 0}}>{titulo}</h3>
+                  <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>{formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}</span>
+                </div>
+                <div className="desp-panel-list" style={{borderRadius: '0 0 16px 16px', background: 'white'}}>
+                  {itens.map((item, idx) => (
+                    <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
+                      <div className="desp-icon-column">
+                        <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}><ShoppingCart size={20} /></div>
+                      </div>
+                      <div className="desp-main-content">
+                        <div className="desp-top-line">
+                          <span className="desp-desc">{item.descricao} {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>{item.parcela_atual}/{item.num_parcelas}</span>}</span>
+                          <span className="desp-value value-negative">{formatarMoeda(item.valor_projetado || 0)}</span>
                         </div>
-                        <div className="desp-main-content">
-                          <div className="desp-top-line">
-                            <span className="desp-desc">{item.descricao} {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>{item.parcela_atual}/{item.num_parcelas}</span>}</span>
-                            <span className="desp-value value-negative">{formatarMoeda(item.valor_projetado || 0)}</span>
-                          </div>
-                          <div className="desp-meta-line">
-                            <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
-                            <span className="meta-divider">•</span>
-                            <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
-                          </div>
+                        <div className="desp-meta-line">
+                          <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
+                          <span className="meta-divider">•</span>
+                          <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ))
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Nenhuma despesa encontrada.</div>
-            )
+              </div>
+            ))
           )}
         </main>
 
@@ -508,128 +483,115 @@ const Despesas: React.FC = () => {
             background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
             display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
           }}>
-            <div className="edit-modal" onClick={e => e.stopPropagation()}>
+            <form className="edit-modal" onClick={e => e.stopPropagation()} onSubmit={handleSalvarEdicao}>
               
-              {/* CABEÇALHO COM ÍCONE PNG */}
-              <div className="modal-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 24px 15px 24px' }}>
+              <div className="modal-header-actions">
                 <div>
                   <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.2rem'}}>Editar Detalhes</h2>
                   <p style={{margin: 0, fontSize: '0.7rem', color: '#64748b'}}>ID: {itemEditando.id.substring(0,8).toUpperCase()}</p>
                 </div>
-                <button onClick={() => setIsModalOpen(false)} className="btn-icon-action" title="Fechar">
-                   <img src={iconFechar} alt="Fechar" />
+                <button type="button" onClick={() => setIsModalOpen(false)} className="btn-png-action">
+                  <img src={iconFechar} alt="Fechar" />
                 </button>
               </div>
 
-              <div className="modal-scrollable-body">
-                <form id="form-edit-desp" onSubmit={handleSalvarEdicao} className="edit-form-grid">
+              <div className="edit-form-grid">
+                <div className="form-group">
+                  <label>Descrição do Gasto</label>
+                  <input type="text" value={itemEditando.descricao || ''} onChange={e => handleChangeEdit('descricao', e.target.value)} required />
+                </div>
+
+                <div className="form-row-2">
                   <div className="form-group">
-                    <label>Descrição do Gasto</label>
-                    <input type="text" value={itemEditando.descricao || ''} onChange={e => handleChangeEdit('descricao', e.target.value)} required />
+                    <label>Valor Total</label>
+                    <input type="text" value={itemEditando.valor_exibicao || ''} onChange={e => handleChangeEdit('valor_exibicao', e.target.value)} placeholder="0,00" required />
                   </div>
-
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label>Valor Total</label>
-                      <input type="text" value={itemEditando.valor_exibicao || ''} onChange={e => handleChangeEdit('valor_exibicao', e.target.value)} placeholder="0,00" required />
-                    </div>
-                    <div className="form-group">
-                      <label>Data da Compra</label>
-                      <input type="date" value={itemEditando.data_compra || ''} onChange={e => handleChangeEdit('data_compra', e.target.value)} required />
-                    </div>
-                  </div>
-
                   <div className="form-group">
-                    <label>Loja / Estabelecimento</label>
-                    <div style={{position: 'relative'}}>
-                      <Store size={16} style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8'}} />
-                      <input style={{paddingLeft: '38px'}} type="text" value={itemEditando.loja || ''} onChange={e => handleChangeEdit('loja', e.target.value)} placeholder="Onde você comprou?" />
-                    </div>
+                    <label>Data da Compra</label>
+                    <input type="date" value={itemEditando.data_compra || ''} onChange={e => handleChangeEdit('data_compra', e.target.value)} required />
                   </div>
+                </div>
 
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label>Categoria</label>
-                      <select value={itemEditando.categoria_id} onChange={e => handleChangeEdit('categoria_id', e.target.value)}>
-                        {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Responsável</label>
-                      <select value={itemEditando.user_id} onChange={e => handleChangeEdit('user_id', e.target.value)}>
-                        {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-                      </select>
-                    </div>
+                <div className="form-group">
+                  <label>Loja / Estabelecimento</label>
+                  <div style={{position: 'relative'}}>
+                    <Store size={16} style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8'}} />
+                    <input style={{paddingLeft: '38px'}} type="text" value={itemEditando.loja || ''} onChange={e => handleChangeEdit('loja', e.target.value)} placeholder="Onde comprou?" />
                   </div>
+                </div>
 
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label>Forma de Pagamento</label>
-                      <select value={itemEditando.forma_pagamento} onChange={e => handleChangeEdit('forma_pagamento', e.target.value)}>
-                        <option value="Pix">Pix</option>
-                        <option value="Crédito">Crédito</option>
-                        <option value="Débito">Débito</option>
-                        <option value="Dinheiro">Dinheiro</option>
-                      </select>
-                    </div>
+                <div className="form-row-2">
+                  <div className="form-group">
+                    <label>Categoria</label>
+                    <select value={itemEditando.categoria_id} onChange={e => handleChangeEdit('categoria_id', e.target.value)}>
+                      {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Responsável</label>
+                    <select value={itemEditando.user_id} onChange={e => handleChangeEdit('user_id', e.target.value)}>
+                      {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                    </select>
+                  </div>
+                </div>
 
-                    {itemEditando.forma_pagamento === 'Crédito' && (
-                      <div className="form-group">
-                        <label>Cartão Utilizado</label>
-                        <select value={itemEditando.cartao || ''} onChange={e => handleChangeEdit('cartao', e.target.value)}>
-                          <option value="">Selecione um cartão</option>
-                          {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                        </select>
-                      </div>
-                    )}
+                <div className="form-row-2">
+                  <div className="form-group">
+                    <label>Forma de Pagamento</label>
+                    <select value={itemEditando.forma_pagamento} onChange={e => handleChangeEdit('forma_pagamento', e.target.value)}>
+                      <option value="Pix">Pix</option>
+                      <option value="Crédito">Crédito</option>
+                      <option value="Débito">Débito</option>
+                      <option value="Dinheiro">Dinheiro</option>
+                    </select>
                   </div>
 
                   {itemEditando.forma_pagamento === 'Crédito' && (
                     <div className="form-group">
-                      <label>Parcelamento (Nº de Vezes)</label>
-                      <input type="number" min="1" max="48" value={itemEditando.num_parcelas || 1} onChange={e => handleChangeEdit('num_parcelas', Number(e.target.value))} />
-                      
-                      {Number(itemEditando.num_parcelas) > 1 && (
-                        <div className="parcela-preview-box">
-                          <span style={{fontSize: '0.75rem', color: '#64748b'}}>Valor de cada parcela:</span>
-                          <strong style={{color: '#1e293b'}}>
-                            {formatarMoeda(
-                              (typeof itemEditando.valor_exibicao === 'string' 
-                                ? Number(itemEditando.valor_exibicao.replace(/\./g, '').replace(',', '.')) 
-                                : itemEditando.valor_total) / (itemEditando.num_parcelas || 1)
-                            )}
-                          </strong>
-                        </div>
-                      )}
+                      <label>Cartão</label>
+                      <select value={itemEditando.cartao || ''} onChange={e => handleChangeEdit('cartao', e.target.value)}>
+                        <option value="">Selecione</option>
+                        {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                      </select>
                     </div>
                   )}
-                </form>
+                </div>
+
+                {itemEditando.forma_pagamento === 'Crédito' && (
+                  <div className="form-group">
+                    <label>Parcelas</label>
+                    <input type="number" min="1" max="48" value={itemEditando.num_parcelas || 1} onChange={e => handleChangeEdit('num_parcelas', Number(e.target.value))} />
+                    {Number(itemEditando.num_parcelas) > 1 && (
+                      <div className="parcela-preview-box">
+                        <span style={{fontSize: '0.75rem'}}>Cada parcela:</span>
+                        <strong>{formatarMoeda((typeof itemEditando.valor_exibicao === 'string' ? Number(itemEditando.valor_exibicao.replace(/\D/g, '')) / 100 : itemEditando.valor_total) / (itemEditando.num_parcelas || 1))}</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* RODAPÉ COM ÍCONES PNG */}
-              <div className="modal-footer-icons">
-                <button type="button" className="btn-icon-action" title="Excluir Registro" onClick={handleExcluir}>
+              <div className="modal-footer-btns">
+                <button type="button" className="btn-png-action" onClick={handleExcluir}>
                   <img src={iconExcluir} alt="Excluir" />
                 </button>
-                
-                <div className="footer-right-actions">
-                  <button type="button" className="btn-icon-action" title="Cancelar" onClick={() => setIsModalOpen(false)}>
+                <div style={{display: 'flex', gap: '20px'}}>
+                  <button type="button" className="btn-png-action" onClick={() => setIsModalOpen(false)}>
                     <img src={iconCancelar} alt="Cancelar" />
                   </button>
-
-                  <button type="submit" form="form-edit-desp" className="btn-icon-action" title="Salvar Alterações">
-                    <img src={iconConfirme} alt="Salvar" />
+                  <button type="submit" className="btn-png-action">
+                    <img src={iconConfirme} alt="Confirmar" />
                   </button>
                 </div>
               </div>
 
-            </div>
+            </form>
           </div>
         )}
       </div>
 
       <ModalFeedback isOpen={feedback.isOpen} type={feedback.type} title={feedback.title} message={feedback.message} onClose={() => setFeedback(prev => ({ ...prev, isOpen: false }))} onConfirm={feedback.onConfirm} />
-      <button className="desp-fab" onClick={() => navigate('/lancamento')} style={{ cursor: 'pointer' }}><Plus size={30} /></button>
+      <button className="desp-fab" onClick={() => navigate('/lancamento')}><Plus size={30} /></button>
     </>
   );
 };

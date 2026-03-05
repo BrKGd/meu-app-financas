@@ -319,6 +319,32 @@
   background: #dc2626;
 }
 
+/* Customização da Barra de Scroll */
+.edit-modal::-webkit-scrollbar {
+  width: 10px;               /* Largura da barra */
+}
+
+.edit-modal::-webkit-scrollbar-track {
+  background: transparent;    /* Fundo da trilha transparente para não sobrepor o arredondamento */
+  margin: 20px;               /* Margem para o scroll não encostar nas bordas superior/inferior */
+}
+
+.edit-modal::-webkit-scrollbar-thumb {
+  background: #cbd5e1;        /* Cor da barra (um cinza suave) */
+  border-radius: 10px;        /* Bordas bem arredondadas */
+  border: 2px solid white;    /* Cria um espaçamento visual entre a barra e a borda do modal */
+}
+
+.edit-modal::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;        /* Cor um pouco mais escura ao passar o mouse */
+}
+
+/* Garante que o conteúdo não cole na borda direita por causa da barra */
+.edit-modal {
+  scrollbar-gutter: stable;   /* Evita que o layout "pule" quando a barra aparece */
+  padding-right: 15px;        /* Espaço interno para o conteúdo respirar */
+}
+
 /* --- ANIMAÇÕES E MOBILE --- */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
