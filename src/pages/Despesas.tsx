@@ -226,7 +226,7 @@ const Despesas: React.FC = () => {
           </header>
 
           <div className="desp-panel desp-summary-card">
-            <span className="summary-label">Total Projetado no Mês</span>
+            <span className="summary-label">Total Gasto no Mês</span>
             <h2 className="summary-value">
                 {formatarMoeda(despesas.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}
             </h2>
