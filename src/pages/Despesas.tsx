@@ -62,6 +62,9 @@ const Despesas: React.FC = () => {
   const [filtroResponsavel, setFiltroResponsavel] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Lista de formas de pagamento sincronizada e ordenada
+  const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [itemEditando, setItemEditando] = useState<any | null>(null);
   const navigate = useNavigate();
@@ -88,10 +91,11 @@ const Despesas: React.FC = () => {
       const mesAtivo = dataFiltro.getMonth() + 1;
       const anoAtivo = dataFiltro.getFullYear();
 
+      // Busca dados com ordenação alfabética (.order)
       const [catRes, profRes, cartRes, metasRes] = await Promise.all([
-        supabase.from('categorias').select('*').eq('tipo', 'despesa'),
-        supabase.from('profiles').select('id, nome'),
-        supabase.from('cartoes').select('*'),
+        supabase.from('categorias').select('*').eq('tipo', 'despesa').order('nome'),
+        supabase.from('profiles').select('id, nome').order('nome'),
+        supabase.from('cartoes').select('*').order('nome'),
         supabase.from('metas')
           .select('valor_meta, tipo_meta')
           .eq('mes_referencia', mesAtivo)
@@ -252,7 +256,7 @@ const Despesas: React.FC = () => {
         .edit-modal {
           width: 95%;
           max-width: 550px;
-          max-height: 90vh;
+          max-height: 85vh;
           background: white;
           border-radius: 28px;
           padding: 24px;
@@ -262,6 +266,24 @@ const Despesas: React.FC = () => {
           overflow-y: auto;
           display: flex;
           flex-direction: column;
+          scrollbar-gutter: stable;
+        }
+
+        /* Scroll Arredondado Coerente */
+        .edit-modal::-webkit-scrollbar {
+          width: 8px;
+        }
+        .edit-modal::-webkit-scrollbar-track {
+          background: transparent;
+          margin: 20px;
+        }
+        .edit-modal::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+          border: 2px solid white;
+        }
+        .edit-modal::-webkit-scrollbar-thumb:hover {
+          background: #cbd5e1;
         }
 
         .edit-form-grid {
@@ -350,6 +372,7 @@ const Despesas: React.FC = () => {
             border-radius: 24px 24px 0 0; 
             position: fixed; 
             bottom: 0; 
+            max-height: 90vh;
           }
           .modal-overlay { align-items: flex-end; }
           .form-row-2 { grid-template-columns: 1fr; }
@@ -488,8 +511,7 @@ const Despesas: React.FC = () => {
               <div className="modal-header-actions">
                 <div>
                   <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.2rem'}}>Editar Detalhes</h2>
-                  <p style={{margin: 0, fontSize: '0.7rem', color: '#64748b'}}>ID: {itemEditando.id.substring(0,8).toUpperCase()}</p>
-                </div>
+                 </div>
                 <button type="button" onClick={() => setIsModalOpen(false)} className="btn-png-action">
                   <img src={iconFechar} alt="Fechar" />
                 </button>
@@ -539,10 +561,9 @@ const Despesas: React.FC = () => {
                   <div className="form-group">
                     <label>Forma de Pagamento</label>
                     <select value={itemEditando.forma_pagamento} onChange={e => handleChangeEdit('forma_pagamento', e.target.value)}>
-                      <option value="Pix">Pix</option>
-                      <option value="Crédito">Crédito</option>
-                      <option value="Débito">Débito</option>
-                      <option value="Dinheiro">Dinheiro</option>
+                      {formasPagamento.map(forma => (
+                        <option key={forma} value={forma}>{forma}</option>
+                      ))}
                     </select>
                   </div>
 
