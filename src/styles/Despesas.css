@@ -14,7 +14,7 @@
   background: white;
   border-radius: 32px;
   border: 1px solid #f1f5f9;
-  padding: 0px;
+  padding: 30px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.02);
   box-sizing: border-box;
 }
@@ -25,6 +25,14 @@
   grid-template-columns: 1fr 1fr; /* Agora os dois cards dividem a tela 50/50 */
   /* Ou use 2fr 1fr se quiser o título maior que o sumário */
   gap: 20px;
+}
+.desp-panel-list {
+  background: white;
+  border-radius: 32px;
+  border: 1px solid #f1f5f9;
+  padding: 0px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.02);
+  box-sizing: border-box;
 }
 
 

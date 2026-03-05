@@ -303,7 +303,7 @@ const Despesas: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="desp-panel" style={{borderRadius: '0 0 16px 16px', borderTop: 'none'}}>
+                <div className="desp-panel-list" style={{borderRadius: '0 0 16px 16px', borderTop: 'none'}}>
                   {itens.map((item, idx) => (
                     <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
                       <div className="desp-icon-column">
