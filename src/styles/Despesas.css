@@ -14,7 +14,7 @@
   background: white;
   border-radius: 32px;
   border: 1px solid #f1f5f9;
-  padding: 30px;
+  padding: 0px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.02);
   box-sizing: border-box;
 }
@@ -26,6 +26,7 @@
   /* Ou use 2fr 1fr se quiser o título maior que o sumário */
   gap: 20px;
 }
+
 
 .desp-header-area {
   display: flex;
@@ -80,7 +81,7 @@
 }
 
 .list-header {
-  padding: 25px 30px;
+  padding: 10px 10px;
   border-bottom: 1px solid #f1f5f9;
   display: flex;
   justify-content: space-between;
@@ -95,7 +96,7 @@
 .desp-item-row {
   display: flex;
   align-items: center;
-  padding: 20px 30px;
+  padding: 10px 10px;
   border-bottom: 1px solid #f8fafc;
   cursor: pointer;
   width: 100%;

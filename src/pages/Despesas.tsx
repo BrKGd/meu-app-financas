@@ -285,7 +285,7 @@ const Despesas: React.FC = () => {
 
         <main className="desp-panel desp-list-panel" style={{padding: 0, background: 'transparent', boxShadow: 'none'}}>
           {loading ? (
-            <div className="desp-panel" style={{padding: '40px', textAlign: 'center'}}><Loader2 className="spinner" /></div>
+            <div className="desp-panel" style={{padding: '10px', textAlign: 'center'}}><Loader2 className="spinner" /></div>
           ) : (
             Object.entries(secoesAgrupadas).map(([titulo, itens]) => (
               <div key={titulo} className="desp-section-container" style={{marginBottom: '25px'}}>
