@@ -69,7 +69,6 @@ const Menu: React.FC = () => {
       const user = authData?.user;
       if (!user) return;
 
-      // Executa as consultas e já tipa os resultados individualmente
       const [resPerfil, resTodosPerfis, resCartoes, resCompras] = await Promise.all([
         supabase.from('profiles').select('nome, tipo_usuario').eq('id', user.id).single(),
         supabase.from('profiles').select('id, nome'),
@@ -77,7 +76,6 @@ const Menu: React.FC = () => {
         supabase.from('compras').select('*')
       ]);
 
-      // Tratamento de tipos para os dados do perfil logado
       const perfilData = resPerfil.data as Profile | null;
       const isMaster = user.email === 'gleidson.fig@gmail.com';
       const tipoFinal = (isMaster ? 'proprietario' : (perfilData?.tipo_usuario || 'comum')) as TipoUsuario;
@@ -90,25 +88,21 @@ const Menu: React.FC = () => {
         });
       }
 
-      // Mapeamento de Nomes (ID -> Primeiro Nome)
       const mapaNomes: Record<string, string> = {};
       (resTodosPerfis.data as Profile[] | null)?.forEach(p => {
         if (p.id && p.nome) mapaNomes[p.id] = p.nome.split(' ')[0];
       });
 
-      // Cache de fechamento de cartões
       const cacheFechamentoCartoes: Record<string, number> = {};
       (resCartoes.data as Cartao[] | null)?.forEach(c => {
         if (c.nome) cacheFechamentoCartoes[c.nome] = c.dia_fechamento || 0;
       });
 
-      // Filtro de compras conforme o nível de acesso
       const comprasBrutas = resCompras.data as Compra[] | null;
       const todasCompras = temAcessoGestao 
         ? comprasBrutas 
         : comprasBrutas?.filter(c => c.user_id === user.id);
 
-      // Lógica de competência (Meses)
       const agora = new Date();
       const mesAtualChave = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
       const mapaHistorico: Record<string, { total: number, porUsuario: Record<string, number> }> = {}; 
@@ -120,7 +114,7 @@ const Menu: React.FC = () => {
         const dataCompraStr = item.data_compra || '';
         const partesData = dataCompraStr.split('-');
         
-        if (partesData.length < 3) return; // Pula se a data estiver mal formatada
+        if (partesData.length < 3) return;
 
         const anoC = parseInt(partesData[0]);
         const mesC = parseInt(partesData[1]);
@@ -134,7 +128,6 @@ const Menu: React.FC = () => {
           if (diaFechamento && diaC > diaFechamento) delayMes = 1;
         }
 
-        // Distribui as parcelas nos meses de competência
         for (let i = 0; i < numP; i++) {
           let mesAlvoZeroIndexed = (mesC - 1) + delayMes + i;
           let anoAlvo = anoC + Math.floor(mesAlvoZeroIndexed / 12);
@@ -228,17 +221,21 @@ const Menu: React.FC = () => {
       
       <div className="actions-grid">
         <QuickActionLink to="/dashboard" icon={<LayoutDashboard />} label="Painel" sub="Análise" color="#4361ee" />
+        
         {isGestor && (
           <QuickActionLink to="/categoriasMetas" icon={<Target />} label="Metas" sub="Planejar" color="#8b5cf6" />
         )}
 
         {isGestor && (
-          <>
-            <QuickActionLink to="/orcamento" icon={<PiggyBank />} label="Orçamento" sub="Gestão" color="#ff9900" />
-            <QuickActionLink to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" sub="Renda" color="#16a34a" />
-            <QuickActionLink to="/despesas" icon={<ArrowDownCircle />} label="Gastos" sub="Fixos" color="#ef4444" />
-          </>
+           <QuickActionLink to="/orcamento" icon={<PiggyBank />} label="Orçamento" sub="Gestão" color="#ff9900" />
         )}
+
+        {isGestor && (
+           <QuickActionLink to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" sub="Renda" color="#16a34a" />
+        )}
+
+        {/* Liberado para todos: Gastos Fixos */}
+        <QuickActionLink to="/despesas" icon={<ArrowDownCircle />} label="Gastos" sub="Fixos" color="#ef4444" />
         
         {perfil.tipo === 'proprietario' && (
           <QuickActionLink to="/cartoes" icon={<CreditCard />} label="Cartões" sub="Bancos" color="#7209b7" />
@@ -246,9 +243,8 @@ const Menu: React.FC = () => {
         
         <QuickActionLink to="/listagem" icon={<ShoppingBag />} label="Extrato" sub="Compras" color="#00cc66" />
         
-        {perfil.tipo === 'proprietario' && (
-          <QuickActionLink to="/lancamento" icon={<Plus />} label="Novo" sub="Lançar" color="#fff" isPrimary />
-        )}
+        {/* Liberado para todos: Novo Lançamento */}
+        <QuickActionLink to="/lancamento" icon={<Plus />} label="Novo" sub="Lançar" color="#fff" isPrimary />
       </div>
 
       <Link to="/perfil" style={{ textDecoration: 'none' }}>

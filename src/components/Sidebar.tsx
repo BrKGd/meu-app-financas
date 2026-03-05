@@ -83,26 +83,29 @@ const Sidebar: React.FC = () => {
             <span>Início</span>
           </Link>
 
-          {/* Lançar: Apenas Proprietário */}
-          {isProprietario && (
-            <Link to="/lancamento" className={`sidebar-nav-item ${isActive('/lancamento') ? 'active' : ''}`}>
-              <PlusCircle size={20} />
-              <span>Lançar</span>
+          {/* Lançar: Agora visível para todos os usuários */}
+          <Link to="/lancamento" className={`sidebar-nav-item ${isActive('/lancamento') ? 'active' : ''}`}>
+            <PlusCircle size={20} />
+            <span>Lançar</span>
+          </Link>
+
+          {/* Área de Gestão: Restrita a Proprietário ou Administrador */}
+          {temAcessoGestao && (
+            <Link to="/proventos" className={`sidebar-nav-item ${isActive('/proventos') ? 'active' : ''}`}>
+              <ArrowUpCircle size={20} />
+              <span>Entradas</span>
             </Link>
           )}
 
-          {/* Área de Gestão: Proprietário ou Administrador */}
+          {/* Saídas (Gastos Fixos): Agora visível para todos os usuários */}
+          <Link to="/despesas" className={`sidebar-nav-item ${isActive('/despesas') ? 'active' : ''}`}>
+            <ArrowDownCircle size={20} />
+            <span>Saídas</span>
+          </Link>
+
+          {/* Planejamento e Orçamento: Restritos a Gestores */}
           {temAcessoGestao && (
             <>
-              <Link to="/proventos" className={`sidebar-nav-item ${isActive('/proventos') ? 'active' : ''}`}>
-                <ArrowUpCircle size={20} />
-                <span>Entradas</span>
-              </Link>
-              <Link to="/despesas" className={`sidebar-nav-item ${isActive('/despesas') ? 'active' : ''}`}>
-                <ArrowDownCircle size={20} />
-                <span>Saídas</span>
-              </Link>
-              
               <Link to="/categoriasMetas" className={`sidebar-nav-item ${isActive('/categoriasMetas') ? 'active' : ''}`}>
                 <Target size={20} />
                 <span>Planejamento</span>
@@ -112,14 +115,15 @@ const Sidebar: React.FC = () => {
                 <PieChart size={20} />
                 <span>Orçamento</span>
               </Link>
-
-              {isProprietario && (
-                <Link to="/cartoes" className={`sidebar-nav-item ${isActive('/cartoes') ? 'active' : ''}`}>
-                  <CreditCard size={20} />
-                  <span>Cartões</span>
-                </Link>
-              )}
             </>
+          )}
+
+          {/* Cartões: Apenas Proprietário */}
+          {isProprietario && (
+            <Link to="/cartoes" className={`sidebar-nav-item ${isActive('/cartoes') ? 'active' : ''}`}>
+              <CreditCard size={20} />
+              <span>Cartões</span>
+            </Link>
           )}
 
           <Link to="/listagem" className={`sidebar-nav-item ${isActive('/listagem') ? 'active' : ''}`}>

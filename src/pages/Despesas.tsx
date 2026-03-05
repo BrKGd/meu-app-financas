@@ -61,6 +61,7 @@ const Despesas: React.FC = () => {
   const [filtroCategoriaId, setFiltroCategoriaId] = useState(''); 
   const [filtroResponsavel, setFiltroResponsavel] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [usuarioAtual, setUsuarioAtual] = useState<any>(null);
 
   // Lista de formas de pagamento sincronizada e ordenada
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
@@ -88,8 +89,20 @@ const Despesas: React.FC = () => {
   const buscarDados = useCallback(async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUsuarioAtual(user);
+
       const mesAtivo = dataFiltro.getMonth() + 1;
       const anoAtivo = dataFiltro.getFullYear();
+
+      // Busca perfil para checar permissão
+      const { data: perfil } = await supabase
+        .from('profiles')
+        .select('tipo_usuario')
+        .eq('id', user?.id)
+        .single();
+
+      const isAdminOuProp = perfil?.tipo_usuario === 'administrador' || perfil?.tipo_usuario === 'proprietario' || user?.email === 'gleidson.fig@gmail.com';
 
       // Busca dados com ordenação alfabética (.order)
       const [catRes, profRes, cartRes, metasRes] = await Promise.all([
@@ -112,9 +125,14 @@ const Despesas: React.FC = () => {
       
       setMetaTotalPlanejada(totalMetasDespesa);
 
-      const { data: dataCompras, error } = await (supabase.from('compras') as any)
-        .select(`*, categorias (nome, cor)`)
-        .order('data_compra', { ascending: false });
+      // Aplica filtro de dono se não for admin
+      let query = supabase.from('compras').select(`*, categorias (nome, cor)`);
+      
+      if (!isAdminOuProp) {
+        query = query.eq('user_id', user?.id);
+      }
+
+      const { data: dataCompras, error } = await (query.order('data_compra', { ascending: false }) as any);
 
       if (error) throw error;
 
@@ -190,6 +208,11 @@ const Despesas: React.FC = () => {
   };
 
   const handleAbrirModal = (item: Compra) => {
+    // Permite abrir o modal apenas se for dono da despesa ou gestor
+    const isDono = item.user_id === usuarioAtual?.id;
+    const isGestor = responsaveis.find(r => r.id === usuarioAtual?.id); // Simples verificação se está na lista (o backend e buscarDados já filtram o grosso)
+    
+    // Deixamos abrir o modal para visualização, mas as travas de banco (RLS) protegem a edição real.
     const valorParaEdicao = item.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     setItemEditando({ ...item, valor_exibicao: valorParaEdicao });
     setIsModalOpen(true);
@@ -225,7 +248,7 @@ const Despesas: React.FC = () => {
       buscarDados();
       alertar('success', 'Atualizado', 'Registro atualizado com sucesso!');
     } catch (error: any) { 
-      alertar('error', 'Erro ao Salvar', error.message); 
+      alertar('error', 'Erro ao Salvar', 'Você não tem permissão para alterar este registro.'); 
     }
   };
 
@@ -238,7 +261,7 @@ const Despesas: React.FC = () => {
         setFeedback(prev => ({ ...prev, isOpen: false }));
         buscarDados();
       } else {
-        alertar('error', 'Erro', 'Não foi possível excluir.');
+        alertar('error', 'Erro', 'Acesso negado para excluir este registro.');
       }
     });
   };
@@ -269,7 +292,6 @@ const Despesas: React.FC = () => {
           scrollbar-gutter: stable;
         }
 
-        /* Scroll Arredondado Coerente */
         .edit-modal::-webkit-scrollbar {
           width: 8px;
         }

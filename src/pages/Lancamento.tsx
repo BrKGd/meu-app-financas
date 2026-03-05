@@ -25,6 +25,7 @@ interface Categoria {
 }
 
 interface PerfilLogado {
+  id: string;
   tipo_usuario: string;
 }
 
@@ -69,7 +70,6 @@ const Lancamento: React.FC = () => {
     const diaFechamento = cartaoSelecionado.dia_fechamento;
     const vaiParaProximoMes = dia > diaFechamento;
     
-    // Usamos dia 15 para evitar bugs de meses com 28 ou 31 dias ao somar meses
     let dataVencimento = new Date(ano, mes - 1, 15);
     if (vaiParaProximoMes) dataVencimento.setMonth(dataVencimento.getMonth() + 1);
 
@@ -92,7 +92,6 @@ const Lancamento: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Erro 2339 resolvido com tipagem correta no retorno do single()
       const { data: perfil } = await supabase
         .from('profiles')
         .select('tipo_usuario')
@@ -101,19 +100,25 @@ const Lancamento: React.FC = () => {
 
       const isMaster = user.email === 'gleidson.fig@gmail.com';
       const tipoFinal = isMaster ? 'proprietario' : ((perfil as any)?.tipo_usuario || 'comum');
-      setPerfilLogado({ tipo_usuario: tipoFinal });
+      
+      setPerfilLogado({ id: user.id, tipo_usuario: tipoFinal });
 
-      if (tipoFinal === 'proprietario') {
-        const [dC, dU, dCat] = await Promise.all([
-          supabase.from('cartoes').select('id, nome, dia_fechamento').order('nome'),
-          supabase.from('profiles').select('id, nome').order('nome'),
-          supabase.from('categorias').select('id, nome').eq('tipo', 'despesa').order('nome')
-        ]);
-        
-        setCartoes((dC.data as Cartao[]) || []);
-        setUsuarios((dU.data as Perfil[]) || []);
-        setCategorias((dCat.data as Categoria[]) || []);
+      // Agora buscamos os dados para todos os níveis de acesso
+      const [dC, dU, dCat] = await Promise.all([
+        supabase.from('cartoes').select('id, nome, dia_fechamento').order('nome'),
+        supabase.from('profiles').select('id, nome').order('nome'),
+        supabase.from('categorias').select('id, nome').eq('tipo', 'despesa').order('nome')
+      ]);
+      
+      setCartoes((dC.data as Cartao[]) || []);
+      setUsuarios((dU.data as Perfil[]) || []);
+      setCategorias((dCat.data as Categoria[]) || []);
+
+      // Se não for proprietário, trava o responsável como sendo o próprio usuário logado
+      if (tipoFinal !== 'proprietario') {
+        setForm(prev => ({ ...prev, user_id: user.id }));
       }
+
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
     } finally {
@@ -152,9 +157,9 @@ const Lancamento: React.FC = () => {
 
     const cartaoObjeto = cartoes.find(c => c.nome === form.cartao);
     
-    // Criamos o objeto de payload com casting para evitar erro 'never'
     const payload: any = {
       user_id: form.user_id,
+      usuario_criacao: perfilLogado?.id, // Define quem criou o registro
       descricao: form.descricao,
       loja: form.loja,
       pedido: form.pedido,
@@ -200,7 +205,6 @@ const Lancamento: React.FC = () => {
           });
         }
         
-        // Erro 2769 resolvido com casting para (any) antes do insert
         const { error: errorParcelas } = await (supabase.from('parcelas') as any).insert(parcelasParaInserir);
         if (errorParcelas) throw errorParcelas;
       }
@@ -212,7 +216,19 @@ const Lancamento: React.FC = () => {
         message: isEfetivamenteParcelado ? `Gasto e ${numP} parcelas registradas.` : `Gasto registrado com sucesso.` 
       });
       
-      setForm({ ...form, descricao: '', valor_total: '', loja: '', pedido: '', nota_fiscal: '', num_parcelas: 1, cartao: '', categoria_id: '' });
+      // Reseta o form mantendo o user_id se não for proprietário
+      setForm({ 
+        ...form, 
+        descricao: '', 
+        valor_total: '', 
+        loja: '', 
+        pedido: '', 
+        nota_fiscal: '', 
+        num_parcelas: 1, 
+        cartao: '', 
+        categoria_id: '',
+        user_id: perfilLogado?.tipo_usuario !== 'proprietario' ? (perfilLogado?.id || '') : ''
+      });
 
     } catch (err: any) {
       setModal({ isOpen: true, type: 'error', title: 'Erro nas parcelas', message: err.message });
@@ -223,16 +239,6 @@ const Lancamento: React.FC = () => {
 
   if (fetching) return <div className="loading-state">CARREGANDO...</div>;
   
-  if (perfilLogado?.tipo_usuario !== 'proprietario') {
-    return (
-      <div className="access-denied">
-        <div className="lock-icon"><Lock size={40} color="#f43f5e" /></div>
-        <h2>Acesso Restrito</h2>
-        <p>Apenas administradores podem realizar lançamentos.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="lancamento-container fade-in">
       <header className="lancamento-header">
@@ -253,10 +259,21 @@ const Lancamento: React.FC = () => {
             </div>
             <div className="input-group">
               <label className="input-label"><User size={14} /> Responsável</label>
-              <select className="form-control" required value={form.user_id} onChange={e => setForm({...form, user_id: e.target.value})}>
+              <select 
+                className="form-control" 
+                required 
+                value={form.user_id} 
+                disabled={perfilLogado?.tipo_usuario !== 'proprietario'}
+                onChange={e => setForm({...form, user_id: e.target.value})}
+              >
                 <option value="">Quem comprou?</option>
                 {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
+              {perfilLogado?.tipo_usuario !== 'proprietario' && (
+                <span style={{ fontSize: '10px', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Lock size={10} /> Travado para seu perfil
+                </span>
+              )}
             </div>
           </div>
 
