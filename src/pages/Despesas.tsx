@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Calendar, Tag, Trash2, X, Save, 
-  ShoppingCart, Loader2, Filter, CreditCard, Banknote, Landmark, ChevronLeft, ChevronRight 
+  ShoppingCart, Loader2, Filter, CreditCard, Banknote, Landmark, ChevronLeft, ChevronRight,
+  QrCode, Receipt
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
@@ -34,7 +35,6 @@ interface Compra {
   parcelado: boolean;
   nota_fiscal?: string;
   pedido?: string;
-  // Campos calculados para a listagem
   parcela_atual?: number;
   valor_projetado?: number;
   categorias?: {
@@ -75,7 +75,6 @@ const Despesas: React.FC = () => {
   const buscarDados = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Buscar dados auxiliares primeiro
       const [catRes, profRes, cartRes] = await Promise.all([
         supabase.from('categorias').select('*').eq('tipo', 'despesa'),
         supabase.from('profiles').select('id, nome'),
@@ -87,7 +86,6 @@ const Despesas: React.FC = () => {
       setResponsaveis(profRes.data || []);
       setCartoes(listaCartoes);
 
-      // 2. Buscar TODAS as compras (a projeção é feita no front-end como na sua Listagem)
       const { data: dataCompras, error } = await (supabase.from('compras') as any)
         .select(`*, categorias (nome, cor)`)
         .order('data_compra', { ascending: false });
@@ -103,7 +101,6 @@ const Despesas: React.FC = () => {
         const [anoC, mesC, diaC] = item.data_compra.split('-').map(Number);
         
         let delayMes = 0;
-        // Lógica de fechamento de cartão
         if (item.forma_pagamento === 'Crédito' && item.cartao) {
           const infoCartao = listaCartoes.find(c => c.nome === item.cartao);
           if (infoCartao && diaC > infoCartao.dia_fechamento) {
@@ -111,7 +108,6 @@ const Despesas: React.FC = () => {
           }
         }
 
-        // Projetar as parcelas e ver se alguma cai no mês selecionado
         for (let i = 0; i < numParcelas; i++) {
           const dataRefParcela = new Date(anoC, (mesC - 1) + delayMes + i, 15);
           
@@ -135,6 +131,7 @@ const Despesas: React.FC = () => {
 
   useEffect(() => { buscarDados(); }, [buscarDados]);
 
+  // --- AGRUPAMENTO POR FORMA DE PAGAMENTO ---
   const secoesAgrupadas = useMemo(() => {
     const filtradas = despesas.filter(d => {
       const matchSearch = d.descricao.toLowerCase().includes(searchTerm.toLowerCase());
@@ -145,9 +142,9 @@ const Despesas: React.FC = () => {
 
     const grupos: Record<string, Compra[]> = {};
     filtradas.forEach(despesa => {
-      const nomeSecao = despesa.categorias?.nome || 'Sem Categoria';
-      if (!grupos[nomeSecao]) grupos[nomeSecao] = [];
-      grupos[nomeSecao].push(despesa);
+      const chave = despesa.forma_pagamento || 'Outros';
+      if (!grupos[chave]) grupos[chave] = [];
+      grupos[chave].push(despesa);
     });
     return grupos;
   }, [despesas, searchTerm, filtroCategoriaId, filtroResponsavel]);
@@ -157,7 +154,6 @@ const Despesas: React.FC = () => {
   };
 
   const handleAbrirModal = (item: Compra) => {
-    // Para edição, usamos o valor total original
     setItemEditando({ 
         ...item, 
         valor_exibicao: formatarMoeda(item.valor_total) 
@@ -211,9 +207,11 @@ const Despesas: React.FC = () => {
 
   const getIconForSection = (title: string) => {
     const t = title.toLowerCase();
-    if (t.includes('cartão')) return <CreditCard size={18} color="#ef4444" />;
-    if (t.includes('fixa') || t.includes('moradia')) return <Landmark size={18} color="#3b82f6" />;
-    return <Banknote size={18} color="#10b981" />;
+    if (t.includes('crédito')) return <CreditCard size={18} color="#ef4444" />;
+    if (t.includes('pix')) return <QrCode size={18} color="#10b981" />;
+    if (t.includes('boleto')) return <Receipt size={18} color="#f59e0b" />;
+    if (t.includes('débito')) return <Banknote size={18} color="#3b82f6" />;
+    return <Landmark size={18} color="#64748b" />;
   };
 
   return (
@@ -239,7 +237,7 @@ const Despesas: React.FC = () => {
           </div>
         </div>
 
-        {/* Filtros */}
+        {/* Barra de Filtros */}
         <div className="filter-container-premium" style={{ marginBottom: '20px' }}>
           <div className="search-wrapper" style={{ display: 'flex', gap: '10px', background: 'white', padding: '10px 15px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
             <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem' }} />
@@ -249,11 +247,15 @@ const Despesas: React.FC = () => {
             <div className="advanced-filters-row" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
               <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.8rem' }}>
                 <option value="">Todas as Categorias</option>
-                {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+                {[...categorias].sort((a, b) => a.nome.localeCompare(b.nome)).map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                ))}
               </select>
               <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.8rem' }}>
                 <option value="">Todos Responsáveis</option>
-                {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                {[...responsaveis].sort((a, b) => a.nome.localeCompare(b.nome)).map(r => (
+                  <option key={r.id} value={r.id}>{r.nome}</option>
+                ))}
               </select>
             </div>
           )}
@@ -302,9 +304,9 @@ const Despesas: React.FC = () => {
                         <div className="desp-meta-line">
                           <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
                           <span className="meta-divider">•</span>
-                          <span className="meta-tag"><Tag size={12} /> {item.loja || 'Loja não inf.'}</span>
+                          <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
                           <span className="meta-divider">•</span>
-                          <span className="meta-tag">{item.forma_pagamento} {item.cartao ? `(${item.cartao})` : ''}</span>
+                          <span className="meta-tag">{item.loja || 'Loja não inf.'}</span>
                         </div>
                       </div>
                     </div>
