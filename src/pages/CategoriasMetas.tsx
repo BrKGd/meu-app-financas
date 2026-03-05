@@ -369,5 +369,4 @@ const CategoriasMetas: React.FC = () => {
     </>
   );
 };
-//
 export default CategoriasMetas;
