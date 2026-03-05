@@ -4,10 +4,16 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Calendar, Tag, Trash2, X, Save, 
   ShoppingCart, Loader2, Filter, CreditCard, Banknote, Landmark, ChevronLeft, ChevronRight,
-  QrCode, Receipt, AlertTriangle
+  QrCode, Receipt, AlertTriangle, User, Store
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
+
+// --- Importação dos Ícones de Imagem ---
+import iconConfirme from '../assets/confirme.png';
+import iconExcluir from '../assets/excluir.png';
+import iconCancelar from '../assets/cancelar.png';
+import iconFechar from '../assets/fechar.png';
 
 // --- Interfaces ---
 interface Categoria {
@@ -73,13 +79,16 @@ const Despesas: React.FC = () => {
     setFeedback({ isOpen: true, type, title, message, onConfirm });
   };
 
+  const formatarMoeda = (valor: number) => {
+    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
   const buscarDados = useCallback(async () => {
     setLoading(true);
     try {
       const mesAtivo = dataFiltro.getMonth() + 1;
       const anoAtivo = dataFiltro.getFullYear();
 
-      // Buscamos as categorias, perfis, cartões e a tabela de METAS (ajuste o nome da tabela se não for 'metas')
       const [catRes, profRes, cartRes, metasRes] = await Promise.all([
         supabase.from('categorias').select('*').eq('tipo', 'despesa'),
         supabase.from('profiles').select('id, nome'),
@@ -94,7 +103,6 @@ const Despesas: React.FC = () => {
       setResponsaveis(profRes.data || []);
       setCartoes(cartRes.data || []);
       
-      // Lógica corrigida: Somar valor_meta apenas de itens do tipo 'despesa' no mês/ano filtrado
       const totalMetasDespesa = metasRes.data
         ?.filter(m => m.tipo_meta === 'despesa')
         .reduce((acc, cur) => acc + Number(cur.valor_meta || 0), 0) || 0;
@@ -124,7 +132,8 @@ const Despesas: React.FC = () => {
         }
 
         for (let i = 0; i < numParcelas; i++) {
-          const dataRefParcela = new Date(anoC, (mesC - 1) + delayMes + i, 15);
+          const dataRefParcela = new Date(anoC, (mesC - 1) + delayMes + i, 10);
+          
           if (dataRefParcela.getMonth() === mesAlvo && dataRefParcela.getFullYear() === anoAlvo) {
             projetadas.push({ 
               ...item, 
@@ -138,6 +147,7 @@ const Despesas: React.FC = () => {
       setDespesas(projetadas);
     } catch (error: any) {
       console.error("Erro técnico:", error.message);
+      alertar('error', 'Falha na Conexão', 'Não foi possível carregar os dados.');
     } finally {
       setLoading(false);
     }
@@ -147,7 +157,6 @@ const Despesas: React.FC = () => {
 
   const totalGastoFinal = useMemo(() => despesas.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0), [despesas]);
   
-  // Porcentagem baseada na soma das metas tipo 'despesa'
   const porcGastoOrcamento = useMemo(() => metaTotalPlanejada > 0 ? (totalGastoFinal / metaTotalPlanejada) * 100 : 0, [totalGastoFinal, metaTotalPlanejada]);
   const extrapolou = totalGastoFinal > metaTotalPlanejada && metaTotalPlanejada > 0;
 
@@ -168,10 +177,6 @@ const Despesas: React.FC = () => {
     return grupos;
   }, [despesas, searchTerm, filtroCategoriaId, filtroResponsavel]);
 
-  const formatarMoeda = (valor: number) => {
-    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
-
   const renderTextoResumo = () => {
     if (extrapolou) {
       const percentualExcedente = porcGastoOrcamento - 100;
@@ -182,17 +187,24 @@ const Despesas: React.FC = () => {
   };
 
   const handleAbrirModal = (item: Compra) => {
-    setItemEditando({ ...item, valor_exibicao: formatarMoeda(item.valor_total) });
+    const valorParaEdicao = item.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    setItemEditando({ ...item, valor_exibicao: valorParaEdicao });
     setIsModalOpen(true);
   };
 
+  const handleChangeEdit = (field: string, value: any) => {
+    setItemEditando((prev: any) => ({ ...prev, [field]: value }));
+  };
+
   const handleSalvarEdicao = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!itemEditando?.id) return;
     try {
       const valorLimpo = typeof itemEditando.valor_exibicao === 'string' 
-        ? Number(itemEditando.valor_exibicao.replace(/[^\d,]/g, '').replace(',', '.')) 
+        ? Number(itemEditando.valor_exibicao.replace(/\D/g, '')) / 100 
         : itemEditando.valor_total;
+
+      if (isNaN(valorLimpo)) throw new Error("Valor inválido");
 
       const { error } = await (supabase.from('compras') as any).update({
         descricao: itemEditando.descricao,
@@ -210,18 +222,22 @@ const Despesas: React.FC = () => {
       if (error) throw error;
       setIsModalOpen(false);
       buscarDados();
-      alertar('success', 'Atualizado', 'Registro atualizado!');
-    } catch (error: any) { alertar('error', 'Erro', error.message); }
+      alertar('success', 'Atualizado', 'Registro atualizado com sucesso!');
+    } catch (error: any) { 
+      alertar('error', 'Erro ao Salvar', error.message); 
+    }
   };
 
   const handleExcluir = () => {
     if (!itemEditando?.id) return;
-    alertar('danger', 'Excluir?', `Apagar lançamento?`, async () => {
+    alertar('danger', 'Confirmar Exclusão', `Deseja realmente apagar este lançamento?`, async () => {
       const { error } = await (supabase.from('compras') as any).delete().eq('id', itemEditando.id);
       if (!error) {
         setIsModalOpen(false);
         setFeedback(prev => ({ ...prev, isOpen: false }));
         buscarDados();
+      } else {
+        alertar('error', 'Erro', 'Não foi possível excluir.');
       }
     });
   };
@@ -236,6 +252,121 @@ const Despesas: React.FC = () => {
         }
         .blinking-badge {
           animation: blink-alert 1.5s infinite ease-in-out;
+        }
+        
+        .edit-modal {
+          width: 95%;
+          max-width: 550px;
+          max-height: 90vh;
+          overflow: hidden; /* Mudado para permitir cabeçalho/rodape fixos se desejar */
+          background: white;
+          border-radius: 28px;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+          z-index: 1001;
+        }
+
+        .modal-scrollable-body {
+          padding: 0 24px 24px 24px;
+          overflow-y: auto;
+          flex: 1;
+        }
+
+        .edit-form-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .form-group label {
+          font-size: 0.65rem;
+          font-weight: 800;
+          color: #64748b;
+          margin-bottom: 6px;
+          display: block;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .form-group input, .form-group select {
+          width: 100%;
+          padding: 12px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 12px;
+          font-size: 0.95rem;
+          outline: none;
+          transition: all 0.2s;
+          background: #f8fafc;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+          border-color: #ef4444;
+          background: white;
+          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .form-row-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .modal-footer-icons {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 15px 24px;
+          border-top: 1px solid #e2e8f0;
+          background: #f8fafc;
+        }
+
+        .footer-right-actions {
+          display: flex;
+          gap: 15px;
+        }
+
+        .btn-icon-action {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 5px;
+          transition: transform 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .btn-icon-action img {
+          width: 32px;
+          height: 32px;
+          object-fit: contain;
+        }
+
+        .btn-icon-action:hover { transform: scale(1.1); }
+        .btn-icon-action:active { transform: scale(0.95); }
+
+        .parcela-preview-box {
+          background: #f1f5f9;
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px dashed #cbd5e1;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 4px;
+        }
+
+        @media (max-width: 480px) {
+          .edit-modal { 
+            width: 100%; 
+            border-radius: 24px 24px 0 0; 
+            position: fixed; 
+            bottom: 0; 
+          }
+          .modal-overlay { align-items: flex-end; }
+          .form-row-2 { grid-template-columns: 1fr; }
         }
       `}</style>
 
@@ -297,10 +428,9 @@ const Despesas: React.FC = () => {
           </div>
         </div>
 
-        {/* ... Restante do código mantido rigorosamente igual ... */}
         <div className="filter-container-premium" style={{ marginBottom: '20px' }}>
           <div className="search-wrapper" style={{ display: 'flex', gap: '10px', background: 'white', padding: '10px 15px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-            <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem' }} />
+            <input type="text" placeholder="Pesquisar despesa..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem' }} />
             <button onClick={() => setShowFilters(!showFilters)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showFilters ? '#ef4444' : '#64748b' }}><Filter size={20} /></button>
           </div>
 
@@ -330,75 +460,176 @@ const Despesas: React.FC = () => {
 
         <main className="desp-panel desp-list-panel" style={{padding: 0, background: 'transparent', boxShadow: 'none'}}>
           {loading ? (
-            <div className="desp-panel" style={{padding: '10px', textAlign: 'center'}}><Loader2 className="spinner" /></div>
+            <div className="desp-panel" style={{padding: '40px', textAlign: 'center', background: 'white', borderRadius: '24px'}}>
+              <Loader2 className="spinner" style={{ margin: '0 auto' }} />
+              <p style={{ marginTop: '10px', color: '#64748b', fontSize: '0.8rem' }}>Sincronizando dados...</p>
+            </div>
           ) : (
-            Object.entries(secoesAgrupadas).map(([titulo, itens]) => (
-              <div key={titulo} className="desp-section-container" style={{marginBottom: '25px'}}>
-                <div className="section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: '#ffffff', borderRadius: '16px 16px 0 0', borderBottom: '1px solid #f1f5f9' }}>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                    <h3 style={{fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800, color: '#475569', margin: 0}}>{titulo}</h3>
-                  </div>
-                  <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>{formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}</span>
-                </div>
-                <div className="desp-panel-list" style={{borderRadius: '0 0 16px 16px', borderTop: 'none'}}>
-                  {itens.map((item, idx) => (
-                    <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
-                      <div className="desp-icon-column">
-                        <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}><ShoppingCart size={20} /></div>
-                      </div>
-                      <div className="desp-main-content">
-                        <div className="desp-top-line">
-                          <span className="desp-desc">{item.descricao} {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>{item.parcela_atual}/{item.num_parcelas}</span>}</span>
-                          <span className="desp-value value-negative">{formatarMoeda(item.valor_projetado || 0)}</span>
-                        </div>
-                        <div className="desp-meta-line">
-                          <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
-                          <span className="meta-divider">•</span>
-                          <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
-                        </div>
-                      </div>
+            Object.keys(secoesAgrupadas).length > 0 ? (
+              Object.entries(secoesAgrupadas).map(([titulo, itens]) => (
+                <div key={titulo} className="desp-section-container" style={{marginBottom: '25px'}}>
+                  <div className="section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: '#ffffff', borderRadius: '16px 16px 0 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                      <h3 style={{fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800, color: '#475569', margin: 0}}>{titulo}</h3>
                     </div>
-                  ))}
+                    <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>{formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}</span>
+                  </div>
+                  <div className="desp-panel-list" style={{borderRadius: '0 0 16px 16px', borderTop: 'none', background: 'white'}}>
+                    {itens.map((item, idx) => (
+                      <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
+                        <div className="desp-icon-column">
+                          <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}><ShoppingCart size={20} /></div>
+                        </div>
+                        <div className="desp-main-content">
+                          <div className="desp-top-line">
+                            <span className="desp-desc">{item.descricao} {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>{item.parcela_atual}/{item.num_parcelas}</span>}</span>
+                            <span className="desp-value value-negative">{formatarMoeda(item.valor_projetado || 0)}</span>
+                          </div>
+                          <div className="desp-meta-line">
+                            <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
+                            <span className="meta-divider">•</span>
+                            <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Nenhuma despesa encontrada.</div>
+            )
           )}
         </main>
 
         {isModalOpen && itemEditando && (
-          <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="modal-overlay" onClick={() => setIsModalOpen(false)} style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+          }}>
             <div className="edit-modal" onClick={e => e.stopPropagation()}>
-              <div className="modal-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{margin: 0, fontWeight: 900}}>Detalhes</h2>
-                <button onClick={() => setIsModalOpen(false)} className="close-btn-desp"><X size={20} /></button>
+              
+              {/* CABEÇALHO COM ÍCONE PNG */}
+              <div className="modal-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 24px 15px 24px' }}>
+                <div>
+                  <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.2rem'}}>Editar Detalhes</h2>
+                  <p style={{margin: 0, fontSize: '0.7rem', color: '#64748b'}}>ID: {itemEditando.id.substring(0,8).toUpperCase()}</p>
+                </div>
+                <button onClick={() => setIsModalOpen(false)} className="btn-icon-action" title="Fechar">
+                   <img src={iconFechar} alt="Fechar" />
+                </button>
               </div>
-              <form onSubmit={handleSalvarEdicao} className="edit-form-grid">
-                <div className="form-group">
-                  <label>DESCRIÇÃO</label>
-                  <input type="text" value={itemEditando.descricao || ''} onChange={e => setItemEditando({...itemEditando, descricao: e.target.value})} required />
-                </div>
-                <div className="form-row" style={{display: 'flex', gap: '15px', marginTop: '15px'}}>
-                  <div className="form-group" style={{flex: 1}}>
-                    <label>VALOR TOTAL</label>
-                    <input type="text" value={itemEditando.valor_exibicao || ''} onChange={e => setItemEditando({...itemEditando, valor_exibicao: e.target.value})} required />
+
+              <div className="modal-scrollable-body">
+                <form id="form-edit-desp" onSubmit={handleSalvarEdicao} className="edit-form-grid">
+                  <div className="form-group">
+                    <label>Descrição do Gasto</label>
+                    <input type="text" value={itemEditando.descricao || ''} onChange={e => handleChangeEdit('descricao', e.target.value)} required />
                   </div>
-                  <div className="form-group" style={{flex: 1}}>
-                    <label>DATA COMPRA</label>
-                    <input type="date" value={itemEditando.data_compra || ''} onChange={e => setItemEditando({...itemEditando, data_compra: e.target.value})} required />
+
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label>Valor Total</label>
+                      <input type="text" value={itemEditando.valor_exibicao || ''} onChange={e => handleChangeEdit('valor_exibicao', e.target.value)} placeholder="0,00" required />
+                    </div>
+                    <div className="form-group">
+                      <label>Data da Compra</label>
+                      <input type="date" value={itemEditando.data_compra || ''} onChange={e => handleChangeEdit('data_compra', e.target.value)} required />
+                    </div>
                   </div>
+
+                  <div className="form-group">
+                    <label>Loja / Estabelecimento</label>
+                    <div style={{position: 'relative'}}>
+                      <Store size={16} style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8'}} />
+                      <input style={{paddingLeft: '38px'}} type="text" value={itemEditando.loja || ''} onChange={e => handleChangeEdit('loja', e.target.value)} placeholder="Onde você comprou?" />
+                    </div>
+                  </div>
+
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label>Categoria</label>
+                      <select value={itemEditando.categoria_id} onChange={e => handleChangeEdit('categoria_id', e.target.value)}>
+                        {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Responsável</label>
+                      <select value={itemEditando.user_id} onChange={e => handleChangeEdit('user_id', e.target.value)}>
+                        {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label>Forma de Pagamento</label>
+                      <select value={itemEditando.forma_pagamento} onChange={e => handleChangeEdit('forma_pagamento', e.target.value)}>
+                        <option value="Pix">Pix</option>
+                        <option value="Crédito">Crédito</option>
+                        <option value="Débito">Débito</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                      </select>
+                    </div>
+
+                    {itemEditando.forma_pagamento === 'Crédito' && (
+                      <div className="form-group">
+                        <label>Cartão Utilizado</label>
+                        <select value={itemEditando.cartao || ''} onChange={e => handleChangeEdit('cartao', e.target.value)}>
+                          <option value="">Selecione um cartão</option>
+                          {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {itemEditando.forma_pagamento === 'Crédito' && (
+                    <div className="form-group">
+                      <label>Parcelamento (Nº de Vezes)</label>
+                      <input type="number" min="1" max="48" value={itemEditando.num_parcelas || 1} onChange={e => handleChangeEdit('num_parcelas', Number(e.target.value))} />
+                      
+                      {Number(itemEditando.num_parcelas) > 1 && (
+                        <div className="parcela-preview-box">
+                          <span style={{fontSize: '0.75rem', color: '#64748b'}}>Valor de cada parcela:</span>
+                          <strong style={{color: '#1e293b'}}>
+                            {formatarMoeda(
+                              (typeof itemEditando.valor_exibicao === 'string' 
+                                ? Number(itemEditando.valor_exibicao.replace(/\./g, '').replace(',', '.')) 
+                                : itemEditando.valor_total) / (itemEditando.num_parcelas || 1)
+                            )}
+                          </strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              {/* RODAPÉ COM ÍCONES PNG */}
+              <div className="modal-footer-icons">
+                <button type="button" className="btn-icon-action" title="Excluir Registro" onClick={handleExcluir}>
+                  <img src={iconExcluir} alt="Excluir" />
+                </button>
+                
+                <div className="footer-right-actions">
+                  <button type="button" className="btn-icon-action" title="Cancelar" onClick={() => setIsModalOpen(false)}>
+                    <img src={iconCancelar} alt="Cancelar" />
+                  </button>
+
+                  <button type="submit" form="form-edit-desp" className="btn-icon-action" title="Salvar Alterações">
+                    <img src={iconConfirme} alt="Salvar" />
+                  </button>
                 </div>
-                <div className="modal-footer-actions">
-                  <button type="button" className="btn-delete-full" onClick={handleExcluir}><Trash2 size={18} /> Excluir</button>
-                  <button type="submit" className="btn-save-full"><Save size={18} /> Salvar</button>
-                </div>
-              </form>
+              </div>
+
             </div>
           </div>
         )}
       </div>
 
       <ModalFeedback isOpen={feedback.isOpen} type={feedback.type} title={feedback.title} message={feedback.message} onClose={() => setFeedback(prev => ({ ...prev, isOpen: false }))} onConfirm={feedback.onConfirm} />
-      <button className="desp-fab" onClick={() => navigate('/lancamento')}><Plus size={30} /></button>
+      <button className="desp-fab" onClick={() => navigate('/lancamento')} style={{ cursor: 'pointer' }}><Plus size={30} /></button>
     </>
   );
 };
