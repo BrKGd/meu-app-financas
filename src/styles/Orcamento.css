@@ -174,6 +174,7 @@
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
 .detalhe-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #f8fafc; border-radius: 18px; margin-bottom: 8px; }
 
+
 /* --- RESPONSIVIDADE --- */
 @media (max-width: 768px) {
   .orcamento-container { padding: 20px 10px 100px; }
@@ -184,6 +185,70 @@
   .stats-values h3 { font-size: 1.75rem; }
   .status-floating-badge { right: 15px; padding: 6px 14px; font-size: 0.65rem }
   .btn-ajuste-premium { bottom: 90px;right: 20px;}
+}
+
+/* Container que empilha e alinha os badges à direita */
+.status-badges-stack {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  z-index: 10;
+}
+
+/* Badge fixo original (ajustado para flex) */
+.status-floating-badge {
+  position: static;
+  padding: 3px 6px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: white;
+  font-weight: 700;
+  font-size: 0.70rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  text-transform: capitalize;
+}
+
+/* NOVO Badge piscante suave e compacto */
+.critical-alert-badge {
+  background-color: #fef2f2; 
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: capitalize;
+  letter-spacing: 0.05em;
+  border: 1px solid #fecaca;
+  animation: premium-pulse-red 2.5s infinite;
+  white-space: nowrap; 
+  width: auto; 
+  box-shadow: 0 2px 5px rgba(153, 27, 27, 0.1);
+}
+
+/* Animação com degradê de vermelhos suaves e opacidade */
+@keyframes premium-pulse-red {
+  0% {
+    background-color: #fef2f2; /* Vermelho ultra suave */
+    border-color: #fecaca;
+    box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    background-color: #fee2e2; /* Vermelho muito suave */
+    border-color: #fca5a5; /* Borda um pouco mais visível */
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); /* Efeito de onda suave */
+    transform: scale(1.03); /* Leve pulsação */
+  }
+  100% {
+    background-color: #fef2f2;
+    border-color: #fecaca;
+    box-shadow: 0 0 0 0px rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
 }
 
 /* --- ANIMAÇÕES --- */

@@ -5,6 +5,7 @@ import {
   Calendar, TrendingUp, X, ArrowDownCircle, CheckCircle2, Info
 } from 'lucide-react';
 import '../styles/Orcamento.css';
+import { useNavigate } from 'react-router-dom';
 
 // --- Interfaces para Tipagem ---
 interface CategoriaConsolidada {
@@ -33,6 +34,7 @@ interface DadosOrcamento {
 }
 
 const Orcamento: React.FC = () => {
+  const navigate = useNavigate(); // Inicialize o hook
   const [loading, setLoading] = useState(true);
   const [modalDetalhe, setModalDetalhe] = useState<{aberto: boolean, tipo: string, dados: any[]}>({ 
     aberto: false, tipo: '', dados: [] 
@@ -158,10 +160,10 @@ const Orcamento: React.FC = () => {
 
   const statusConfig = useMemo(() => {
     if (dados.metaGasto === 0 && dados.gastoReal > 0) return { label: 'Sem teto definido', class: 'status-bad', color: '#ef4444', icon: <AlertCircle size={14} /> };
-    if (porcGasto <= 85) return { label: 'Tá de boa', class: 'status-good', color: '#10b981', icon: <CheckCircle2 size={14} /> };
-    if (porcGasto <= 100) return { label: 'Cuidado!', class: 'status-warning', color: '#f59e0b', icon: <Info size={14} /> };
-    return { label: 'Teto estourado', class: 'status-bad', color: '#ef4444', icon: <AlertCircle size={14} /> };
-  }, [porcGasto, dados]);
+    if (porcGastoOrcamento <= 85) return { label: 'Tá de boa', class: 'status-good', color: '#10b981', icon: <CheckCircle2 size={14} /> };
+    if (porcGastoOrcamento <= 100) return { label: 'Sua grana tá acabando!', class: 'status-warning', color: '#f59e0b', icon: <Info size={14} /> };
+    return { label: 'Deu ruim, gastou demais!', class: 'status-bad', color: '#ef4444', icon: <AlertCircle size={14} /> };
+  }, [porcGastoOrcamento, dados]);
 
   return (
     <div className="orcamento-container fade-in">
@@ -173,7 +175,9 @@ const Orcamento: React.FC = () => {
             <span>{new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date()).toUpperCase()}</span>
           </div>
         </div>
-        <button className="btn-ajuste-premium" onClick={() => window.location.href='/CategoriasMetas'}>Definir Metas</button>
+        <button className="btn-ajuste-premium" onClick={() => navigate('/CategoriasMetas')}>
+          Definir Metas
+        </button>
       </header>
 
       {loading ? (
@@ -193,14 +197,27 @@ const Orcamento: React.FC = () => {
                 <PiggyBank size={32} />
               </div>
             </div>
+            
             <div className="premium-progress-bg">
               <div className="premium-progress-fill" style={{ width: `${Math.min(porcGastoOrcamento, 100)}%`, backgroundColor: statusConfig.color }} />
             </div>
+            
             <div className="progress-details">
-              <span className="perc-text" style={{ color: statusConfig.color }}>{porcGastoOrcamento.toFixed(1)}% utilizado do teto</span>
+              <span className="perc-text" style={{ color: statusConfig.color }}>
+                {porcGastoOrcamento.toFixed(1)}% do que você ganhou, já foi gasto.
+              </span>
             </div>
-            <div className={`status-floating-badge ${statusConfig.class}`} style={{ backgroundColor: statusConfig.color }}>
-              {statusConfig.icon} {statusConfig.label}
+
+            {/* CONTAINER DOS BADGES (POSICIONAMENTO SOBREPOSTO E ALINHADO) */}
+            <div className="status-badges-stack">
+              {porcGastoOrcamento > 100 && (
+                <div className="critical-alert-badge">
+                  Limite excedido
+                </div>
+              )}
+              <div className={`status-floating-badge ${statusConfig.class}`} style={{ backgroundColor: statusConfig.color }}>
+                {statusConfig.icon} {statusConfig.label}
+              </div>
             </div>
           </section>
 
