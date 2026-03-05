@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Tag, Edit2, Target, Loader2,
-  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star
+  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star, Settings2
 } from 'lucide-react';
 
 // Componentes e Estilos
@@ -46,6 +46,7 @@ const CategoriasMetas: React.FC = () => {
   const [ano, setAno] = useState<number>(new Date().getFullYear());
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false); // Novo estado para controlar edição
   const [selectedItem, setSelectedItem] = useState<any>(null);
   
   const [form, setForm] = useState({ 
@@ -54,7 +55,6 @@ const CategoriasMetas: React.FC = () => {
     valor_meta: '' as string | number
   });
 
-  // --- ESTADO PARA O MODAL FEEDBACK ---
   const [feedback, setFeedback] = useState<{
     isOpen: boolean;
     type: ModalType;
@@ -63,9 +63,19 @@ const CategoriasMetas: React.FC = () => {
     onConfirm?: () => void;
   }>({ isOpen: false, type: 'success', title: '', message: '' });
 
-  // Função auxiliar para disparar o feedback
   const alertar = (type: ModalType, title: string, message: string, onConfirm?: () => void) => {
     setFeedback({ isOpen: true, type, title, message, onConfirm });
+  };
+
+  // Função para cor contrastante do ícone Settings2
+  const getSettingsColor = (hexcolor: string) => {
+    if (!hexcolor) return '#ffffff';
+    const hex = hexcolor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 128 ? '#000000' : '#ffffff';
   };
 
   const buscarDados = useCallback(async () => {
@@ -73,15 +83,10 @@ const CategoriasMetas: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const [resCats, resMetas] = await Promise.all([
         supabase.from('categorias').select('*').order('nome'),
-        supabase.from('metas')
-          .select('*')
-          .eq('mes_referencia', mes)
-          .eq('ano_referencia', ano)
+        supabase.from('metas').select('*').eq('mes_referencia', mes).eq('ano_referencia', ano)
       ]);
-
       setCategorias((resCats.data as Categoria[]) || []);
       setMetasMes((resMetas.data as Meta[]) || []);
     } catch (error) {
@@ -118,10 +123,12 @@ const CategoriasMetas: React.FC = () => {
         cor: item.cor,
         valor_meta: item.existe_meta ? item.valor_meta : ''
       });
+      setIsEditing(false); // Abre apenas para visualização/preenchimento da meta
     } else {
       setSelectedItem(null);
       const corPadrao = activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee';
       setForm({ nome: '', cor: corPadrao, valor_meta: '' });
+      setIsEditing(true); // Se for novo, já abre editável
     }
     setIsModalOpen(true);
   };
@@ -135,12 +142,16 @@ const CategoriasMetas: React.FC = () => {
 
       let currentCatId = selectedItem?.categoria_id;
 
-      if (!currentCatId) {
-        const { data: newCat, error: catErr } = await (supabase.from('categorias') as any)
-          .insert({ nome: form.nome, tipo: activeTab, cor: form.cor, user_id: user.id })
-          .select().single();
-        if (catErr) throw catErr;
-        currentCatId = newCat.id;
+      // Se estiver editando a categoria ou for nova
+      if (!currentCatId || isEditing) {
+        const catPayload = { nome: form.nome, tipo: activeTab, cor: form.cor, user_id: user.id };
+        if (currentCatId) {
+          await supabase.from('categorias').update(catPayload).eq('id', currentCatId);
+        } else {
+          const { data: newCat, error: catErr } = await (supabase.from('categorias') as any).insert(catPayload).select().single();
+          if (catErr) throw catErr;
+          currentCatId = newCat.id;
+        }
       }
 
       const metaPayload: any = {
@@ -161,8 +172,7 @@ const CategoriasMetas: React.FC = () => {
 
       setIsModalOpen(false);
       buscarDados();
-      // Feedback de Sucesso ao salvar
-      alertar('success', 'Tudo pronto!', 'Seu planejamento foi atualizado com sucesso.');
+      alertar('success', 'Sucesso!', 'Seu planejamento foi atualizado.');
     } catch (error: any) {
       alertar('error', 'Ops!', 'Erro ao salvar: ' + error.message);
     } finally {
@@ -172,44 +182,34 @@ const CategoriasMetas: React.FC = () => {
 
   const handleExcluirCascata = () => {
     if (!selectedItem?.categoria_id) return;
-
-    // Uso do ModalFeedback para confirmação de exclusão (Danger)
-    alertar(
-      'danger', 
-      'Confirmar Exclusão', 
-      `Isso apagará permanentemente a categoria "${selectedItem.nome}" e todas as metas relacionadas a ela. Deseja continuar?`,
-      async () => {
-        setLoading(true);
-        try {
-          // Exclui metas primeiro (integridade referencial)
-          await supabase.from('metas').delete().eq('categoria_id', selectedItem.categoria_id);
-          // Exclui a categoria
-          const { error: catErr } = await supabase.from('categorias').delete().eq('id', selectedItem.categoria_id);
-          
-          if (catErr) throw catErr;
-
-          setIsModalOpen(false);
-          buscarDados();
-          // Alerta opcional de sucesso após excluir
-          alertar('success', 'Excluído', 'A categoria e seus dados foram removidos.');
-        } catch (error: any) {
-          alertar('error', 'Erro', 'Não foi possível excluir: ' + error.message);
-        } finally {
-          setLoading(false);
-        }
+    alertar('danger', 'Confirmar Exclusão', `Isso apagará "${selectedItem.nome}" e todos os registros vinculados. Deseja continuar?`, async () => {
+      setLoading(true);
+      try {
+        await supabase.from('metas').delete().eq('categoria_id', selectedItem.categoria_id);
+        const { error: catErr } = await supabase.from('categorias').delete().eq('id', selectedItem.categoria_id);
+        if (catErr) throw catErr;
+        setIsModalOpen(false);
+        buscarDados();
+      } catch (error: any) {
+        alertar('error', 'Erro', 'Não foi possível excluir: ' + error.message);
+      } finally {
+        setLoading(false);
       }
-    );
+    });
   };
 
   return (
     <>
       <style>{`
         .edit-modal {
-          width: 95%; max-width: 500px; background: white; border-radius: 28px;
-          padding: 24px; position: relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-          z-index: 1001; display: flex; flex-direction: column;
+          width: 95%; max-width: 500px; background: white; border-radius: 40px;
+          padding: 0; position: relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+          z-index: 1001; display: flex; flex-direction: column; overflow: hidden;
         }
-        .edit-form-grid { display: flex; flex-direction: column; gap: 16px; }
+        .modal-header-premium {
+          padding: 30px; transition: background 0.3s; color: white;
+        }
+        .edit-form-grid { display: flex; flex-direction: column; gap: 16px; padding: 30px; }
         .form-group label {
           font-size: 0.65rem; font-weight: 800; color: #64748b;
           margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px;
@@ -218,23 +218,21 @@ const CategoriasMetas: React.FC = () => {
           width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px;
           font-size: 0.95rem; outline: none; background: #f8fafc; transition: all 0.2s;
         }
-        .form-group input:focus { border-color: #4361ee; background: white; }
-        .modal-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .form-group input:disabled { opacity: 0.6; cursor: not-allowed; }
+        .form-group input:focus:not(:disabled) { border-color: #4361ee; background: white; }
         .modal-footer-btns {
           display: flex; justify-content: space-between; align-items: center;
-          margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;
+          padding: 20px 30px 30px;
         }
         .btn-png-action { background: none; border: none; cursor: pointer; padding: 0; transition: transform 0.2s; }
         .btn-png-action img { width: 38px; height: 38px; object-fit: contain; }
         .btn-png-action:hover { transform: scale(1.1); }
-        .color-preview-wrapper {
-          display: flex; align-items: center; gap: 12px; background: #f8fafc;
-          padding: 8px 12px; border-radius: 12px; border: 1.5px solid #e2e8f0;
+        .color-input-container {
+          display: flex; gap: 10px; align-items: center;
         }
-        .input-color-circle { width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer; }
+        .hex-input { font-family: monospace; font-weight: 600; text-transform: uppercase; }
         @media (max-width: 480px) {
-          .edit-modal { width: 100%; border-radius: 24px 24px 0 0; position: fixed; bottom: 0; }
-          .modal-overlay { align-items: flex-end; }
+          .edit-modal { width: 100%; border-radius: 30px 30px 0 0; position: fixed; bottom: 0; }
         }
       `}</style>
 
@@ -261,7 +259,7 @@ const CategoriasMetas: React.FC = () => {
 
         <div className="cat-list-container metas-content">
           {loading ? (
-            <div className="cat-status"><Loader2 className="spinner" /> Carregando...</div>
+            <div className="cat-status"><Loader2 className="spinner" /></div>
           ) : (
             <div className="grid-metas-cats">
               {cardsParaExibir.map((item) => (
@@ -285,7 +283,6 @@ const CategoriasMetas: React.FC = () => {
           )}
         </div>
 
-        {/* Modal de Edição */}
         {isModalOpen && (
           <div className="modal-overlay" onClick={() => setIsModalOpen(false)} style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -293,45 +290,87 @@ const CategoriasMetas: React.FC = () => {
             display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
           }}>
             <form className="edit-modal" onClick={e => e.stopPropagation()} onSubmit={handleSalvar}>
-              <div className="modal-header-actions">
-                <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.2rem'}}>
-                  {selectedItem?.categoria_id ? 'Editar Detalhes' : 'Novo Registro'}
-                </h2>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="btn-png-action"><img src={iconFechar} alt="Fechar" /></button>
+              
+              <div className="modal-header-premium" style={{ background: isEditing ? '#1e293b' : form.cor }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ margin: 0, fontWeight: 800 }}>
+                    {!selectedItem ? 'Nova Categoria' : isEditing ? 'Editar Configuração' : form.nome}
+                  </h2>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    {selectedItem && !isEditing && (
+                      <button type="button" className="btn-png-action" onClick={() => setIsEditing(true)}>
+                        <Settings2 size={30} color={getSettingsColor(form.cor)} />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="btn-png-action">
+                      <img src={iconFechar} alt="Fechar" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="edit-form-grid">
                 <div className="form-group">
-                  <label>Nome / Categoria</label>
-                  <input type="text" value={form.nome} disabled={!!selectedItem?.categoria_id} onChange={e => setForm({...form, nome: e.target.value})} required />
+                  <label>Nome da Categoria</label>
+                  <input 
+                    type="text" 
+                    value={form.nome} 
+                    disabled={!isEditing} 
+                    onChange={e => setForm({...form, nome: e.target.value})} 
+                    required 
+                  />
                 </div>
                 <div className="form-group">
                   <label>Valor da Meta</label>
-                  <input type="number" step="0.01" value={form.valor_meta} onChange={e => setForm({...form, valor_meta: e.target.value})} required />
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={form.valor_meta} 
+                    onChange={e => setForm({...form, valor_meta: e.target.value})} 
+                    required 
+                  />
                 </div>
                 <div className="form-group">
-                  <label>Cor</label>
-                  <div className="color-preview-wrapper">
-                    <input type="color" className="input-color-circle" value={form.cor} onChange={e => setForm({...form, cor: e.target.value})} />
-                    <span style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 600}}>{form.cor.toUpperCase()}</span>
+                  <label>Cor de Identificação</label>
+                  <div className="color-input-container">
+                    <input 
+                      type="color" 
+                      style={{ width: '50px', height: '45px', padding: '2px', cursor: isEditing ? 'pointer' : 'default' }} 
+                      value={form.cor} 
+                      disabled={!isEditing}
+                      onChange={e => setForm({...form, cor: e.target.value})} 
+                    />
+                    <input 
+                      type="text" 
+                      className="hex-input"
+                      value={form.cor} 
+                      disabled={!isEditing}
+                      onChange={e => setForm({...form, cor: e.target.value})}
+                      maxLength={7}
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="modal-footer-btns">
-                {selectedItem?.categoria_id ? (
-                  <button type="button" className="btn-png-action" onClick={handleExcluirCascata}><img src={iconExcluir} alt="Excluir" /></button>
+                {selectedItem && isEditing ? (
+                  <button type="button" className="btn-png-action" onClick={handleExcluirCascata}>
+                    <img src={iconExcluir} alt="Excluir" />
+                  </button>
                 ) : <div />}
-                <div style={{display: 'flex', gap: '20px'}}>
-                  <button type="button" className="btn-png-action" onClick={() => setIsModalOpen(false)}><img src={iconCancelar} alt="Cancelar" /></button>
-                  <button type="submit" className="btn-png-action"><img src={iconConfirme} alt="Confirmar" /></button>
+                <div style={{ display: 'flex', gap: '15px' }}>
+                  <button type="button" className="btn-png-action" onClick={() => setIsModalOpen(false)}>
+                    <img src={iconCancelar} alt="Cancelar" />
+                  </button>
+                  <button type="submit" className="btn-png-action">
+                    <img src={iconConfirme} alt="Confirmar" />
+                  </button>
                 </div>
               </div>
             </form>
           </div>
         )}
 
-        {/* Modal de Feedback (Sucesso/Erro/Exclusão) */}
         <ModalFeedback 
           isOpen={feedback.isOpen} 
           type={feedback.type} 
