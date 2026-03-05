@@ -252,10 +252,10 @@ const CategoriasMetas: React.FC = () => {
               {/* HEADER DO MODAL - ESTILO IGUAL AO DE CARTÕES */}
               <div className="modal-details-header" style={{ background: isEditing ? '#1e293b' : form.cor, padding: '30px', color: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 style={{ margin: 0 }}>
+                  <h2 style={{ margin: 0, fontSize: '1.5rem'}}>
                     {!selectedItem ? 'Nova Categoria' : isEditing ? 'Editar Configuração' : form.nome}
                   </h2>
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '10px'}}>
                     {selectedItem && !isEditing && (
                       <button type="button" className="btn-icon-action" onClick={() => setIsEditing(true)}>
                         <Settings2 size={32} color={getSettingsColor(form.cor)} />
@@ -267,7 +267,7 @@ const CategoriasMetas: React.FC = () => {
                   </div>
                 </div>
                 {selectedItem && !isEditing && (
-                  <div style={{ marginTop: '10px', fontWeight: 700, opacity: 0.9 }}>
+                  <div style={{ marginTop: '10px', fontWeight: 700, opacity: 0.9}}>
                     Planejamento Mensal
                   </div>
                 )}
