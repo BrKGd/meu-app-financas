@@ -31,6 +31,7 @@ interface ItemCompra {
   valorParcela?: number;
   nomeResponsavel?: string;
   nomeCategoria?: string;
+  corCategoria?: string; // Adicionado para suportar a cor
   valorVisual?: string; 
 }
 
@@ -115,14 +116,15 @@ const Listagem: React.FC = () => {
         if (dataReferenciaParcela.getMonth() === filtroData.mes && dataReferenciaParcela.getFullYear() === filtroData.ano) {
           const valorParcela = Number(item.valor_total) / numParcelas;
           const nomeResp = mapaNomes[item.user_id] || '⚠️ Pendente';
-          const nomeCat = mapaCats[item.categoria_id] || 'Sem Categoria';
+          const infoCat = mapaCats[item.categoria_id] || { nome: 'Sem Categoria', cor: '#94a3b8' };
 
           projetadas.push({ 
             ...item, 
             parcelaAtual: i + 1, 
             valorParcela: valorParcela, 
             nomeResponsavel: nomeResp,
-            nomeCategoria: nomeCat
+            nomeCategoria: infoCat.nome,
+            corCategoria: infoCat.cor
           });
 
           mapaTotais[nomeResp] = (mapaTotais[nomeResp] || 0) + valorParcela;
@@ -142,7 +144,7 @@ const Listagem: React.FC = () => {
 
     const [pRes, cRes, cartRes, meuPerfilRes] = await Promise.all([
       (supabase.from('profiles') as any).select('id, nome'),
-      (supabase.from('categorias') as any).select('id, nome').eq('tipo', 'despesa').order('nome'),
+      (supabase.from('categorias') as any).select('id, nome, cor').eq('tipo', 'despesa').order('nome'),
       (supabase.from('cartoes') as any).select('id, nome, dia_fechamento').order('nome'),
       (supabase.from('profiles') as any).select('*').eq('id', user.id).single()
     ]);
@@ -152,7 +154,9 @@ const Listagem: React.FC = () => {
     setUsuarios(pRes.data || []);
 
     const mapaCats: any = {};
-    (cRes.data as any[])?.forEach(c => mapaCats[c.id] = c.nome);
+    (cRes.data as any[])?.forEach(c => {
+      mapaCats[c.id] = { nome: c.nome, cor: c.cor };
+    });
     setCategorias(cRes.data || []);
 
     const meuPerfil = meuPerfilRes.data as any;
@@ -264,7 +268,18 @@ const Listagem: React.FC = () => {
                 <tr key={`${item.id}-${idx}`} className="clickable-row" onClick={() => setItemParaEditar({...item})}>
                   <td className="cell-date">{item.data_compra.split('-').reverse().slice(0,2).join('/')}</td>
                   <td className="cell-user">{item.nomeResponsavel}</td>
-                  <td className="cell-category"><span className="cat-badge">{item.nomeCategoria}</span></td>
+                  <td className="cell-category">
+                    <span 
+                      className="cat-badge" 
+                      style={{ 
+                        backgroundColor: `${item.corCategoria}20`, // 20 é ~12% de opacidade em HEX
+                        color: item.corCategoria,
+                        border: `1px solid ${item.corCategoria}40`
+                      }}
+                    >
+                      {item.nomeCategoria}
+                    </span>
+                  </td>
                   <td className="cell-main">{item.descricao}</td>
                   <td className="cell-sub">{item.loja || '-'}</td>
                   <td className="cell-nf">{completarNF(item.nota_fiscal)}</td>
