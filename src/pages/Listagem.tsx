@@ -13,7 +13,7 @@ import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
 
-// --- Interfaces para Tipagem Atualizada conforme SQL ---
+// --- Interfaces para Tipagem ---
 interface ItemCompra {
   id: string;
   user_id: string;
@@ -29,10 +29,8 @@ interface ItemCompra {
   cartao: string | null;
   forma_pagamento: string;
   categoria_id: string;
-  // Campos vindos do seu SQL (CHECK constraints)
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
-  tipo_recorrencia: string; 
-  // Campos virtuais para UI
+  tipo_recorrencia: string;
   parcelaAtual?: number;
   valorParcela?: number;
   nomeResponsavel?: string;
@@ -64,7 +62,13 @@ const Listagem: React.FC = () => {
 
   const mesesNominais = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
-  const opcoesRecorrencia = ["Nenhuma", "Mensal", "Anual"];
+  
+  // Opções de recorrência alinhadas com os valores do banco de dados
+  const opcoesRecorrencia = [
+    { label: 'Única', value: 'unica' },
+    { label: 'Parcelada', value: 'parcelada' },
+    { label: 'Mensal', value: 'mensal' }
+  ];
 
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
   const currentUserId = perfilLogado?.id;
@@ -201,12 +205,11 @@ const Listagem: React.FC = () => {
 
     const isCredito = itemParaEditar.forma_pagamento === 'Crédito';
     
-    // CORREÇÃO DO ERRO 400: Enviando apenas o que existe na tabela 'compras'
     const { error } = await (supabase.from('compras') as any).update({
       descricao: itemParaEditar.descricao,
       loja: itemParaEditar.loja,
       user_id: itemParaEditar.user_id,
-      usuario_criacao: itemParaEditar.usuario_criacao || perfilLogado.id, 
+      usuario_criacao: itemParaEditar.usuario_criacao,
       categoria_id: itemParaEditar.categoria_id,
       valor_total: itemParaEditar.valor_total,
       forma_pagamento: itemParaEditar.forma_pagamento,
@@ -216,14 +219,11 @@ const Listagem: React.FC = () => {
       parcelado: isCredito && Number(itemParaEditar.num_parcelas) > 1,
       pedido: itemParaEditar.pedido,
       nota_fiscal: itemParaEditar.nota_fiscal,
-      // Novos campos vindos da estrutura SQL:
-      status_pagamento: itemParaEditar.status_pagamento.toLowerCase(), 
-      tipo_recorrencia: itemParaEditar.tipo_recorrencia || 'Nenhuma'
+      status_pagamento: itemParaEditar.status_pagamento,
+      tipo_recorrencia: itemParaEditar.tipo_recorrencia
     }).eq('id', itemParaEditar.id);
 
-    if (error) {
-      setModal({ isOpen: true, type: 'error', title: 'Erro ao Salvar', message: error.message });
-    } else {
+    if (!error) {
       setItemParaEditar(null);
       setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Lançamento atualizado.' });
       carregarDadosIniciais();
@@ -232,6 +232,7 @@ const Listagem: React.FC = () => {
 
   const confirmDelete = (id: string) => {
     if (!temPermissaoEscrita(itemParaEditar)) return;
+
     setModal({
       isOpen: true,
       type: 'danger',
@@ -282,7 +283,6 @@ const Listagem: React.FC = () => {
               <th>Status</th>
               <th>Responsável</th>
               <th>Categoria</th>
-              <th>Recorrência</th>
               <th>Descrição</th>
               <th>Loja</th>
               <th>NF</th>
@@ -311,7 +311,6 @@ const Listagem: React.FC = () => {
                       {item.nomeCategoria}
                     </span>
                   </td>
-                  <td className="cell-sub">{item.tipo_recorrencia !== 'Nenhuma' ? item.tipo_recorrencia : '-'}</td>
                   <td className="cell-main">
                     {item.descricao}
                     {!temPermissaoEscrita(item) && <Lock size={12} style={{marginLeft: '6px', opacity: 0.5}} />}
@@ -326,7 +325,9 @@ const Listagem: React.FC = () => {
                       {item.parcelado ? `${item.parcelaAtual}/${item.num_parcelas}` : 'À Vista'}
                     </span>
                   </td>
-                  <td className="cell-value" style={{ textAlign: 'right' }}>{formatarMoedaVisual(item.valorParcela || 0)}</td>
+                  <td className="cell-value" style={{ textAlign: 'right' }}>
+                    {formatarMoedaVisual(item.valorParcela || 0)}
+                  </td>
                   <td className="cell-sub" style={{ fontSize: '0.75rem' }}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
                        <UserPlus size={10} /> {item.nomeCriador}
@@ -335,7 +336,11 @@ const Listagem: React.FC = () => {
                 </tr>
               ))
             ) : (
-              <tr><td colSpan={14} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Nenhum lançamento.</td></tr>
+              <tr>
+                <td colSpan={13} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                  Nenhum lançamento encontrado para este mês.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -365,14 +370,16 @@ const Listagem: React.FC = () => {
           <div className="edit-modal-content">
             <div className="modal-fixed-header">
               <h3>{temPermissaoEscrita(itemParaEditar) ? 'Editar Gasto' : 'Detalhes do Gasto'}</h3>
-              <button onClick={() => setItemParaEditar(null)} className="btn-icon-action"><img src={iconFechar} alt="Fechar" /></button>
+              <button onClick={() => setItemParaEditar(null)} className="btn-icon-action">
+                  <img src={iconFechar} alt="Fechar" title="Fechar" />
+              </button>
             </div>
 
             <div className="modal-scrollable-body">
               <form id="edit-form" onSubmit={handleUpdate}>
                 <div className="grid-form">
                   <div className="form-group">
-                    <label><Calendar size={12}/> Data</label>
+                    <label><Calendar size={12}/> Data Compra</label>
                     <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.data_compra} onChange={e => setItemParaEditar({...itemParaEditar, data_compra: e.target.value})} />
                   </div>
                   
@@ -388,8 +395,17 @@ const Listagem: React.FC = () => {
 
                   <div className="form-group">
                     <label><RefreshCw size={12}/> Recorrência</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia || 'Nenhuma'} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value})}>
-                      {opcoesRecorrencia.map(op => <option key={op} value={op}>{op}</option>)}
+                    <select 
+                      className="form-control" 
+                      disabled={!temPermissaoEscrita(itemParaEditar)} 
+                      value={itemParaEditar.tipo_recorrencia} 
+                      onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value})}
+                    >
+                      {opcoesRecorrencia.map(op => (
+                        <option key={op.value} value={op.value}>
+                          {op.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -403,20 +419,18 @@ const Listagem: React.FC = () => {
                   <div className="form-group">
                     <label><Tag size={12}/> Categoria</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.categoria_id} onChange={e => setItemParaEditar({...itemParaEditar, categoria_id: e.target.value})}>
+                      <option value="">Selecione...</option>
                       {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
                     </select>
                   </div>
-
                   <div className="form-group">
                     <label><ShoppingBag size={12}/> Loja</label>
                     <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.loja || ''} onChange={e => setItemParaEditar({...itemParaEditar, loja: e.target.value})} />
                   </div>
-
                   <div className="form-group full-width">
                     <label>Descrição</label>
                     <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.descricao} onChange={e => setItemParaEditar({...itemParaEditar, descricao: e.target.value})} />
                   </div>
-
                   <div className="form-group">
                     <label>Valor Total</label>
                     <input type="text" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.valorVisual || formatarMoedaVisual(itemParaEditar.valor_total)} 
@@ -426,7 +440,6 @@ const Listagem: React.FC = () => {
                       }} 
                     />
                   </div>
-
                   <div className="form-group">
                     <label><Landmark size={12}/> Pagamento</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.forma_pagamento} onChange={e => setItemParaEditar({...itemParaEditar, forma_pagamento: e.target.value})}>
@@ -455,17 +468,26 @@ const Listagem: React.FC = () => {
 
             {temPermissaoEscrita(itemParaEditar) ? (
               <div className="modal-footer-icons">
-                <button type="button" className="btn-icon-action btn-delete" onClick={() => confirmDelete(itemParaEditar.id)}><img src={iconExcluir} alt="Excluir" /></button>
+                <button type="button" className="btn-icon-action btn-delete" title='Excluir Registro' onClick={() => confirmDelete(itemParaEditar.id)}>
+                  <img src={iconExcluir} alt="Excluir" />
+                </button>
+                
                 <div className="footer-right-actions">
-                  <button type="button" className="btn-icon-action" onClick={() => setItemParaEditar(null)}><img src={iconCancelar} alt="Cancelar" /></button>
-                  <button type="submit" form="edit-form" className="btn-icon-action"><img src={iconConfirme} alt="Salvar" /></button>
+                  <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
+                    <img src={iconCancelar} alt="Cancelar" />
+                  </button>
+                  <button type="submit" form="edit-form" className="btn-icon-action" title='Salvar'>
+                    <img src={iconConfirme} alt="Salvar" />
+                  </button>
                 </div>
               </div>
             ) : (
                 <div className="modal-footer-icons" style={{justifyContent: 'center', backgroundColor: '#f8fafc', padding: '15px', borderTop: '1px solid #e2e8f0'}}>
                     <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px'}}>
-                        <div style={{display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600}}><Lock size={14} style={{marginRight: '8px'}} /> Apenas visualização</div>
-                        <span style={{fontSize: '0.7rem', color: '#94a3b8'}}>Registro por: {itemParaEditar.nomeCriador}</span>
+                        <div style={{display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600}}>
+                            <Lock size={14} style={{marginRight: '8px'}} /> Apenas visualização
+                        </div>
+                        <span style={{fontSize: '0.7rem', color: '#94a3b8'}}>Registro inserido por: {itemParaEditar.nomeCriador}</span>
                     </div>
                 </div>
             )}
@@ -473,7 +495,10 @@ const Listagem: React.FC = () => {
         </div>
       )}
 
-      <ModalFeedback isOpen={modal.isOpen} type={modal.type} title={modal.title} message={modal.message} onClose={() => setModal({ ...modal, isOpen: false })} onConfirm={modal.onConfirm} />
+      <ModalFeedback 
+        isOpen={modal.isOpen} type={modal.type} title={modal.title} message={modal.message}
+        onClose={() => setModal({ ...modal, isOpen: false })} onConfirm={modal.onConfirm}
+      />
     </div>
   );
 };
