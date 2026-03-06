@@ -3,7 +3,8 @@ import { supabase } from '../services/supabaseClient';
 import { 
   ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
-  Tag, ShoppingBag, Landmark, Lock, UserPlus
+  Tag, ShoppingBag, Landmark, Lock, UserPlus,
+  RefreshCw, CheckCircle2
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
@@ -28,6 +29,9 @@ interface ItemCompra {
   cartao: string | null;
   forma_pagamento: string;
   categoria_id: string;
+  status_pagamento: string; // Nova Coluna
+  cor_pagamento: string;    // Nova Coluna
+  tipo_recorrencia: string; // Nova Coluna
   parcelaAtual?: number;
   valorParcela?: number;
   nomeResponsavel?: string;
@@ -59,16 +63,18 @@ const Listagem: React.FC = () => {
 
   const mesesNominais = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
+  const opcoesRecorrencia = ["Única", "Mensal", "Anual"];
+  const opcoesStatus = [
+    { nome: "Pendente", cor: "#f59e0b" },
+    { nome: "Pago", cor: "#10b981" },
+    { nome: "Atrasado", cor: "#ef4444" },
+    { nome: "Agendado", cor: "#3b82f6" }
+  ];
 
-  // --- LÓGICA DE PERMISSÃO ATUALIZADA ---
+  // --- LÓGICA DE PERMISSÃO ---
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
   const currentUserId = perfilLogado?.id;
 
-  /**
-   * Nova Regra: 
-   * - Proprietário: Edita tudo.
-   * - Adm/Comum: Só edita se ele mesmo foi o 'usuario_criacao'.
-   */
   const temPermissaoEscrita = (item: ItemCompra | null) => {
     if (!item) return false;
     if (isProprietario) return true; 
@@ -102,7 +108,6 @@ const Listagem: React.FC = () => {
   const fetchDespesas = useCallback(async (perfil: any, mapaNomes: any, listaCartoes: any[], mapaCats: any) => {
     let query = (supabase.from('compras') as any).select('*').order('data_compra', { ascending: false });
     
-    // Filtro de visibilidade permanece: Comum só vê os dele. Adm/Prop vê tudo.
     if (perfil?.tipo_usuario === 'comum') {
       query = query.eq('user_id', perfil.id);
     }
@@ -207,7 +212,6 @@ const Listagem: React.FC = () => {
       descricao: itemParaEditar.descricao,
       loja: itemParaEditar.loja,
       user_id: itemParaEditar.user_id,
-      // Mantemos ou atualizamos o usuário de criação caso queira registrar quem editou por último
       usuario_criacao: itemParaEditar.usuario_criacao || perfilLogado.id, 
       categoria_id: itemParaEditar.categoria_id,
       valor_total: itemParaEditar.valor_total,
@@ -217,7 +221,10 @@ const Listagem: React.FC = () => {
       num_parcelas: isCredito ? Number(itemParaEditar.num_parcelas) : 1,
       parcelado: isCredito && Number(itemParaEditar.num_parcelas) > 1,
       pedido: itemParaEditar.pedido,
-      nota_fiscal: itemParaEditar.nota_fiscal
+      nota_fiscal: itemParaEditar.nota_fiscal,
+      status_pagamento: itemParaEditar.status_pagamento,
+      cor_pagamento: itemParaEditar.cor_pagamento,
+      tipo_recorrencia: itemParaEditar.tipo_recorrencia
     }).eq('id', itemParaEditar.id);
 
     if (!error) {
@@ -228,7 +235,6 @@ const Listagem: React.FC = () => {
   };
 
   const confirmDelete = (id: string) => {
-    // Verificação de segurança adicional antes de abrir o modal de confirmação
     if (!temPermissaoEscrita(itemParaEditar)) return;
 
     setModal({
@@ -278,9 +284,11 @@ const Listagem: React.FC = () => {
           <thead>
             <tr>
               <th>Data</th>
+              <th>Status</th>
               <th>Responsável</th>
               <th>Categoria</th>
               <th>Descrição</th>
+              <th>Recorrência</th>
               <th>Loja</th>
               <th>NF</th>
               <th>Pedido</th>
@@ -296,6 +304,19 @@ const Listagem: React.FC = () => {
               despesas.map((item, idx) => (
                 <tr key={`${item.id}-${idx}`} className="clickable-row" onClick={() => setItemParaEditar({...item})}>
                   <td className="cell-date">{item.data_compra.split('-').reverse().slice(0,2).join('/')}</td>
+                  <td className="cell-status">
+                    <span 
+                      className="cat-badge" 
+                      style={{ 
+                        backgroundColor: `${item.cor_pagamento || '#94a3b8'}20`,
+                        color: item.cor_pagamento || '#94a3b8',
+                        border: `1px solid ${item.cor_pagamento || '#94a3b8'}40`,
+                        fontWeight: 700
+                      }}
+                    >
+                      {item.status_pagamento || 'Pendente'}
+                    </span>
+                  </td>
                   <td className="cell-user">{item.nomeResponsavel}</td>
                   <td className="cell-category">
                     <span 
@@ -313,6 +334,11 @@ const Listagem: React.FC = () => {
                     {item.descricao}
                     {!temPermissaoEscrita(item) && <Lock size={12} style={{marginLeft: '6px', opacity: 0.5}} />}
                   </td>
+                  <td className="cell-sub">
+                    <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                        <RefreshCw size={10} /> {item.tipo_recorrencia || 'Única'}
+                    </div>
+                  </td>
                   <td className="cell-sub">{item.loja || '-'}</td>
                   <td className="cell-nf">{completarNF(item.nota_fiscal)}</td>
                   <td className="cell-nf">{item.pedido ? `#${item.pedido}` : '-'}</td>
@@ -328,14 +354,14 @@ const Listagem: React.FC = () => {
                   </td>
                   <td className="cell-sub" style={{ fontSize: '0.75rem' }}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
-                       <UserPlus size={10} /> {item.nomeCriador}
+                        <UserPlus size={10} /> {item.nomeCriador}
                     </div>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={12} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                <td colSpan={14} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                   Nenhum lançamento encontrado para este mês.
                 </td>
               </tr>
@@ -391,6 +417,30 @@ const Listagem: React.FC = () => {
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.categoria_id} onChange={e => setItemParaEditar({...itemParaEditar, categoria_id: e.target.value})}>
                       <option value="">Selecione...</option>
                       {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label><CheckCircle2 size={12}/> Status Pagamento</label>
+                    <select 
+                        className="form-control" 
+                        disabled={!temPermissaoEscrita(itemParaEditar)} 
+                        value={itemParaEditar.status_pagamento || 'Pendente'} 
+                        onChange={e => {
+                            const selected = opcoesStatus.find(o => o.nome === e.target.value);
+                            setItemParaEditar({
+                                ...itemParaEditar, 
+                                status_pagamento: e.target.value,
+                                cor_pagamento: selected?.cor || '#94a3b8'
+                            });
+                        }}
+                    >
+                      {opcoesStatus.map(opt => <option key={opt.nome} value={opt.nome}>{opt.nome}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label><RefreshCw size={12}/> Tipo Recorrência</label>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia || 'Única'} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value})}>
+                      {opcoesRecorrencia.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
                   <div className="form-group">
