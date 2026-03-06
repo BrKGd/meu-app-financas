@@ -272,6 +272,26 @@
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.status-select-table {
+  border: none;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  font-size: 0.8rem;
+  appearance: none; /* Remove a setinha padrão do navegador se quiser */
+  text-align: center;
+}
+
+.status-select-table:hover {
+  filter: brightness(0.9);
+}
+
+.status-select-table:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
 .btn-icon-action img {
   width: 45px;
   height: 45px;
