@@ -29,6 +29,7 @@ interface ItemCompra {
   cartao: string | null;
   forma_pagamento: string;
   categoria_id: string;
+  // Atualizado conforme constraint CHECK do banco
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
   tipo_recorrencia: string;
   parcelaAtual?: number;
@@ -63,13 +64,13 @@ const Listagem: React.FC = () => {
   const mesesNominais = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
   
-  // Opções de recorrência alinhadas com os valores do banco de dados
-  const opcoesRecorrencia = [
-    { label: 'Única', value: 'unica' },
-    { label: 'Parcelada', value: 'parcelada' },
-    { label: 'Mensal', value: 'mensal' }
-  ];
+  // ATUALIZADO: Conforme constraint CHECK da tabela public.compras
+  const opcoesRecorrencia = ["unica", "parcelada", "mensal", "anual", "semanal", "variavel"];
+  
+  // ATUALIZADO: Conforme constraint CHECK da tabela public.compras
+  const opcoesStatus = ["pendente", "pago", "vencido", "cancelado"];
 
+  // --- LÓGICA DE PERMISSÃO RESTAURADA E FIEL ---
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
   const currentUserId = perfilLogado?.id;
 
@@ -386,26 +387,16 @@ const Listagem: React.FC = () => {
                   <div className="form-group">
                     <label><CheckCircle2 size={12}/> Status</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.status_pagamento} onChange={e => setItemParaEditar({...itemParaEditar, status_pagamento: e.target.value as any})}>
-                      <option value="pendente">Pendente</option>
-                      <option value="pago">Pago</option>
-                      <option value="vencido">Vencido</option>
-                      <option value="cancelado">Cancelado</option>
+                      {/* ATUALIZADO: Conforme constraint do banco */}
+                      {opcoesStatus.map(st => <option key={st} value={st}>{st.charAt(0).toUpperCase() + st.slice(1)}</option>)}
                     </select>
                   </div>
 
                   <div className="form-group">
                     <label><RefreshCw size={12}/> Recorrência</label>
-                    <select 
-                      className="form-control" 
-                      disabled={!temPermissaoEscrita(itemParaEditar)} 
-                      value={itemParaEditar.tipo_recorrencia} 
-                      onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value})}
-                    >
-                      {opcoesRecorrencia.map(op => (
-                        <option key={op.value} value={op.value}>
-                          {op.label}
-                        </option>
-                      ))}
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value})}>
+                      {/* ATUALIZADO: Conforme constraint do banco */}
+                      {opcoesRecorrencia.map(op => <option key={op} value={op}>{op.charAt(0).toUpperCase() + op.slice(1)}</option>)}
                     </select>
                   </div>
 
