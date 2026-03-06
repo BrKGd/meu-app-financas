@@ -79,7 +79,7 @@ const Listagem: React.FC = () => {
   const temPermissaoEscrita = (item: ItemCompra | null) => {
     if (!item) return false;
     if (isProprietario) return true; 
-    return item.usuario_criacao === currentUserId; 
+    return item.usuario_criacao === currentUserId || item.user_id === currentUserId; 
   };
 
   const formatarMoedaVisual = (valor: number) => {
@@ -108,7 +108,6 @@ const Listagem: React.FC = () => {
   const fetchDespesas = useCallback(async (perfil: any, mapaNomes: any, listaCartoes: any[], mapaCats: any) => {
     let query = (supabase.from('compras') as any).select('*').order('data_compra', { ascending: false });
     
-    // Admin e Proprietário veem tudo. Comum vê apenas o dele.
     if (perfil?.tipo_usuario !== 'proprietario' && perfil?.tipo_usuario !== 'administrador') {
       query = query.eq('user_id', perfil.id);
     }
@@ -218,6 +217,14 @@ const Listagem: React.FC = () => {
     let recorrenciaIdFinal = itemParaEditar.recorrencia_id;
 
     try {
+        const frequenciaTratada = (itemParaEditar.frequencia_recorrencia || 'mensal').toLowerCase().trim();
+        const dataRef = new Date(itemParaEditar.data_compra + 'T00:00:00');
+
+        const periodoNormalizado = itemParaEditar.periodo_referencia 
+          ? itemParaEditar.periodo_referencia.substring(0, 7) + '-01'
+          : itemParaEditar.data_compra.substring(0, 7) + '-01';
+
+        // 1. Manutenção da Recorrência
         if (isRecorrente && (!recorrenciaIdFinal || recorrenciaIdFinal === "")) {
           const novoUuid = self.crypto.randomUUID();
           const { error: errorRec } = await (supabase.from('recorrencias') as any).insert({
@@ -230,10 +237,10 @@ const Listagem: React.FC = () => {
             tipo_despesa: 'Gastos Variáveis',
             forma_pagamento: itemParaEditar.forma_pagamento,
             cartao_id: isCredito ? itemParaEditar.cartao_id : null,
-            dia_vencimento: new Date(itemParaEditar.data_compra).getDate(),
-            frequencia: itemParaEditar.frequencia_recorrencia || 'mensal',
+            dia_vencimento: dataRef.getDate(),
+            frequencia: frequenciaTratada,
             data_inicio: itemParaEditar.data_compra,
-            data_fim: itemParaEditar.data_fim, 
+            data_fim: itemParaEditar.data_fim || null, 
             ativo: true
           });
           if (errorRec) throw errorRec;
@@ -246,12 +253,13 @@ const Listagem: React.FC = () => {
                 categoria_id: itemParaEditar.categoria_id,
                 forma_pagamento: itemParaEditar.forma_pagamento,
                 cartao_id: isCredito ? itemParaEditar.cartao_id : null,
-                frequencia: itemParaEditar.frequencia_recorrencia,
-                data_fim: itemParaEditar.data_fim 
+                frequencia: frequenciaTratada,
+                data_fim: itemParaEditar.data_fim || null 
             }).eq('id', recorrenciaIdFinal);
             if (errorUpdateRec) throw errorUpdateRec;
         }
 
+        // 2. Atualização da Compra
         const { error: errorCompra } = await (supabase.from('compras') as any).update({
           descricao: itemParaEditar.descricao,
           loja: itemParaEditar.loja,
@@ -262,25 +270,29 @@ const Listagem: React.FC = () => {
           cartao: isCredito ? itemParaEditar.cartao : null,
           cartao_id: isCredito ? itemParaEditar.cartao_id : null,
           data_compra: itemParaEditar.data_compra,
-          periodo_referencia: itemParaEditar.periodo_referencia,
+          periodo_referencia: periodoNormalizado,
           num_parcelas: isCredito ? Number(itemParaEditar.num_parcelas) : 1,
           parcelado: isCredito && Number(itemParaEditar.num_parcelas) > 1,
           pedido: itemParaEditar.pedido,
           nota_fiscal: itemParaEditar.nota_fiscal,
           status_pagamento: itemParaEditar.status_pagamento,
           tipo_recorrencia: itemParaEditar.tipo_recorrencia,
-          frequencia_recorrencia: isRecorrente ? itemParaEditar.frequencia_recorrencia : null,
-          recorrencia_id: recorrenciaIdFinal
+          frequencia_recorrencia: isRecorrente ? frequenciaTratada : null,
+          recorrencia_id: recorrenciaIdFinal || null
         }).eq('id', itemParaEditar.id);
 
         if (errorCompra) throw errorCompra;
-        await supabase.rpc("gerar_recorrencias");
+
+        // 3. Sincronização via RPC (Isso agora gera as parcelas_recorrencia também)
+        const { error: rpcError } = await supabase.rpc("gerar_recorrencias");
+        if (rpcError) throw rpcError;
         
         setItemParaEditar(null);
-        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Dados atualizados com sucesso.' });
+        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Dados atualizados e sincronizados com sucesso.' });
         carregarDadosIniciais();
     } catch (err: any) {
-        setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha: ' + err.message });
+        console.error("Erro completo:", err);
+        setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha: ' + (err.message || "Erro desconhecido") });
     }
   };
 
@@ -292,14 +304,9 @@ const Listagem: React.FC = () => {
       message: 'Esta ação excluirá o gasto e todas as suas parcelas vinculadas permanentemente.',
       onConfirm: async () => {
         try {
-          // 1. Deletar parcelas vinculadas primeiro para evitar erro de Conflict (FK)
           await (supabase.from('parcelas') as any).delete().eq('compra_id', id);
-          
-          // 2. Deletar a compra
           const { error } = await (supabase.from('compras') as any).delete().eq('id', id);
-          
           if (error) throw error;
-
           setItemParaEditar(null); 
           setModal(prev => ({ ...prev, isOpen: false }));
           carregarDadosIniciais();
@@ -363,7 +370,9 @@ const Listagem: React.FC = () => {
                     <div style={{display: 'flex', flexDirection: 'column'}}>
                        <span>{item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
                        {item.periodo_referencia && (
-                         <span style={{fontSize: '0.65rem', color: '#6366f1', fontWeight: 600}}>Ref: {item.periodo_referencia.split('-').reverse().slice(1,2)}/{item.periodo_referencia.split('-')[0].slice(-2)}</span>
+                         <span style={{fontSize: '0.65rem', color: '#6366f1', fontWeight: 600}}>
+                            Ref: {item.periodo_referencia.split('-')[1]}/{item.periodo_referencia.split('-')[0].slice(-2)}
+                         </span>
                        )}
                     </div>
                   </td>
@@ -461,14 +470,14 @@ const Listagem: React.FC = () => {
                   
                   <div className="form-group">
                     <label><CheckCircle2 size={12}/> Status</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.status_pagamento} onChange={e => setItemParaEditar({...itemParaEditar, status_pagamento: e.target.value as any})}>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.status_pagamento ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, status_pagamento: e.target.value as any})}>
                       {statusPagamento.map(st => <option key={st} value={st}>{st.charAt(0).toUpperCase() + st.slice(1)}</option>)}
                     </select>
                   </div>
 
                   <div className="form-group">
                     <label><RefreshCw size={12}/> Tipo Recorrência</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value as any})}>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value as any})}>
                       {tiposRecorrencia.map(tipo => <option key={tipo} value={tipo}>{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</option>)}
                     </select>
                   </div>
@@ -491,14 +500,14 @@ const Listagem: React.FC = () => {
 
                   <div className="form-group">
                     <label><User size={12}/> Responsável</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.user_id} onChange={e => setItemParaEditar({...itemParaEditar, user_id: e.target.value})}>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.user_id ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, user_id: e.target.value})}>
                       {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
                     </select>
                   </div>
 
                   <div className="form-group">
                     <label><Tag size={12}/> Categoria</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.categoria_id} onChange={e => setItemParaEditar({...itemParaEditar, categoria_id: e.target.value})}>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.categoria_id ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, categoria_id: e.target.value})}>
                       <option value="">Selecione...</option>
                       {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
                     </select>
@@ -523,7 +532,7 @@ const Listagem: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label><Landmark size={12}/> Pagamento</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.forma_pagamento} onChange={e => setItemParaEditar({...itemParaEditar, forma_pagamento: e.target.value})}>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.forma_pagamento ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, forma_pagamento: e.target.value})}>
                       {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
                     </select>
                   </div>
@@ -535,7 +544,7 @@ const Listagem: React.FC = () => {
                         <select 
                           className="form-control" 
                           disabled={!temPermissaoEscrita(itemParaEditar)} 
-                          value={itemParaEditar.cartao_id || ''} 
+                          value={itemParaEditar.cartao_id ?? ''} 
                           onChange={e => {
                             const selectedId = e.target.value ? Number(e.target.value) : null;
                             const cartaoObj = cartoes.find(c => c.id === selectedId);
