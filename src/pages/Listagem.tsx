@@ -4,8 +4,7 @@ import {
   ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
   Tag, ShoppingBag, Landmark, Lock, UserPlus,
-  CheckCircle2, Clock, RefreshCw, Repeat, Layers,
-  CalendarOff, ShieldCheck
+  CheckCircle2, Clock, RefreshCw, Repeat, Layers, CalendarDays
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
@@ -36,8 +35,7 @@ interface ItemCompra {
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
   tipo_recorrencia: 'unica' | 'parcelada' | 'recorrente';
   frequencia_recorrencia?: 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
-  tipo_despesa: 'Compra no Crédito' | 'Gastos Variáveis' | 'Gastos Fixos'; // Novo Campo Obrigatório
-  data_fim_recorrencia?: string; // Novo Campo para limite de recorrência
+  data_fim?: string; 
   parcelaAtual?: number;
   valorParcela?: number;
   nomeResponsavel?: string;
@@ -73,9 +71,9 @@ const Listagem: React.FC = () => {
   const tiposRecorrencia = ["unica", "parcelada", "recorrente"];
   const frequenciasRecorrencia = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
   const statusPagamento = ["pendente", "pago", "vencido", "cancelado"];
-  const tiposDespesaOpcoes = ["Compra no Crédito", "Gastos Variáveis", "Gastos Fixos"];
 
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
+  const isAdmin = perfilLogado?.tipo_usuario === 'administrador';
   const currentUserId = perfilLogado?.id;
 
   const temPermissaoEscrita = (item: ItemCompra | null) => {
@@ -110,12 +108,17 @@ const Listagem: React.FC = () => {
   const fetchDespesas = useCallback(async (perfil: any, mapaNomes: any, listaCartoes: any[], mapaCats: any) => {
     let query = (supabase.from('compras') as any).select('*').order('data_compra', { ascending: false });
     
-    if (perfil?.tipo_usuario === 'comum') {
+    // Admin e Proprietário veem tudo. Comum vê apenas o dele.
+    if (perfil?.tipo_usuario !== 'proprietario' && perfil?.tipo_usuario !== 'administrador') {
       query = query.eq('user_id', perfil.id);
     }
     
     const { data, error } = await query;
     if (error) return;
+
+    const { data: recs } = await (supabase.from('recorrencias') as any).select('id, data_fim');
+    const mapaDataFim: Record<string, string> = {};
+    recs?.forEach((r: any) => { mapaDataFim[r.id] = r.data_fim; });
 
     const projetadas: ItemCompra[] = [];
     const mapaTotais: Record<string, number> = {};
@@ -150,7 +153,8 @@ const Listagem: React.FC = () => {
             nomeResponsavel: nomeResp,
             nomeCriador: nomeCriador,
             nomeCategoria: infoCat.nome,
-            corCategoria: infoCat.cor
+            corCategoria: infoCat.cor,
+            data_fim: item.recorrencia_id ? mapaDataFim[item.recorrencia_id] : null
           });
 
           mapaTotais[nomeResp] = (mapaTotais[nomeResp] || 0) + valorParcela;
@@ -211,73 +215,72 @@ const Listagem: React.FC = () => {
 
     const isCredito = itemParaEditar.forma_pagamento === 'Crédito';
     const isRecorrente = itemParaEditar.tipo_recorrencia === 'recorrente';
-    
     let recorrenciaIdFinal = itemParaEditar.recorrencia_id;
 
-    // Se for recorrente e não tiver ID, cria a recorrência na tabela pai (regra de negócio unificada)
-    if (isRecorrente && (!recorrenciaIdFinal || recorrenciaIdFinal === "")) {
-      const novoUuid = self.crypto.randomUUID();
-      
-      const { error: errorRec } = await (supabase.from('recorrencias') as any).insert({
-        id: novoUuid,
-        user_id: itemParaEditar.user_id,
-        descricao: itemParaEditar.descricao,
-        loja: itemParaEditar.loja,
-        valor: itemParaEditar.valor_total,
-        categoria_id: itemParaEditar.categoria_id,
-        tipo_despesa: itemParaEditar.tipo_despesa, // Sincronizando o novo campo
-        forma_pagamento: itemParaEditar.forma_pagamento,
-        cartao_id: isCredito ? itemParaEditar.cartao_id : null,
-        dia_vencimento: new Date(itemParaEditar.data_compra).getDate() + 1, // Ajuste de fuso comum em inputs date
-        frequencia: itemParaEditar.frequencia_recorrencia || 'mensal',
-        data_inicio: itemParaEditar.data_compra,
-        data_fim: itemParaEditar.data_fim_recorrencia || null, // Novo campo fim
-        ativo: true
-      });
+    try {
+        if (isRecorrente && (!recorrenciaIdFinal || recorrenciaIdFinal === "")) {
+          const novoUuid = self.crypto.randomUUID();
+          const { error: errorRec } = await (supabase.from('recorrencias') as any).insert({
+            id: novoUuid,
+            user_id: itemParaEditar.user_id,
+            descricao: itemParaEditar.descricao,
+            loja: itemParaEditar.loja,
+            valor: itemParaEditar.valor_total,
+            categoria_id: itemParaEditar.categoria_id,
+            tipo_despesa: 'Gastos Variáveis',
+            forma_pagamento: itemParaEditar.forma_pagamento,
+            cartao_id: isCredito ? itemParaEditar.cartao_id : null,
+            dia_vencimento: new Date(itemParaEditar.data_compra).getDate(),
+            frequencia: itemParaEditar.frequencia_recorrencia || 'mensal',
+            data_inicio: itemParaEditar.data_compra,
+            data_fim: itemParaEditar.data_fim, 
+            ativo: true
+          });
+          if (errorRec) throw errorRec;
+          recorrenciaIdFinal = novoUuid;
+        } else if (isRecorrente && recorrenciaIdFinal) {
+            const { error: errorUpdateRec } = await (supabase.from('recorrencias') as any).update({
+                descricao: itemParaEditar.descricao,
+                loja: itemParaEditar.loja,
+                valor: itemParaEditar.valor_total,
+                categoria_id: itemParaEditar.categoria_id,
+                forma_pagamento: itemParaEditar.forma_pagamento,
+                cartao_id: isCredito ? itemParaEditar.cartao_id : null,
+                frequencia: itemParaEditar.frequencia_recorrencia,
+                data_fim: itemParaEditar.data_fim 
+            }).eq('id', recorrenciaIdFinal);
+            if (errorUpdateRec) throw errorUpdateRec;
+        }
 
-      if (errorRec) {
-        setModal({ isOpen: true, type: 'error', title: 'Erro de Vínculo', message: 'Não foi possível criar o grupo de recorrência.' });
-        return;
-      }
-      recorrenciaIdFinal = novoUuid;
-    } else if (isRecorrente && recorrenciaIdFinal) {
-        // Se já existe, atualizamos a regra pai também para manter a integridade
-        await (supabase.from('recorrencias') as any).update({
-            tipo_despesa: itemParaEditar.tipo_despesa,
-            data_fim: itemParaEditar.data_fim_recorrencia || null,
-            frequencia: itemParaEditar.frequencia_recorrencia
-        }).eq('id', recorrenciaIdFinal);
-    }
+        const { error: errorCompra } = await (supabase.from('compras') as any).update({
+          descricao: itemParaEditar.descricao,
+          loja: itemParaEditar.loja,
+          user_id: itemParaEditar.user_id,
+          categoria_id: itemParaEditar.categoria_id,
+          valor_total: itemParaEditar.valor_total,
+          forma_pagamento: itemParaEditar.forma_pagamento,
+          cartao: isCredito ? itemParaEditar.cartao : null,
+          cartao_id: isCredito ? itemParaEditar.cartao_id : null,
+          data_compra: itemParaEditar.data_compra,
+          periodo_referencia: itemParaEditar.periodo_referencia,
+          num_parcelas: isCredito ? Number(itemParaEditar.num_parcelas) : 1,
+          parcelado: isCredito && Number(itemParaEditar.num_parcelas) > 1,
+          pedido: itemParaEditar.pedido,
+          nota_fiscal: itemParaEditar.nota_fiscal,
+          status_pagamento: itemParaEditar.status_pagamento,
+          tipo_recorrencia: itemParaEditar.tipo_recorrencia,
+          frequencia_recorrencia: isRecorrente ? itemParaEditar.frequencia_recorrencia : null,
+          recorrencia_id: recorrenciaIdFinal
+        }).eq('id', itemParaEditar.id);
 
-    const { error } = await (supabase.from('compras') as any).update({
-      descricao: itemParaEditar.descricao,
-      loja: itemParaEditar.loja,
-      user_id: itemParaEditar.user_id,
-      usuario_criacao: itemParaEditar.usuario_criacao,
-      categoria_id: itemParaEditar.categoria_id,
-      valor_total: itemParaEditar.valor_total,
-      tipo_despesa: itemParaEditar.tipo_despesa, // Novo campo no update
-      forma_pagamento: itemParaEditar.forma_pagamento,
-      cartao: isCredito ? itemParaEditar.cartao : null,
-      cartao_id: isCredito ? itemParaEditar.cartao_id : null,
-      data_compra: itemParaEditar.data_compra,
-      periodo_referencia: itemParaEditar.periodo_referencia,
-      num_parcelas: isCredito ? Number(itemParaEditar.num_parcelas) : 1,
-      parcelado: isCredito && Number(itemParaEditar.num_parcelas) > 1,
-      pedido: itemParaEditar.pedido,
-      nota_fiscal: itemParaEditar.nota_fiscal,
-      status_pagamento: itemParaEditar.status_pagamento,
-      tipo_recorrencia: itemParaEditar.tipo_recorrencia,
-      frequencia_recorrencia: isRecorrente ? itemParaEditar.frequencia_recorrencia : null,
-      recorrencia_id: recorrenciaIdFinal
-    }).eq('id', itemParaEditar.id);
-
-    if (!error) {
-      setItemParaEditar(null);
-      setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Lançamento atualizado.' });
-      carregarDadosIniciais();
-    } else {
-      setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha ao atualizar compra: ' + error.message });
+        if (errorCompra) throw errorCompra;
+        await supabase.rpc("gerar_recorrencias");
+        
+        setItemParaEditar(null);
+        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Dados atualizados com sucesso.' });
+        carregarDadosIniciais();
+    } catch (err: any) {
+        setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha: ' + err.message });
     }
   };
 
@@ -286,13 +289,22 @@ const Listagem: React.FC = () => {
       isOpen: true,
       type: 'danger',
       title: 'Remover?',
-      message: 'Esta ação excluirá o gasto permanentemente.',
+      message: 'Esta ação excluirá o gasto e todas as suas parcelas vinculadas permanentemente.',
       onConfirm: async () => {
-        const { error } = await (supabase.from('compras') as any).delete().eq('id', id);
-        if (!error) {
+        try {
+          // 1. Deletar parcelas vinculadas primeiro para evitar erro de Conflict (FK)
+          await (supabase.from('parcelas') as any).delete().eq('compra_id', id);
+          
+          // 2. Deletar a compra
+          const { error } = await (supabase.from('compras') as any).delete().eq('id', id);
+          
+          if (error) throw error;
+
           setItemParaEditar(null); 
           setModal(prev => ({ ...prev, isOpen: false }));
           carregarDadosIniciais();
+        } catch (error: any) {
+          setModal({ isOpen: true, type: 'error', title: 'Erro ao excluir', message: error.message });
         }
       }
     });
@@ -455,14 +467,6 @@ const Listagem: React.FC = () => {
                   </div>
 
                   <div className="form-group">
-                    <label><ShieldCheck size={12}/> Tipo de Despesa</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_despesa} onChange={e => setItemParaEditar({...itemParaEditar, tipo_despesa: e.target.value as any})}>
-                      <option value="">Selecione...</option>
-                      {tiposDespesaOpcoes.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
                     <label><RefreshCw size={12}/> Tipo Recorrência</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value as any})}>
                       {tiposRecorrencia.map(tipo => <option key={tipo} value={tipo}>{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</option>)}
@@ -471,17 +475,17 @@ const Listagem: React.FC = () => {
 
                   {itemParaEditar.tipo_recorrencia === 'recorrente' && (
                     <>
-                        <div className="form-group">
+                      <div className="form-group">
                         <label><Repeat size={12}/> Frequência</label>
                         <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.frequencia_recorrencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, frequencia_recorrencia: e.target.value as any})}>
-                            <option value="">Selecione...</option>
-                            {frequenciasRecorrencia.map(freq => <option key={freq} value={freq}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</option>)}
+                          <option value="">Selecione...</option>
+                          {frequenciasRecorrencia.map(freq => <option key={freq} value={freq}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</option>)}
                         </select>
-                        </div>
-                        <div className="form-group">
-                            <label><CalendarOff size={12}/> Data Fim (Opcional)</label>
-                            <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.data_fim_recorrencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, data_fim_recorrencia: e.target.value})} />
-                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label><CalendarDays size={12}/> Data Limite</label>
+                        <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.data_fim || ''} onChange={e => setItemParaEditar({...itemParaEditar, data_fim: e.target.value})} />
+                      </div>
                     </>
                   )}
 
