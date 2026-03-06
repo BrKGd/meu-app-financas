@@ -4,7 +4,8 @@ import {
   ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
   Tag, ShoppingBag, Landmark, Lock, UserPlus,
-  CheckCircle2, Clock, RefreshCw, Repeat, Layers
+  CheckCircle2, Clock, RefreshCw, Repeat, Layers,
+  CalendarOff, ShieldCheck
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
@@ -35,6 +36,8 @@ interface ItemCompra {
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
   tipo_recorrencia: 'unica' | 'parcelada' | 'recorrente';
   frequencia_recorrencia?: 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
+  tipo_despesa: 'Compra no Crédito' | 'Gastos Variáveis' | 'Gastos Fixos'; // Novo Campo Obrigatório
+  data_fim_recorrencia?: string; // Novo Campo para limite de recorrência
   parcelaAtual?: number;
   valorParcela?: number;
   nomeResponsavel?: string;
@@ -70,6 +73,7 @@ const Listagem: React.FC = () => {
   const tiposRecorrencia = ["unica", "parcelada", "recorrente"];
   const frequenciasRecorrencia = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
   const statusPagamento = ["pendente", "pago", "vencido", "cancelado"];
+  const tiposDespesaOpcoes = ["Compra no Crédito", "Gastos Variáveis", "Gastos Fixos"];
 
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
   const currentUserId = perfilLogado?.id;
@@ -210,12 +214,10 @@ const Listagem: React.FC = () => {
     
     let recorrenciaIdFinal = itemParaEditar.recorrencia_id;
 
-    // --- CORREÇÃO DO CONFLITO (409) ---
-    // Se for recorrente e não tiver ID, precisamos CRIAR a recorrência na tabela pai primeiro
+    // Se for recorrente e não tiver ID, cria a recorrência na tabela pai (regra de negócio unificada)
     if (isRecorrente && (!recorrenciaIdFinal || recorrenciaIdFinal === "")) {
       const novoUuid = self.crypto.randomUUID();
       
-      // Cria o registro pai na tabela public.recorrencias
       const { error: errorRec } = await (supabase.from('recorrencias') as any).insert({
         id: novoUuid,
         user_id: itemParaEditar.user_id,
@@ -223,11 +225,13 @@ const Listagem: React.FC = () => {
         loja: itemParaEditar.loja,
         valor: itemParaEditar.valor_total,
         categoria_id: itemParaEditar.categoria_id,
+        tipo_despesa: itemParaEditar.tipo_despesa, // Sincronizando o novo campo
         forma_pagamento: itemParaEditar.forma_pagamento,
         cartao_id: isCredito ? itemParaEditar.cartao_id : null,
-        dia_vencimento: new Date(itemParaEditar.data_compra).getDate(),
+        dia_vencimento: new Date(itemParaEditar.data_compra).getDate() + 1, // Ajuste de fuso comum em inputs date
         frequencia: itemParaEditar.frequencia_recorrencia || 'mensal',
         data_inicio: itemParaEditar.data_compra,
+        data_fim: itemParaEditar.data_fim_recorrencia || null, // Novo campo fim
         ativo: true
       });
 
@@ -236,6 +240,13 @@ const Listagem: React.FC = () => {
         return;
       }
       recorrenciaIdFinal = novoUuid;
+    } else if (isRecorrente && recorrenciaIdFinal) {
+        // Se já existe, atualizamos a regra pai também para manter a integridade
+        await (supabase.from('recorrencias') as any).update({
+            tipo_despesa: itemParaEditar.tipo_despesa,
+            data_fim: itemParaEditar.data_fim_recorrencia || null,
+            frequencia: itemParaEditar.frequencia_recorrencia
+        }).eq('id', recorrenciaIdFinal);
     }
 
     const { error } = await (supabase.from('compras') as any).update({
@@ -245,6 +256,7 @@ const Listagem: React.FC = () => {
       usuario_criacao: itemParaEditar.usuario_criacao,
       categoria_id: itemParaEditar.categoria_id,
       valor_total: itemParaEditar.valor_total,
+      tipo_despesa: itemParaEditar.tipo_despesa, // Novo campo no update
       forma_pagamento: itemParaEditar.forma_pagamento,
       cartao: isCredito ? itemParaEditar.cartao : null,
       cartao_id: isCredito ? itemParaEditar.cartao_id : null,
@@ -261,7 +273,6 @@ const Listagem: React.FC = () => {
     }).eq('id', itemParaEditar.id);
 
     if (!error) {
-      await supabase.rpc("gerar_recorrencias");
       setItemParaEditar(null);
       setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Lançamento atualizado.' });
       carregarDadosIniciais();
@@ -444,6 +455,14 @@ const Listagem: React.FC = () => {
                   </div>
 
                   <div className="form-group">
+                    <label><ShieldCheck size={12}/> Tipo de Despesa</label>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_despesa} onChange={e => setItemParaEditar({...itemParaEditar, tipo_despesa: e.target.value as any})}>
+                      <option value="">Selecione...</option>
+                      {tiposDespesaOpcoes.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
                     <label><RefreshCw size={12}/> Tipo Recorrência</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value as any})}>
                       {tiposRecorrencia.map(tipo => <option key={tipo} value={tipo}>{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</option>)}
@@ -451,13 +470,19 @@ const Listagem: React.FC = () => {
                   </div>
 
                   {itemParaEditar.tipo_recorrencia === 'recorrente' && (
-                    <div className="form-group">
-                      <label><Repeat size={12}/> Frequência</label>
-                      <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.frequencia_recorrencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, frequencia_recorrencia: e.target.value as any})}>
-                        <option value="">Selecione...</option>
-                        {frequenciasRecorrencia.map(freq => <option key={freq} value={freq}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</option>)}
-                      </select>
-                    </div>
+                    <>
+                        <div className="form-group">
+                        <label><Repeat size={12}/> Frequência</label>
+                        <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.frequencia_recorrencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, frequencia_recorrencia: e.target.value as any})}>
+                            <option value="">Selecione...</option>
+                            {frequenciasRecorrencia.map(freq => <option key={freq} value={freq}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</option>)}
+                        </select>
+                        </div>
+                        <div className="form-group">
+                            <label><CalendarOff size={12}/> Data Fim (Opcional)</label>
+                            <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.data_fim_recorrencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, data_fim_recorrencia: e.target.value})} />
+                        </div>
+                    </>
                   )}
 
                   <div className="form-group">
