@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
   Tag, ShoppingBag, Landmark, Lock, UserPlus,
-  CheckCircle2, Clock, RefreshCw
+  CheckCircle2, Clock, RefreshCw, Repeat
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
@@ -29,9 +29,9 @@ interface ItemCompra {
   cartao: string | null;
   forma_pagamento: string;
   categoria_id: string;
-  // Atualizado conforme constraint CHECK do banco
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
-  tipo_recorrencia: string;
+  tipo_recorrencia: 'unica' | 'parcelada' | 'recorrente'; // Atualizado
+  frequencia_recorrencia?: string; // Novo campo
   parcelaAtual?: number;
   valorParcela?: number;
   nomeResponsavel?: string;
@@ -64,13 +64,11 @@ const Listagem: React.FC = () => {
   const mesesNominais = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
   
-  // ATUALIZADO: Conforme constraint CHECK da tabela public.compras
-  const opcoesRecorrencia = ["unica", "parcelada", "mensal", "anual", "semanal", "variavel"];
-  
-  // ATUALIZADO: Conforme constraint CHECK da tabela public.compras
+  // ATUALIZADO CONFORME NOVO SCHEMA
+  const opcoesTipoRecorrencia = ["unica", "parcelada", "recorrente"];
+  const opcoesFrequencia = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
   const opcoesStatus = ["pendente", "pago", "vencido", "cancelado"];
 
-  // --- LÓGICA DE PERMISSÃO RESTAURADA E FIEL ---
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
   const currentUserId = perfilLogado?.id;
 
@@ -200,7 +198,7 @@ const Listagem: React.FC = () => {
     if (!itemParaEditar) return;
 
     if (!temPermissaoEscrita(itemParaEditar)) {
-        setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Você não tem permissão para editar este registro.' });
+        setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Você não tem permissão para editar.' });
         return;
     }
 
@@ -221,7 +219,8 @@ const Listagem: React.FC = () => {
       pedido: itemParaEditar.pedido,
       nota_fiscal: itemParaEditar.nota_fiscal,
       status_pagamento: itemParaEditar.status_pagamento,
-      tipo_recorrencia: itemParaEditar.tipo_recorrencia
+      tipo_recorrencia: itemParaEditar.tipo_recorrencia,
+      frequencia_recorrencia: itemParaEditar.tipo_recorrencia === 'recorrente' ? itemParaEditar.frequencia_recorrencia : null
     }).eq('id', itemParaEditar.id);
 
     if (!error) {
@@ -233,7 +232,6 @@ const Listagem: React.FC = () => {
 
   const confirmDelete = (id: string) => {
     if (!temPermissaoEscrita(itemParaEditar)) return;
-
     setModal({
       isOpen: true,
       type: 'danger',
@@ -387,18 +385,26 @@ const Listagem: React.FC = () => {
                   <div className="form-group">
                     <label><CheckCircle2 size={12}/> Status</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.status_pagamento} onChange={e => setItemParaEditar({...itemParaEditar, status_pagamento: e.target.value as any})}>
-                      {/* ATUALIZADO: Conforme constraint do banco */}
                       {opcoesStatus.map(st => <option key={st} value={st}>{st.charAt(0).toUpperCase() + st.slice(1)}</option>)}
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label><RefreshCw size={12}/> Recorrência</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value})}>
-                      {/* ATUALIZADO: Conforme constraint do banco */}
-                      {opcoesRecorrencia.map(op => <option key={op} value={op}>{op.charAt(0).toUpperCase() + op.slice(1)}</option>)}
+                    <label><RefreshCw size={12}/> Tipo Recorrência</label>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value as any})}>
+                      {opcoesTipoRecorrencia.map(op => <option key={op} value={op}>{op.charAt(0).toUpperCase() + op.slice(1)}</option>)}
                     </select>
                   </div>
+
+                  {itemParaEditar.tipo_recorrencia === 'recorrente' && (
+                    <div className="form-group">
+                      <label><Repeat size={12}/> Frequência</label>
+                      <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.frequencia_recorrencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, frequencia_recorrencia: e.target.value})}>
+                        <option value="">Selecione...</option>
+                        {opcoesFrequencia.map(f => <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</option>)}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="form-group">
                     <label><User size={12}/> Responsável</label>
@@ -462,7 +468,6 @@ const Listagem: React.FC = () => {
                 <button type="button" className="btn-icon-action btn-delete" title='Excluir Registro' onClick={() => confirmDelete(itemParaEditar.id)}>
                   <img src={iconExcluir} alt="Excluir" />
                 </button>
-                
                 <div className="footer-right-actions">
                   <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
                     <img src={iconCancelar} alt="Cancelar" />
