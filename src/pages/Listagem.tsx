@@ -3,18 +3,17 @@ import { supabase } from '../services/supabaseClient';
 import { 
   ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
-  Tag, ShoppingBag, Landmark, Lock, UserPlus
+  Tag, ShoppingBag, Landmark, Lock, UserPlus,
+  CheckCircle2, Clock, RefreshCw
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
-
-// --- Assets (Ícones PNG) ---
 import iconConfirme from '../assets/confirme.png';
 import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
 
-// --- Interfaces para Tipagem ---
+// --- Interfaces para Tipagem Atualizada conforme SQL ---
 interface ItemCompra {
   id: string;
   user_id: string;
@@ -30,6 +29,10 @@ interface ItemCompra {
   cartao: string | null;
   forma_pagamento: string;
   categoria_id: string;
+  // Campos vindos do seu SQL (CHECK constraints)
+  status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
+  tipo_recorrencia: string; 
+  // Campos virtuais para UI
   parcelaAtual?: number;
   valorParcela?: number;
   nomeResponsavel?: string;
@@ -61,8 +64,8 @@ const Listagem: React.FC = () => {
 
   const mesesNominais = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
+  const opcoesRecorrencia = ["Nenhuma", "Mensal", "Anual"];
 
-  // --- LÓGICA DE PERMISSÃO ---
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
   const currentUserId = perfilLogado?.id;
 
@@ -72,7 +75,6 @@ const Listagem: React.FC = () => {
     return item.usuario_criacao === currentUserId; 
   };
 
-  // --- Funções de Formatação ---
   const formatarMoedaVisual = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
   };
@@ -96,7 +98,6 @@ const Listagem: React.FC = () => {
     return apenasNumeros.padStart(9, '0').replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
   };
 
-  // --- Busca de Dados ---
   const fetchDespesas = useCallback(async (perfil: any, mapaNomes: any, listaCartoes: any[], mapaCats: any) => {
     let query = (supabase.from('compras') as any).select('*').order('data_compra', { ascending: false });
     
@@ -151,7 +152,7 @@ const Listagem: React.FC = () => {
     setDespesas(projetadas);
     setTotalGeralMes(acumuladoGeral);
     setTotaisPorResponsavel(Object.entries(mapaTotais).map(([nome, valor]) => ({ nome, valor })));
-  }, [filtroData.mes, filtroData.ano]);
+  }, [filtroData]);
 
   const carregarDadosIniciais = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -189,7 +190,6 @@ const Listagem: React.FC = () => {
     carregarDadosIniciais(); 
   }, [carregarDadosIniciais]);
 
-  // --- Handlers ---
   const handleUpdate = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!itemParaEditar) return;
@@ -201,6 +201,7 @@ const Listagem: React.FC = () => {
 
     const isCredito = itemParaEditar.forma_pagamento === 'Crédito';
     
+    // CORREÇÃO DO ERRO 400: Enviando apenas o que existe na tabela 'compras'
     const { error } = await (supabase.from('compras') as any).update({
       descricao: itemParaEditar.descricao,
       loja: itemParaEditar.loja,
@@ -214,21 +215,23 @@ const Listagem: React.FC = () => {
       num_parcelas: isCredito ? Number(itemParaEditar.num_parcelas) : 1,
       parcelado: isCredito && Number(itemParaEditar.num_parcelas) > 1,
       pedido: itemParaEditar.pedido,
-      nota_fiscal: itemParaEditar.nota_fiscal
+      nota_fiscal: itemParaEditar.nota_fiscal,
+      // Novos campos vindos da estrutura SQL:
+      status_pagamento: itemParaEditar.status_pagamento.toLowerCase(), 
+      tipo_recorrencia: itemParaEditar.tipo_recorrencia || 'Nenhuma'
     }).eq('id', itemParaEditar.id);
 
-    if (!error) {
+    if (error) {
+      setModal({ isOpen: true, type: 'error', title: 'Erro ao Salvar', message: error.message });
+    } else {
       setItemParaEditar(null);
       setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Lançamento atualizado.' });
       carregarDadosIniciais();
-    } else {
-      setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha ao atualizar o registro.' });
     }
   };
 
   const confirmDelete = (id: string) => {
     if (!temPermissaoEscrita(itemParaEditar)) return;
-
     setModal({
       isOpen: true,
       type: 'danger',
@@ -255,7 +258,6 @@ const Listagem: React.FC = () => {
 
   return (
     <div className="listagem-container fade-in">
-      {/* HEADER */}
       <div className="listagem-header">
         <div className="header-title-wrapper">
           <h2>Extrato</h2>
@@ -272,14 +274,15 @@ const Listagem: React.FC = () => {
         </div>
       </div>
 
-      {/* TABELA */}
       <div className="table-wrapper">
         <table className="custom-table">
           <thead>
             <tr>
               <th>Data</th>
+              <th>Status</th>
               <th>Responsável</th>
               <th>Categoria</th>
+              <th>Recorrência</th>
               <th>Descrição</th>
               <th>Loja</th>
               <th>NF</th>
@@ -296,19 +299,19 @@ const Listagem: React.FC = () => {
               despesas.map((item, idx) => (
                 <tr key={`${item.id}-${idx}`} className="clickable-row" onClick={() => setItemParaEditar({...item})}>
                   <td className="cell-date">{item.data_compra.split('-').reverse().slice(0,2).join('/')}</td>
+                  <td>
+                    <span className={`status-badge status-${item.status_pagamento}`}>
+                      {item.status_pagamento === 'pago' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                      {item.status_pagamento}
+                    </span>
+                  </td>
                   <td className="cell-user">{item.nomeResponsavel}</td>
                   <td className="cell-category">
-                    <span 
-                      className="cat-badge" 
-                      style={{ 
-                        backgroundColor: `${item.corCategoria}20`,
-                        color: item.corCategoria,
-                        border: `1px solid ${item.corCategoria}40`
-                      }}
-                    >
+                    <span className="cat-badge" style={{ backgroundColor: `${item.corCategoria}20`, color: item.corCategoria, border: `1px solid ${item.corCategoria}40` }}>
                       {item.nomeCategoria}
                     </span>
                   </td>
+                  <td className="cell-sub">{item.tipo_recorrencia !== 'Nenhuma' ? item.tipo_recorrencia : '-'}</td>
                   <td className="cell-main">
                     {item.descricao}
                     {!temPermissaoEscrita(item) && <Lock size={12} style={{marginLeft: '6px', opacity: 0.5}} />}
@@ -323,9 +326,7 @@ const Listagem: React.FC = () => {
                       {item.parcelado ? `${item.parcelaAtual}/${item.num_parcelas}` : 'À Vista'}
                     </span>
                   </td>
-                  <td className="cell-value" style={{ textAlign: 'right' }}>
-                    {formatarMoedaVisual(item.valorParcela || 0)}
-                  </td>
+                  <td className="cell-value" style={{ textAlign: 'right' }}>{formatarMoedaVisual(item.valorParcela || 0)}</td>
                   <td className="cell-sub" style={{ fontSize: '0.75rem' }}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
                        <UserPlus size={10} /> {item.nomeCriador}
@@ -334,17 +335,12 @@ const Listagem: React.FC = () => {
                 </tr>
               ))
             ) : (
-              <tr>
-                <td colSpan={12} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                  Nenhum lançamento encontrado para este mês.
-                </td>
-              </tr>
+              <tr><td colSpan={14} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Nenhum lançamento.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* RESUMO */}
       {despesas.length > 0 && (
         <div className="resumo-badges-container fade-in">
           <div className="resumo-badges-list">
@@ -364,62 +360,73 @@ const Listagem: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DE EDIÇÃO / DETALHES */}
       {itemParaEditar && (
         <div className="edit-modal-overlay">
           <div className="edit-modal-content">
             <div className="modal-fixed-header">
               <h3>{temPermissaoEscrita(itemParaEditar) ? 'Editar Gasto' : 'Detalhes do Gasto'}</h3>
-              <button onClick={() => setItemParaEditar(null)} className="btn-icon-action">
-                  <img src={iconFechar} alt="Fechar" title="Fechar" />
-              </button>
+              <button onClick={() => setItemParaEditar(null)} className="btn-icon-action"><img src={iconFechar} alt="Fechar" /></button>
             </div>
 
             <div className="modal-scrollable-body">
               <form id="edit-form" onSubmit={handleUpdate}>
                 <div className="grid-form">
                   <div className="form-group">
-                    <label><Calendar size={12}/> Data Compra</label>
+                    <label><Calendar size={12}/> Data</label>
                     <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.data_compra} onChange={e => setItemParaEditar({...itemParaEditar, data_compra: e.target.value})} />
                   </div>
+                  
+                  <div className="form-group">
+                    <label><CheckCircle2 size={12}/> Status</label>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.status_pagamento} onChange={e => setItemParaEditar({...itemParaEditar, status_pagamento: e.target.value as any})}>
+                      <option value="pendente">Pendente</option>
+                      <option value="pago">Pago</option>
+                      <option value="vencido">Vencido</option>
+                      <option value="cancelado">Cancelado</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label><RefreshCw size={12}/> Recorrência</label>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia || 'Nenhuma'} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value})}>
+                      {opcoesRecorrencia.map(op => <option key={op} value={op}>{op}</option>)}
+                    </select>
+                  </div>
+
                   <div className="form-group">
                     <label><User size={12}/> Responsável</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.user_id} onChange={e => setItemParaEditar({...itemParaEditar, user_id: e.target.value})}>
                       {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
                     </select>
                   </div>
+
                   <div className="form-group">
                     <label><Tag size={12}/> Categoria</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.categoria_id} onChange={e => setItemParaEditar({...itemParaEditar, categoria_id: e.target.value})}>
-                      <option value="">Selecione...</option>
                       {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
                     </select>
                   </div>
+
                   <div className="form-group">
                     <label><ShoppingBag size={12}/> Loja</label>
                     <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.loja || ''} onChange={e => setItemParaEditar({...itemParaEditar, loja: e.target.value})} />
                   </div>
+
                   <div className="form-group full-width">
                     <label>Descrição</label>
                     <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.descricao} onChange={e => setItemParaEditar({...itemParaEditar, descricao: e.target.value})} />
                   </div>
+
                   <div className="form-group">
                     <label>Valor Total</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      disabled={!temPermissaoEscrita(itemParaEditar)} 
-                      value={itemParaEditar.valorVisual || formatarMoedaVisual(itemParaEditar.valor_total)} 
+                    <input type="text" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.valorVisual || formatarMoedaVisual(itemParaEditar.valor_total)} 
                       onChange={e => {
                         const masked = mascaraMoedaInput(e.target.value);
-                        setItemParaEditar({
-                          ...itemParaEditar,
-                          valorVisual: masked,
-                          valor_total: desformatarMoedaParaBanco(masked)
-                        });
+                        setItemParaEditar({...itemParaEditar, valorVisual: masked, valor_total: desformatarMoedaParaBanco(masked)});
                       }} 
                     />
                   </div>
+
                   <div className="form-group">
                     <label><Landmark size={12}/> Pagamento</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.forma_pagamento} onChange={e => setItemParaEditar({...itemParaEditar, forma_pagamento: e.target.value})}>
@@ -432,51 +439,33 @@ const Listagem: React.FC = () => {
                       <div className="form-group">
                         <label><CreditCard size={12}/> Cartão</label>
                         <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.cartao || ''} onChange={e => setItemParaEditar({...itemParaEditar, cartao: e.target.value})}>
-                          <option value="">Selecione o cartão...</option>
+                          <option value="">Selecione...</option>
                           {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                         </select>
                       </div>
                       <div className="form-group">
-                        <label>N° de Parcelas</label>
+                        <label>Parcelas</label>
                         <input type="number" min="1" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.num_parcelas} onChange={e => setItemParaEditar({...itemParaEditar, num_parcelas: Number(e.target.value)})} />
                       </div>
                     </>
                   )}
-
-                  <div className="form-group">
-                    <label><Receipt size={12}/> Nota Fiscal</label>
-                    <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.nota_fiscal || ''} onChange={e => setItemParaEditar({...itemParaEditar, nota_fiscal: e.target.value})} />
-                  </div>
-                  <div className="form-group">
-                    <label><Hash size={12}/> Pedido</label>
-                    <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.pedido || ''} onChange={e => setItemParaEditar({...itemParaEditar, pedido: e.target.value})} />
-                  </div>
                 </div>
               </form>
             </div>
 
             {temPermissaoEscrita(itemParaEditar) ? (
               <div className="modal-footer-icons">
-                <button type="button" className="btn-icon-action btn-delete" title='Excluir Registro' onClick={() => confirmDelete(itemParaEditar.id)}>
-                  <img src={iconExcluir} alt="Excluir" />
-                </button>
-                
+                <button type="button" className="btn-icon-action btn-delete" onClick={() => confirmDelete(itemParaEditar.id)}><img src={iconExcluir} alt="Excluir" /></button>
                 <div className="footer-right-actions">
-                  <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
-                    <img src={iconCancelar} alt="Cancelar" />
-                  </button>
-                  <button type="submit" form="edit-form" className="btn-icon-action" title='Salvar'>
-                    <img src={iconConfirme} alt="Salvar" />
-                  </button>
+                  <button type="button" className="btn-icon-action" onClick={() => setItemParaEditar(null)}><img src={iconCancelar} alt="Cancelar" /></button>
+                  <button type="submit" form="edit-form" className="btn-icon-action"><img src={iconConfirme} alt="Salvar" /></button>
                 </div>
               </div>
             ) : (
                 <div className="modal-footer-icons" style={{justifyContent: 'center', backgroundColor: '#f8fafc', padding: '15px', borderTop: '1px solid #e2e8f0'}}>
                     <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px'}}>
-                        <div style={{display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600}}>
-                            <Lock size={14} style={{marginRight: '8px'}} /> Apenas visualização
-                        </div>
-                        <span style={{fontSize: '0.7rem', color: '#94a3b8'}}>Registro inserido por: {itemParaEditar.nomeCriador}</span>
+                        <div style={{display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600}}><Lock size={14} style={{marginRight: '8px'}} /> Apenas visualização</div>
+                        <span style={{fontSize: '0.7rem', color: '#94a3b8'}}>Registro por: {itemParaEditar.nomeCriador}</span>
                     </div>
                 </div>
             )}
@@ -484,10 +473,7 @@ const Listagem: React.FC = () => {
         </div>
       )}
 
-      <ModalFeedback 
-        isOpen={modal.isOpen} type={modal.type} title={modal.title} message={modal.message}
-        onClose={() => setModal({ ...modal, isOpen: false })} onConfirm={modal.onConfirm}
-      />
+      <ModalFeedback isOpen={modal.isOpen} type={modal.type} title={modal.title} message={modal.message} onClose={() => setModal({ ...modal, isOpen: false })} onConfirm={modal.onConfirm} />
     </div>
   );
 };
