@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
   Tag, ShoppingBag, Landmark, Lock, UserPlus,
-  CheckCircle2, Clock, RefreshCw, Repeat
+  CheckCircle2, Clock, RefreshCw, Repeat, Layers
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
@@ -26,14 +26,14 @@ interface ItemCompra {
   parcelado: boolean;
   num_parcelas: number;
   data_compra: string;
+  periodo_referencia?: string; 
+  recorrencia_id?: string;    
   cartao: string | null;
+  cartao_id?: number | null; 
   forma_pagamento: string;
   categoria_id: string;
-  // Conforme CONSTRAINT status_pagamento CHECK
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
-  // Conforme CONSTRAINT tipo_recorrencia CHECK
   tipo_recorrencia: 'unica' | 'parcelada' | 'recorrente';
-  // Conforme CONSTRAINT frequencia_recorrencia CHECK
   frequencia_recorrencia?: 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
   parcelaAtual?: number;
   valorParcela?: number;
@@ -67,12 +67,10 @@ const Listagem: React.FC = () => {
   const mesesNominais = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
   
-  // OPÇÕES SINCRONIZADAS COM O SCHEMA DO BANCO
   const tiposRecorrencia = ["unica", "parcelada", "recorrente"];
   const frequenciasRecorrencia = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
   const statusPagamento = ["pendente", "pago", "vencido", "cancelado"];
 
-  // --- LÓGICA DE PERMISSÃO ---
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
   const currentUserId = perfilLogado?.id;
 
@@ -121,11 +119,12 @@ const Listagem: React.FC = () => {
 
     (data as any[])?.forEach((item) => {
       const numParcelas = item.num_parcelas || 1;
-      const [anoC, mesC, diaC] = item.data_compra.split('-').map(Number);
+      const dataBaseReferencia = item.periodo_referencia || item.data_compra;
+      const [anoC, mesC, diaC] = dataBaseReferencia.split('-').map(Number);
       
       let delayMes = 0;
-      if (item.forma_pagamento === 'Crédito' && item.cartao) {
-        const infoCartao = listaCartoes.find(c => c.nome === item.cartao);
+      if (item.forma_pagamento === 'Crédito' && (item.cartao || item.cartao_id)) {
+        const infoCartao = listaCartoes.find(c => c.id === item.cartao_id || c.nome === item.cartao);
         if (infoCartao && diaC > infoCartao.dia_fechamento) {
           delayMes = 1;
         }
@@ -202,12 +201,43 @@ const Listagem: React.FC = () => {
     if (!itemParaEditar) return;
 
     if (!temPermissaoEscrita(itemParaEditar)) {
-        setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Você não tem permissão para editar este registro.' });
-        return;
+      setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Você não tem permissão para editar este registro.' });
+      return;
     }
 
     const isCredito = itemParaEditar.forma_pagamento === 'Crédito';
+    const isRecorrente = itemParaEditar.tipo_recorrencia === 'recorrente';
     
+    let recorrenciaIdFinal = itemParaEditar.recorrencia_id;
+
+    // --- CORREÇÃO DO CONFLITO (409) ---
+    // Se for recorrente e não tiver ID, precisamos CRIAR a recorrência na tabela pai primeiro
+    if (isRecorrente && (!recorrenciaIdFinal || recorrenciaIdFinal === "")) {
+      const novoUuid = self.crypto.randomUUID();
+      
+      // Cria o registro pai na tabela public.recorrencias
+      const { error: errorRec } = await (supabase.from('recorrencias') as any).insert({
+        id: novoUuid,
+        user_id: itemParaEditar.user_id,
+        descricao: itemParaEditar.descricao,
+        loja: itemParaEditar.loja,
+        valor: itemParaEditar.valor_total,
+        categoria_id: itemParaEditar.categoria_id,
+        forma_pagamento: itemParaEditar.forma_pagamento,
+        cartao_id: isCredito ? itemParaEditar.cartao_id : null,
+        dia_vencimento: new Date(itemParaEditar.data_compra).getDate(),
+        frequencia: itemParaEditar.frequencia_recorrencia || 'mensal',
+        data_inicio: itemParaEditar.data_compra,
+        ativo: true
+      });
+
+      if (errorRec) {
+        setModal({ isOpen: true, type: 'error', title: 'Erro de Vínculo', message: 'Não foi possível criar o grupo de recorrência.' });
+        return;
+      }
+      recorrenciaIdFinal = novoUuid;
+    }
+
     const { error } = await (supabase.from('compras') as any).update({
       descricao: itemParaEditar.descricao,
       loja: itemParaEditar.loja,
@@ -217,26 +247,30 @@ const Listagem: React.FC = () => {
       valor_total: itemParaEditar.valor_total,
       forma_pagamento: itemParaEditar.forma_pagamento,
       cartao: isCredito ? itemParaEditar.cartao : null,
+      cartao_id: isCredito ? itemParaEditar.cartao_id : null,
       data_compra: itemParaEditar.data_compra,
+      periodo_referencia: itemParaEditar.periodo_referencia,
       num_parcelas: isCredito ? Number(itemParaEditar.num_parcelas) : 1,
       parcelado: isCredito && Number(itemParaEditar.num_parcelas) > 1,
       pedido: itemParaEditar.pedido,
       nota_fiscal: itemParaEditar.nota_fiscal,
       status_pagamento: itemParaEditar.status_pagamento,
       tipo_recorrencia: itemParaEditar.tipo_recorrencia,
-      frequencia_recorrencia: itemParaEditar.tipo_recorrencia === 'recorrente' ? itemParaEditar.frequencia_recorrencia : null
+      frequencia_recorrencia: isRecorrente ? itemParaEditar.frequencia_recorrencia : null,
+      recorrencia_id: recorrenciaIdFinal
     }).eq('id', itemParaEditar.id);
 
     if (!error) {
+      await supabase.rpc("gerar_recorrencias");
       setItemParaEditar(null);
       setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Lançamento atualizado.' });
       carregarDadosIniciais();
+    } else {
+      setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha ao atualizar compra: ' + error.message });
     }
   };
 
   const confirmDelete = (id: string) => {
-    if (!temPermissaoEscrita(itemParaEditar)) return;
-
     setModal({
       isOpen: true,
       type: 'danger',
@@ -302,7 +336,14 @@ const Listagem: React.FC = () => {
             {despesas.length > 0 ? (
               despesas.map((item, idx) => (
                 <tr key={`${item.id}-${idx}`} className="clickable-row" onClick={() => setItemParaEditar({...item})}>
-                  <td className="cell-date">{item.data_compra.split('-').reverse().slice(0,2).join('/')}</td>
+                  <td className="cell-date">
+                    <div style={{display: 'flex', flexDirection: 'column'}}>
+                       <span>{item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
+                       {item.periodo_referencia && (
+                         <span style={{fontSize: '0.65rem', color: '#6366f1', fontWeight: 600}}>Ref: {item.periodo_referencia.split('-').reverse().slice(1,2)}/{item.periodo_referencia.split('-')[0].slice(-2)}</span>
+                       )}
+                    </div>
+                  </td>
                   <td>
                     <span className={`status-badge status-${item.status_pagamento}`}>
                       {item.status_pagamento === 'pago' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
@@ -316,8 +357,11 @@ const Listagem: React.FC = () => {
                     </span>
                   </td>
                   <td className="cell-main">
-                    {item.descricao}
-                    {!temPermissaoEscrita(item) && <Lock size={12} style={{marginLeft: '6px', opacity: 0.5}} />}
+                    <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                        {item.recorrencia_id && <Repeat size={10} className="text-indigo-500" />}
+                        {item.descricao}
+                        {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.5}} />}
+                    </div>
                   </td>
                   <td className="cell-sub">{item.loja || '-'}</td>
                   <td className="cell-nf">{completarNF(item.nota_fiscal)}</td>
@@ -383,8 +427,13 @@ const Listagem: React.FC = () => {
               <form id="edit-form" onSubmit={handleUpdate}>
                 <div className="grid-form">
                   <div className="form-group">
-                    <label><Calendar size={12}/> Data Compra</label>
+                    <label><Calendar size={12}/> Data Real Compra</label>
                     <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.data_compra} onChange={e => setItemParaEditar({...itemParaEditar, data_compra: e.target.value})} />
+                  </div>
+
+                  <div className="form-group">
+                    <label><Layers size={12}/> Período Referência</label>
+                    <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.periodo_referencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, periodo_referencia: e.target.value})} />
                   </div>
                   
                   <div className="form-group">
@@ -425,6 +474,7 @@ const Listagem: React.FC = () => {
                       {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
                     </select>
                   </div>
+
                   <div className="form-group">
                     <label><ShoppingBag size={12}/> Loja</label>
                     <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.loja || ''} onChange={e => setItemParaEditar({...itemParaEditar, loja: e.target.value})} />
@@ -453,9 +503,18 @@ const Listagem: React.FC = () => {
                     <>
                       <div className="form-group">
                         <label><CreditCard size={12}/> Cartão</label>
-                        <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.cartao || ''} onChange={e => setItemParaEditar({...itemParaEditar, cartao: e.target.value})}>
+                        <select 
+                          className="form-control" 
+                          disabled={!temPermissaoEscrita(itemParaEditar)} 
+                          value={itemParaEditar.cartao_id || ''} 
+                          onChange={e => {
+                            const selectedId = e.target.value ? Number(e.target.value) : null;
+                            const cartaoObj = cartoes.find(c => c.id === selectedId);
+                            setItemParaEditar({...itemParaEditar, cartao_id: selectedId, cartao: cartaoObj?.nome || null});
+                          }}
+                        >
                           <option value="">Selecione...</option>
-                          {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                          {cartoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                         </select>
                       </div>
                       <div className="form-group">
