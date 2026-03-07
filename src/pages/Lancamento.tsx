@@ -103,7 +103,6 @@ const Lancamento: React.FC = () => {
       
       setPerfilLogado({ id: user.id, tipo_usuario: tipoFinal });
 
-      // Agora buscamos os dados para todos os níveis de acesso
       const [dC, dU, dCat] = await Promise.all([
         supabase.from('cartoes').select('id, nome, dia_fechamento').order('nome'),
         supabase.from('profiles').select('id, nome').order('nome'),
@@ -114,7 +113,6 @@ const Lancamento: React.FC = () => {
       setUsuarios((dU.data as Perfil[]) || []);
       setCategorias((dCat.data as Categoria[]) || []);
 
-      // Se não for proprietário, trava o responsável como sendo o próprio usuário logado
       if (tipoFinal !== 'proprietario') {
         setForm(prev => ({ ...prev, user_id: user.id }));
       }
@@ -144,42 +142,59 @@ const Lancamento: React.FC = () => {
     const isCredito = form.forma_pagamento === 'Crédito';
     const numP = isCredito ? Number(form.num_parcelas) : 1;
     const isEfetivamenteParcelado = numP > 1;
+    const valorTotalNum = parseFloat(form.valor_total);
 
-    if (parseFloat(form.valor_total) <= 0) {
+    if (valorTotalNum <= 0) {
       setModal({ isOpen: true, type: 'warning', title: 'Atenção', message: 'O valor total deve ser maior que zero.' });
       setLoading(false); return;
     }
 
-    let dataVencimentoFinal = form.data_compra;
-    if (isCredito && infoFechamento) {
-      dataVencimentoFinal = infoFechamento.dataBaseVencimento.toISOString().split('T')[0];
+    const cartaoObjeto = cartoes.find(c => c.nome === form.cartao);
+    const recorrenciaId = isEfetivamenteParcelado ? crypto.randomUUID() : null;
+    const valorParcela = (valorTotalNum / numP).toFixed(2);
+    
+    const comprasParaInserir = [];
+
+    for (let i = 1; i <= numP; i++) {
+      let dataVencimento = form.data_compra;
+      
+      if (isCredito && infoFechamento) {
+        let d = new Date(infoFechamento.dataBaseVencimento);
+        d.setMonth(d.getMonth() + (i - 1));
+        dataVencimento = d.toISOString().split('T')[0];
+      }
+
+      // Cálculo do período de referência (Sempre dia 01 do mês do vencimento)
+      const refDate = new Date(dataVencimento);
+      const periodoReferencia = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, '0')}-01`;
+
+      comprasParaInserir.push({
+        user_id: form.user_id,
+        usuario_criacao: perfilLogado?.id,
+        descricao: numP > 1 ? `${form.descricao} (${i}/${numP})` : form.descricao,
+        loja: form.loja,
+        pedido: form.pedido,
+        nota_fiscal: completarNF(form.nota_fiscal),
+        valor_total: valorParcela, // Agora o valor total de cada linha é o valor da parcela
+        parcelado: isEfetivamenteParcelado,
+        parcelas_total: numP,
+        parcela_numero: i,
+        data_compra: form.data_compra,
+        forma_pagamento: form.forma_pagamento,
+        cartao: isCredito ? form.cartao : null,
+        cartao_id: isCredito && cartaoObjeto ? cartaoObjeto.id : null,
+        categoria_id: form.categoria_id,
+        tipo_despesa: isCredito ? 'Compra no Crédito' : 'Gastos Variáveis',
+        data_vencimento: dataVencimento,
+        status_pagamento: 'pendente',
+        cor_pagamento: '#f59e0b',
+        tipo_lancamento: isEfetivamenteParcelado ? 'parcelado' : 'unico',
+        recorrencia_id: recorrenciaId,
+        periodo_referencia: periodoReferencia
+      });
     }
 
-    const cartaoObjeto = cartoes.find(c => c.nome === form.cartao);
-    
-    const payload: any = {
-      user_id: form.user_id,
-      usuario_criacao: perfilLogado?.id, // Define quem criou o registro
-      descricao: form.descricao,
-      loja: form.loja,
-      pedido: form.pedido,
-      nota_fiscal: completarNF(form.nota_fiscal),
-      valor_total: parseFloat(form.valor_total),
-      parcelado: isEfetivamenteParcelado,
-      num_parcelas: numP,
-      data_compra: form.data_compra,
-      forma_pagamento: form.forma_pagamento,
-      cartao: isCredito ? form.cartao : null,
-      cartao_id: isCredito && cartaoObjeto ? cartaoObjeto.id : null,
-      categoria_id: form.categoria_id,
-      tipo_despesa: isCredito ? 'Compra no Crédito' : 'Gastos Variáveis',
-      data_vencimento: dataVencimentoFinal
-    };
-
-    const { data: compraCriada, error: errorCompra } = await (supabase.from('compras') as any)
-      .insert([payload])
-      .select()
-      .single();
+    const { error: errorCompra } = await (supabase.from('compras') as any).insert(comprasParaInserir);
 
     if (errorCompra) {
       setModal({ isOpen: true, type: 'error', title: 'Erro ao salvar compra', message: errorCompra.message });
@@ -187,54 +202,27 @@ const Lancamento: React.FC = () => {
       return;
     }
 
-    try {
-      if (isEfetivamenteParcelado && infoFechamento) {
-        const valorParcela = (payload.valor_total / numP);
-        const parcelasParaInserir = [];
+    setModal({ 
+      isOpen: true, 
+      type: 'success', 
+      title: 'Sucesso!', 
+      message: isEfetivamenteParcelado ? `Gasto e ${numP} parcelas registradas na tabela compras.` : `Gasto registrado com sucesso.` 
+    });
+    
+    setForm({ 
+      ...form, 
+      descricao: '', 
+      valor_total: '', 
+      loja: '', 
+      pedido: '', 
+      nota_fiscal: '', 
+      num_parcelas: 1, 
+      cartao: '', 
+      categoria_id: '',
+      user_id: perfilLogado?.tipo_usuario !== 'proprietario' ? (perfilLogado?.id || '') : ''
+    });
 
-        for (let i = 1; i <= numP; i++) {
-          let d = new Date(infoFechamento.dataBaseVencimento);
-          d.setMonth(d.getMonth() + (i - 1));
-
-          parcelasParaInserir.push({
-            compra_id: (compraCriada as any).id,
-            valor_parcela: valorParcela,
-            numero_sequencial: i,
-            data_vencimento: d.toISOString().split('T')[0],
-            pago: false
-          });
-        }
-        
-        const { error: errorParcelas } = await (supabase.from('parcelas') as any).insert(parcelasParaInserir);
-        if (errorParcelas) throw errorParcelas;
-      }
-
-      setModal({ 
-        isOpen: true, 
-        type: 'success', 
-        title: 'Sucesso!', 
-        message: isEfetivamenteParcelado ? `Gasto e ${numP} parcelas registradas.` : `Gasto registrado com sucesso.` 
-      });
-      
-      // Reseta o form mantendo o user_id se não for proprietário
-      setForm({ 
-        ...form, 
-        descricao: '', 
-        valor_total: '', 
-        loja: '', 
-        pedido: '', 
-        nota_fiscal: '', 
-        num_parcelas: 1, 
-        cartao: '', 
-        categoria_id: '',
-        user_id: perfilLogado?.tipo_usuario !== 'proprietario' ? (perfilLogado?.id || '') : ''
-      });
-
-    } catch (err: any) {
-      setModal({ isOpen: true, type: 'error', title: 'Erro nas parcelas', message: err.message });
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
   };
 
   if (fetching) return <div className="loading-state">CARREGANDO...</div>;
@@ -345,7 +333,7 @@ const Lancamento: React.FC = () => {
               <Info size={16} />
               <span>
                 {infoFechamento.vaiParaProximoMes 
-                  ? `Fatura fechada (dia ${infoFechamento.diaFechamento}). 1ª parcela/vencimento em ${infoFechamento.mesCobranca}.`
+                  ? `Fatura fechada (dia ${infoFechamento.diaFechamento}). 1ª parcela em ${infoFechamento.mesCobranca}.`
                   : `Compra antes do fechamento. Vencimento em ${infoFechamento.mesCobranca}.`}
               </span>
             </div>

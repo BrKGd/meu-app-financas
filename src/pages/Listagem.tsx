@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   ChevronLeft, ChevronRight, 
@@ -13,7 +13,26 @@ import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
 
-// --- Interfaces para Tipagem ---
+// --- Interfaces Refinadas ---
+interface Perfil {
+  id: string;
+  nome: string;
+  tipo_usuario: 'proprietario' | 'administrador' | 'comum';
+  email?: string;
+}
+
+interface Categoria {
+  id: string;
+  nome: string;
+  cor: string;
+}
+
+interface Cartao {
+  id: number;
+  nome: string;
+  dia_fechamento: number;
+}
+
 interface ItemCompra {
   id: string;
   user_id: string;
@@ -24,33 +43,34 @@ interface ItemCompra {
   pedido: string;
   valor_total: number;
   parcelado: boolean;
-  num_parcelas: number;
+  parcelas_total: number; // Alinhado com o Banco
   data_compra: string;
+  data_vencimento?: string; // Adicionado para refletir o cálculo do banco
   periodo_referencia?: string; 
-  recorrencia_id?: string;    
+  recorrencia_id?: string | null;     
   cartao: string | null;
   cartao_id?: number | null; 
   forma_pagamento: string;
   categoria_id: string;
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
-  tipo_recorrencia: 'unica' | 'parcelada' | 'recorrente';
-  frequencia_recorrencia?: 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
-  data_fim?: string; 
-  parcelaAtual?: number;
-  valorParcela?: number;
+  tipo_lancamento: 'unico' | 'parcelado' | 'fixo'; // Alinhado com o Banco
+  intervalo_frequencia?: 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | null;
+  data_fim?: string | null; 
+  parcela_numero?: number; // Alinhado com o Banco
+  valorVisual?: string; 
+  // Propriedades auxiliares de visualização
   nomeResponsavel?: string;
   nomeCriador?: string; 
   nomeCategoria?: string;
   corCategoria?: string; 
-  valorVisual?: string; 
 }
 
 const Listagem: React.FC = () => {
   const [despesas, setDespesas] = useState<ItemCompra[]>([]);
-  const [cartoes, setCartoes] = useState<any[]>([]);
-  const [usuarios, setUsuarios] = useState<any[]>([]); 
-  const [categorias, setCategorias] = useState<any[]>([]);
-  const [perfilLogado, setPerfilLogado] = useState<any>(null);
+  const [cartoes, setCartoes] = useState<Cartao[]>([]);
+  const [usuarios, setUsuarios] = useState<Perfil[]>([]); 
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [perfilLogado, setPerfilLogado] = useState<Perfil | null>(null);
   const [itemParaEditar, setItemParaEditar] = useState<ItemCompra | null>(null);
   
   const [modal, setModal] = useState<{
@@ -65,31 +85,32 @@ const Listagem: React.FC = () => {
   const [totaisPorResponsavel, setTotaisPorResponsavel] = useState<{nome: string, valor: number}[]>([]);
   const [totalGeralMes, setTotalGeralMes] = useState(0);
 
-  const mesesNominais = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-  const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
-  
-  const tiposRecorrencia = ["unica", "parcelada", "recorrente"];
+  const mesesNominais = useMemo(() => [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ], []);
+
+  const formasPagamento = useMemo(() => ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort(), []);
+  const tiposLancamento = ["unico", "parcelado", "fixo"]; // Alinhado
   const frequenciasRecorrencia = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
   const statusPagamento = ["pendente", "pago", "vencido", "cancelado"];
 
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
-  const isAdmin = perfilLogado?.tipo_usuario === 'administrador';
   const currentUserId = perfilLogado?.id;
 
-  const temPermissaoEscrita = (item: ItemCompra | null) => {
-    if (!item) return false;
+  const temPermissaoEscrita = useCallback((item: ItemCompra | null) => {
+    if (!item || !currentUserId) return false;
     if (isProprietario) return true; 
     return item.usuario_criacao === currentUserId || item.user_id === currentUserId; 
-  };
+  }, [isProprietario, currentUserId]);
 
   const formatarMoedaVisual = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
   };
 
   const mascaraMoedaInput = (valor: string) => {
-    let v = valor.replace(/\D/g, "");
-    v = (Number(v) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-    return v;
+    const v = valor.replace(/\D/g, "");
+    return (Number(v) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   };
 
   const desformatarMoedaParaBanco = (valorString: string) => {
@@ -98,105 +119,93 @@ const Listagem: React.FC = () => {
     return parseFloat(apenasNumeros) / 100;
   };
 
-  const completarNF = (valor: any) => {
+  const completarNF = (valor: string | number | null) => {
     if (!valor) return '-';
     const apenasNumeros = valor.toString().replace(/\D/g, '');
     if (!apenasNumeros) return '-';
     return apenasNumeros.padStart(9, '0').replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
   };
 
-  const fetchDespesas = useCallback(async (perfil: any, mapaNomes: any, listaCartoes: any[], mapaCats: any) => {
-    let query = (supabase.from('compras') as any).select('*').order('data_compra', { ascending: false });
+  const fetchDespesas = useCallback(async (perfil: Perfil, mapaNomes: Record<string, string>, listaCartoes: Cartao[], mapaCats: Record<string, {nome: string, cor: string}>) => {
+    // Filtro de data via RPC ou via Periodo Referencia no banco
+    const primeiroDia = `${filtroData.ano}-${String(filtroData.mes + 1).padStart(2, '0')}-01`;
     
-    if (perfil?.tipo_usuario !== 'proprietario' && perfil?.tipo_usuario !== 'administrador') {
+    let query = supabase
+      .from('compras')
+      .select('*')
+      .eq('periodo_referencia', primeiroDia) // Busca exata pelo período gerado
+      .order('data_compra', { ascending: false });
+    
+    if (perfil.tipo_usuario !== 'proprietario' && perfil.tipo_usuario !== 'administrador') {
       query = query.eq('user_id', perfil.id);
     }
     
     const { data, error } = await query;
     if (error) return;
 
-    const { data: recs } = await (supabase.from('recorrencias') as any).select('id, data_fim');
+    // Mapa de data_fim vindo da tabela mestra (Recorrências)
+    const { data: recs } = await supabase.from('recorrencias').select('id, data_fim');
     const mapaDataFim: Record<string, string> = {};
-    recs?.forEach((r: any) => { mapaDataFim[r.id] = r.data_fim; });
+    recs?.forEach((r: any) => { if(r.id) mapaDataFim[r.id] = r.data_fim; });
 
-    const projetadas: ItemCompra[] = [];
+    const formatadas: ItemCompra[] = [];
     const mapaTotais: Record<string, number> = {};
     let acumuladoGeral = 0;
 
     (data as any[])?.forEach((item) => {
-      const numParcelas = item.num_parcelas || 1;
-      const dataBaseReferencia = item.periodo_referencia || item.data_compra;
-      const [anoC, mesC, diaC] = dataBaseReferencia.split('-').map(Number);
-      
-      let delayMes = 0;
-      if (item.forma_pagamento === 'Crédito' && (item.cartao || item.cartao_id)) {
-        const infoCartao = listaCartoes.find(c => c.id === item.cartao_id || c.nome === item.cartao);
-        if (infoCartao && diaC > infoCartao.dia_fechamento) {
-          delayMes = 1;
-        }
-      }
+      const valorLinha = Number(item.valor_total);
+      const nomeResp = mapaNomes[item.user_id] || '⚠️ Pendente';
+      const nomeCriador = mapaNomes[item.usuario_criacao || ''] || 'Sistema'; 
+      const infoCat = mapaCats[item.categoria_id] || { nome: 'Sem Categoria', cor: '#94a3b8' };
 
-      for (let i = 0; i < numParcelas; i++) {
-        const dataReferenciaParcela = new Date(anoC, (mesC - 1) + delayMes + i, 15);
-        
-        if (dataReferenciaParcela.getMonth() === filtroData.mes && dataReferenciaParcela.getFullYear() === filtroData.ano) {
-          const valorParcela = Number(item.valor_total) / numParcelas;
-          const nomeResp = mapaNomes[item.user_id] || '⚠️ Pendente';
-          const nomeCriador = mapaNomes[item.usuario_criacao] || 'Sistema'; 
-          const infoCat = mapaCats[item.categoria_id] || { nome: 'Sem Categoria', cor: '#94a3b8' };
+      formatadas.push({ 
+        ...item, 
+        nomeResponsavel: nomeResp,
+        nomeCriador: nomeCriador,
+        nomeCategoria: infoCat.nome,
+        corCategoria: infoCat.cor,
+        data_fim: item.recorrencia_id ? mapaDataFim[item.recorrencia_id] : null
+      });
 
-          projetadas.push({ 
-            ...item, 
-            parcelaAtual: i + 1, 
-            valorParcela: valorParcela, 
-            nomeResponsavel: nomeResp,
-            nomeCriador: nomeCriador,
-            nomeCategoria: infoCat.nome,
-            corCategoria: infoCat.cor,
-            data_fim: item.recorrencia_id ? mapaDataFim[item.recorrencia_id] : null
-          });
-
-          mapaTotais[nomeResp] = (mapaTotais[nomeResp] || 0) + valorParcela;
-          acumuladoGeral += valorParcela;
-        }
-      }
+      mapaTotais[nomeResp] = (mapaTotais[nomeResp] || 0) + valorLinha;
+      acumuladoGeral += valorLinha;
     });
 
-    setDespesas(projetadas);
+    setDespesas(formatadas);
     setTotalGeralMes(acumuladoGeral);
     setTotaisPorResponsavel(Object.entries(mapaTotais).map(([nome, valor]) => ({ nome, valor })));
-  }, [filtroData]);
+  }, [filtroData.mes, filtroData.ano]);
 
   const carregarDadosIniciais = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const [pRes, cRes, cartRes, meuPerfilRes] = await Promise.all([
-      (supabase.from('profiles') as any).select('id, nome'),
-      (supabase.from('categorias') as any).select('id, nome, cor').eq('tipo', 'despesa').order('nome'),
-      (supabase.from('cartoes') as any).select('id, nome, dia_fechamento').order('nome'),
-      (supabase.from('profiles') as any).select('*').eq('id', user.id).single()
+      supabase.from('profiles').select('id, nome, tipo_usuario'),
+      supabase.from('categorias').select('id, nome, cor').eq('tipo', 'despesa').order('nome'),
+      supabase.from('cartoes').select('id, nome, dia_fechamento').order('nome'),
+      supabase.from('profiles').select('*').eq('id', user.id).single()
     ]);
 
-    const mapaNomes: any = {};
-    (pRes.data as any[])?.forEach(p => mapaNomes[p.id] = p.nome);
-    setUsuarios(pRes.data || []);
+    const mapaNomes: Record<string, string> = {};
+    (pRes.data as Perfil[])?.forEach(p => mapaNomes[p.id] = p.nome);
+    setUsuarios((pRes.data as Perfil[]) || []);
 
-    const mapaCats: any = {};
-    (cRes.data as any[])?.forEach(c => {
+    const mapaCats: Record<string, {nome: string, cor: string}> = {};
+    (cRes.data as Categoria[])?.forEach(c => {
       mapaCats[c.id] = { nome: c.nome, cor: c.cor };
     });
-    setCategorias(cRes.data || []);
+    setCategorias((cRes.data as Categoria[]) || []);
 
-    const meuPerfil = meuPerfilRes.data as any;
+    const meuPerfil = meuPerfilRes.data as Perfil;
     const isMaster = user.email === 'gleidson.fig@gmail.com';
     const tipoFinal = isMaster ? 'proprietario' : (meuPerfil?.tipo_usuario || 'comum');
-    const perfilAtualizado = { ...meuPerfil, id: user.id, tipo_usuario: tipoFinal };
+    const perfilAtualizado: Perfil = { ...meuPerfil, id: user.id, tipo_usuario: tipoFinal as any };
     
     setPerfilLogado(perfilAtualizado);
-    setCartoes(cartRes.data || []);
+    setCartoes((cartRes.data as Cartao[]) || []);
 
-    fetchDespesas(perfilAtualizado, mapaNomes, cartRes.data || [], mapaCats);
+    fetchDespesas(perfilAtualizado, mapaNomes, (cartRes.data as Cartao[]) || [], mapaCats);
   }, [fetchDespesas]);
 
   useEffect(() => { 
@@ -213,54 +222,44 @@ const Listagem: React.FC = () => {
     }
 
     const isCredito = itemParaEditar.forma_pagamento === 'Crédito';
-    const isRecorrente = itemParaEditar.tipo_recorrencia === 'recorrente';
+    const isRecorrenteOuParcelado = itemParaEditar.tipo_lancamento !== 'unico';
     let recorrenciaIdFinal = itemParaEditar.recorrencia_id;
 
     try {
-        const frequenciaTratada = (itemParaEditar.frequencia_recorrencia || 'mensal').toLowerCase().trim();
+        const frequenciaTratada = (itemParaEditar.intervalo_frequencia || 'mensal').toLowerCase().trim();
         const dataRef = new Date(itemParaEditar.data_compra + 'T00:00:00');
 
-        const periodoNormalizado = itemParaEditar.periodo_referencia 
-          ? itemParaEditar.periodo_referencia.substring(0, 7) + '-01'
-          : itemParaEditar.data_compra.substring(0, 7) + '-01';
-
-        // 1. Manutenção da Recorrência
-        if (isRecorrente && (!recorrenciaIdFinal || recorrenciaIdFinal === "")) {
-          const novoUuid = self.crypto.randomUUID();
-          const { error: errorRec } = await (supabase.from('recorrencias') as any).insert({
-            id: novoUuid,
+        // Se for recorrente/parcelado, atualizamos o "Piloto" e o banco cuida do resto via Trigger
+        if (isRecorrenteOuParcelado) {
+          const dadosRecorrencia = {
             user_id: itemParaEditar.user_id,
             descricao: itemParaEditar.descricao,
             loja: itemParaEditar.loja,
-            valor: itemParaEditar.valor_total,
+            valor: itemParaEditar.valor_total, // Valor base da recorrência
             categoria_id: itemParaEditar.categoria_id,
-            tipo_despesa: 'Gastos Variáveis',
             forma_pagamento: itemParaEditar.forma_pagamento,
             cartao_id: isCredito ? itemParaEditar.cartao_id : null,
             dia_vencimento: dataRef.getDate(),
-            frequencia: frequenciaTratada,
-            data_inicio: itemParaEditar.data_compra,
-            data_fim: itemParaEditar.data_fim || null, 
+            intervalo_frequencia: frequenciaTratada,
+            tipo_lancamento: itemParaEditar.tipo_lancamento,
+            data_fim: itemParaEditar.data_fim || null,
+            parcelas_total: itemParaEditar.parcelas_total || 1,
             ativo: true
-          });
-          if (errorRec) throw errorRec;
-          recorrenciaIdFinal = novoUuid;
-        } else if (isRecorrente && recorrenciaIdFinal) {
-            const { error: errorUpdateRec } = await (supabase.from('recorrencias') as any).update({
-                descricao: itemParaEditar.descricao,
-                loja: itemParaEditar.loja,
-                valor: itemParaEditar.valor_total,
-                categoria_id: itemParaEditar.categoria_id,
-                forma_pagamento: itemParaEditar.forma_pagamento,
-                cartao_id: isCredito ? itemParaEditar.cartao_id : null,
-                frequencia: frequenciaTratada,
-                data_fim: itemParaEditar.data_fim || null 
-            }).eq('id', recorrenciaIdFinal);
+          };
+
+          if (!recorrenciaIdFinal) {
+            const novoUuid = crypto.randomUUID();
+            const { error: errorRec } = await supabase.from('recorrencias').insert({ id: novoUuid, ...dadosRecorrencia, data_inicio: itemParaEditar.data_compra });
+            if (errorRec) throw errorRec;
+            recorrenciaIdFinal = novoUuid;
+          } else {
+            const { error: errorUpdateRec } = await supabase.from('recorrencias').update(dadosRecorrencia).eq('id', recorrenciaIdFinal);
             if (errorUpdateRec) throw errorUpdateRec;
+          }
         }
 
-        // 2. Atualização da Compra
-        const { error: errorCompra } = await (supabase.from('compras') as any).update({
+        // Atualiza a compra específica (ou única)
+        const { error: errorCompra } = await supabase.from('compras').update({
           descricao: itemParaEditar.descricao,
           loja: itemParaEditar.loja,
           user_id: itemParaEditar.user_id,
@@ -270,28 +269,17 @@ const Listagem: React.FC = () => {
           cartao: isCredito ? itemParaEditar.cartao : null,
           cartao_id: isCredito ? itemParaEditar.cartao_id : null,
           data_compra: itemParaEditar.data_compra,
-          periodo_referencia: periodoNormalizado,
-          num_parcelas: isCredito ? Number(itemParaEditar.num_parcelas) : 1,
-          parcelado: isCredito && Number(itemParaEditar.num_parcelas) > 1,
-          pedido: itemParaEditar.pedido,
-          nota_fiscal: itemParaEditar.nota_fiscal,
           status_pagamento: itemParaEditar.status_pagamento,
-          tipo_recorrencia: itemParaEditar.tipo_recorrencia,
-          frequencia_recorrencia: isRecorrente ? frequenciaTratada : null,
+          tipo_lancamento: itemParaEditar.tipo_lancamento,
           recorrencia_id: recorrenciaIdFinal || null
         }).eq('id', itemParaEditar.id);
 
         if (errorCompra) throw errorCompra;
-
-        // 3. Sincronização via RPC (Isso agora gera as parcelas_recorrencia também)
-        const { error: rpcError } = await supabase.rpc("gerar_recorrencias");
-        if (rpcError) throw rpcError;
         
         setItemParaEditar(null);
-        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Dados atualizados e sincronizados com sucesso.' });
+        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Registro e recorrências sincronizados.' });
         carregarDadosIniciais();
     } catch (err: any) {
-        console.error("Erro completo:", err);
         setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha: ' + (err.message || "Erro desconhecido") });
     }
   };
@@ -301,11 +289,11 @@ const Listagem: React.FC = () => {
       isOpen: true,
       type: 'danger',
       title: 'Remover?',
-      message: 'Esta ação excluirá o gasto e todas as suas parcelas vinculadas permanentemente.',
+      message: 'Se este item for parte de uma recorrência, as parcelas futuras não pagas também serão removidas.',
       onConfirm: async () => {
         try {
-          await (supabase.from('parcelas') as any).delete().eq('compra_id', id);
-          const { error } = await (supabase.from('compras') as any).delete().eq('id', id);
+          // O Banco deletará em cascata ou via trigger se configurado
+          const { error } = await supabase.from('compras').delete().eq('id', id);
           if (error) throw error;
           setItemParaEditar(null); 
           setModal(prev => ({ ...prev, isOpen: false }));
@@ -318,11 +306,13 @@ const Listagem: React.FC = () => {
   };
 
   const mudarMes = (direcao: number) => {
-    let novoMes = filtroData.mes + direcao;
-    let novoAno = filtroData.ano;
-    if (novoMes < 0) { novoMes = 11; novoAno--; }
-    else if (novoMes > 11) { novoMes = 0; novoAno++; }
-    setFiltroData({ mes: novoMes, ano: novoAno });
+    setFiltroData(prev => {
+        let novoMes = prev.mes + direcao;
+        let novoAno = prev.ano;
+        if (novoMes < 0) { novoMes = 11; novoAno--; }
+        else if (novoMes > 11) { novoMes = 0; novoAno++; }
+        return { mes: novoMes, ano: novoAno };
+    });
   };
 
   return (
@@ -401,12 +391,12 @@ const Listagem: React.FC = () => {
                   <td>{item.forma_pagamento}</td>
                   <td>{item.cartao || '-'}</td>
                   <td>
-                    <span className={`badge-parcela ${item.parcelado ? 'is-parcelado' : 'is-avista'}`}>
-                      {item.parcelado ? `${item.parcelaAtual}/${item.num_parcelas}` : 'À Vista'}
+                    <span className={`badge-parcela ${item.tipo_lancamento !== 'unico' ? 'is-parcelado' : 'is-avista'}`}>
+                      {item.tipo_lancamento !== 'unico' ? `${item.parcela_numero}/${item.parcelas_total}` : 'À Vista'}
                     </span>
                   </td>
                   <td className="cell-value" style={{ textAlign: 'right' }}>
-                    {formatarMoedaVisual(item.valorParcela || 0)}
+                    {formatarMoedaVisual(item.valor_total || 0)}
                   </td>
                   <td className="cell-sub" style={{ fontSize: '0.75rem' }}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
@@ -465,7 +455,8 @@ const Listagem: React.FC = () => {
 
                   <div className="form-group">
                     <label><Layers size={12}/> Período Referência</label>
-                    <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.periodo_referencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, periodo_referencia: e.target.value})} />
+                    <input type="date" className="form-control" disabled={true} value={itemParaEditar.periodo_referencia || ''} />
+                    <small style={{fontSize: '0.6rem', color: '#94a3b8'}}>Gerado automaticamente pelo sistema</small>
                   </div>
                   
                   <div className="form-group">
@@ -476,17 +467,17 @@ const Listagem: React.FC = () => {
                   </div>
 
                   <div className="form-group">
-                    <label><RefreshCw size={12}/> Tipo Recorrência</label>
-                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_recorrencia ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, tipo_recorrencia: e.target.value as any})}>
-                      {tiposRecorrencia.map(tipo => <option key={tipo} value={tipo}>{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</option>)}
+                    <label><RefreshCw size={12}/> Tipo Lançamento</label>
+                    <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.tipo_lancamento ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, tipo_lancamento: e.target.value as any})}>
+                      {tiposLancamento.map(tipo => <option key={tipo} value={tipo}>{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</option>)}
                     </select>
                   </div>
 
-                  {itemParaEditar.tipo_recorrencia === 'recorrente' && (
+                  {itemParaEditar.tipo_lancamento !== 'unico' && (
                     <>
                       <div className="form-group">
                         <label><Repeat size={12}/> Frequência</label>
-                        <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.frequencia_recorrencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, frequencia_recorrencia: e.target.value as any})}>
+                        <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.intervalo_frequencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, intervalo_frequencia: e.target.value as any})}>
                           <option value="">Selecione...</option>
                           {frequenciasRecorrencia.map(freq => <option key={freq} value={freq}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</option>)}
                         </select>
@@ -522,7 +513,7 @@ const Listagem: React.FC = () => {
                     <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.descricao} onChange={e => setItemParaEditar({...itemParaEditar, descricao: e.target.value})} />
                   </div>
                   <div className="form-group">
-                    <label>Valor Total</label>
+                    <label>Valor {itemParaEditar.tipo_lancamento === 'parcelado' ? 'Total' : 'Mensal'}</label>
                     <input type="text" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.valorVisual || formatarMoedaVisual(itemParaEditar.valor_total)} 
                       onChange={e => {
                         const masked = mascaraMoedaInput(e.target.value);
@@ -556,8 +547,8 @@ const Listagem: React.FC = () => {
                         </select>
                       </div>
                       <div className="form-group">
-                        <label>Parcelas</label>
-                        <input type="number" min="1" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.num_parcelas} onChange={e => setItemParaEditar({...itemParaEditar, num_parcelas: Number(e.target.value)})} />
+                        <label>Total de Parcelas</label>
+                        <input type="number" min="1" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.parcelas_total} onChange={e => setItemParaEditar({...itemParaEditar, parcelas_total: Number(e.target.value)})} />
                       </div>
                     </>
                   )}
