@@ -21,15 +21,19 @@ interface Cartao {
   dia_vencimento: number;
 }
 
-// Interface da tabela Compras (Resolve os erros de 'never')
+// Interface da tabela Compras Atualizada conforme novo Schema
 interface Compra {
   id: string;
   user_id: string;
   valor_total: number;
-  num_parcelas: number;
+  parcelas_total: number; // Antigo num_parcelas
+  parcela_numero: number; // Nova coluna
   data_compra: string;
+  data_vencimento: string; // Importante para o dashboard
   cartao: string;
   forma_pagamento: string;
+  periodo_referencia: string; // Nova coluna: 'YYYY-MM-01'
+  status_pagamento: string; // Nova coluna
 }
 
 interface DetalhePessoa {
@@ -64,7 +68,9 @@ const Dashboard: React.FC = () => {
   const diaAtual = hoje.getDate();
   const mesAtual = hoje.getMonth();
   const anoAtual = hoje.getFullYear();
-  const mesAtualChave = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+  
+  // Chave baseada no primeiro dia do mês para bater com 'periodo_referencia'
+  const mesAtualReferencia = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-01`;
 
   const colors = {
     primary: '#4361ee',
@@ -79,7 +85,6 @@ const Dashboard: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Buscar Perfil e Configurações (Tipagem explícita)
       const { data: perfilData } = await supabase.from('profiles').select('*').eq('id', user.id).single() as { data: Perfil | null };
       const { data: cartoes } = await supabase.from('cartoes').select('*') as { data: Cartao[] | null };
       const { data: todosPerfis } = await supabase.from('profiles').select('id, nome') as { data: { id: string, nome: string }[] | null };
@@ -94,7 +99,6 @@ const Dashboard: React.FC = () => {
         mapaNomes[p.id] = p.nome.split(' ')[0];
       });
 
-      // 2. Buscar Compras com Tipagem (Resolve os 7 erros de propriedade inexistente)
       let query = supabase.from('compras').select('*');
       if (!isProprietario && perfilData?.tipo_usuario !== 'administrador') {
         query = query.eq('user_id', user.id);
@@ -108,14 +112,12 @@ const Dashboard: React.FC = () => {
       };
 
       compras?.forEach(item => {
-        const valorTotal = parseFloat(item.valor_total.toString()) || 0;
-        const numP = parseInt(item.num_parcelas.toString()) || 1;
-        const valorP = valorTotal / numP;
-        const [anoC, mesC, diaC] = item.data_compra.split('-').map(Number);
+        const valorLinha = parseFloat(item.valor_total.toString()) || 0;
         const responsavel = mapaNomes[item.user_id] || 'Outro';
 
+        // O vencimento agora vem direto da linha, ou do cartão se for crédito
         const infoCartao = cartoes?.find(c => c.nome === item.cartao);
-        const vencimento = infoCartao?.dia_vencimento || 0;
+        const diaVencimento = infoCartao?.dia_vencimento || 0;
 
         if (!resumo.detalhesPorPessoa[responsavel]) {
           resumo.detalhesPorPessoa[responsavel] = {
@@ -125,32 +127,30 @@ const Dashboard: React.FC = () => {
         }
 
         const p = resumo.detalhesPorPessoa[responsavel];
+        const dataVencimentoObjeto = new Date(item.data_vencimento + 'T12:00:00');
 
-        let delayMes = 0;
-        if (item.forma_pagamento === 'Crédito' && item.cartao !== 'À Vista') {
-          if (infoCartao && diaC > infoCartao.dia_fechamento) delayMes = 1;
+        // Atualiza última parcela para saber quando a pessoa "fica livre"
+        if (dataVencimentoObjeto > p.ultimaParcelaDate) {
+          p.ultimaParcelaDate = dataVencimentoObjeto;
         }
 
-        for (let i = 0; i < numP; i++) {
-          const dtP = new Date(anoC, (mesC - 1) + delayMes + i, 1);
-          const chaveP = `${dtP.getFullYear()}-${String(dtP.getMonth() + 1).padStart(2, '0')}`;
+        // Lógica: Se o período de referência é este mês
+        if (item.periodo_referencia === mesAtualReferencia) {
+          resumo.totalMes += valorLinha;
+          resumo.qtdComprasMes++;
+          p.valorNoMes += valorLinha;
+          p.qtdComprasMes++;
 
-          if (dtP > p.ultimaParcelaDate) p.ultimaParcelaDate = dtP;
+          // Lógica de Badges (Dia 15 ou 20)
+          if (diaVencimento > 0 && diaVencimento <= 15) p.vencimentoAte15 += valorLinha;
+          else if (diaVencimento > 15) p.vencimentoAte20 += valorLinha;
+        }
 
-          if (chaveP === mesAtualChave) {
-            resumo.totalMes += valorP;
-            resumo.qtdComprasMes++;
-            p.valorNoMes += valorP;
-            p.qtdComprasMes++;
-            if (vencimento > 0 && vencimento <= 15) p.vencimentoAte15 += valorP;
-            else if (vencimento > 15) p.vencimentoAte20 += valorP;
-          }
-
-          const dataReferenciaAtual = new Date(anoAtual, mesAtual, 1);
-          if (dtP > dataReferenciaAtual && chaveP !== mesAtualChave) {
-            resumo.totalEmAbertoFuturo += valorP;
-            p.totalRestanteFuturo += valorP;
-          }
+        // Dívida Futura: Tudo que tem vencimento após o último dia deste mês e não está pago
+        const fimDoMesAtual = new Date(anoAtual, mesAtual + 1, 0);
+        if (dataVencimentoObjeto > fimDoMesAtual && item.status_pagamento !== 'pago') {
+          resumo.totalEmAbertoFuturo += valorLinha;
+          p.totalRestanteFuturo += valorLinha;
         }
       });
 
@@ -160,7 +160,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [mesAtualChave, anoAtual, mesAtual]);
+  }, [mesAtualReferencia, anoAtual, mesAtual]);
 
   useEffect(() => {
     carregarDados();
@@ -189,8 +189,8 @@ const Dashboard: React.FC = () => {
 
       <div className="dashboard-grid">
         <Card title="Fatura Mês" icon={<Calendar size={20} />} value={formatMoney(stats.totalMes)} gradient={`linear-gradient(135deg, ${colors.primary}, #3f37c9)`} />
-        <Card title="Dívida Futura" icon={<Clock size={20} />} value={formatMoney(stats.totalEmAbertoFuturo)} gradient={`linear-gradient(135deg, ${colors.secondary}, #560bad)`} footer="Pós-fatura atual" />
-        <Card title="Compras no Mês" icon={<ShoppingCart size={20} />} value={stats.qtdComprasMes.toString()} gradient={`linear-gradient(135deg, ${colors.accent2}, ${colors.primary})`} />
+        <Card title="Dívida Futura" icon={<Clock size={20} />} value={formatMoney(stats.totalEmAbertoFuturo)} gradient={`linear-gradient(135deg, ${colors.secondary}, #560bad)`} footer="Somente pendentes" />
+        <Card title="Itens no Mês" icon={<ShoppingCart size={20} />} value={stats.qtdComprasMes.toString()} gradient={`linear-gradient(135deg, ${colors.accent2}, ${colors.primary})`} />
       </div>
 
       <div style={{ margin: '45px 0 20px 0' }}>
@@ -232,13 +232,15 @@ const Dashboard: React.FC = () => {
 
               <div className="mini-stat-grid">
                 <div className="mini-stat-box">
-                  <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Compras</span>
+                  <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Lançamentos</span>
                   <div style={{ fontWeight: 800, color: '#334155' }}>{dados.qtdComprasMes}</div>
                 </div>
                 <div className="mini-stat-box">
                   <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Quitação</span>
                   <div style={{ fontWeight: 800, color: '#334155', textTransform: 'capitalize', fontSize: '0.85rem' }}>
-                    {dados.ultimaParcelaDate.toLocaleDateString('pt-BR', { month: 'long', year: '2-digit' }).replace('.', '')}
+                    {dados.ultimaParcelaDate.getTime() > 0 
+                      ? dados.ultimaParcelaDate.toLocaleDateString('pt-BR', { month: 'long', year: '2-digit' }).replace('.', '')
+                      : '--'}
                   </div>
                 </div>
               </div>
@@ -249,7 +251,7 @@ const Dashboard: React.FC = () => {
   );
 };
 
-// --- Subcomponente Card Corrigido (Resolve o erro do CloneElement) ---
+// --- Subcomponente Card ---
 interface CardProps {
   title: string;
   icon: React.ReactElement<{ size?: number }>;
@@ -265,7 +267,6 @@ const Card: React.FC<CardProps> = ({ title, icon, value, gradient, footer }) => 
     display: 'flex', flexDirection: 'column', justifyContent: 'center', 
     boxShadow: '0 10px 20px -5px rgba(0,0,0,0.1)' 
   }}>
-    {/* CORREÇÃO DO CLONE ELEMENT: Forçamos a tipagem do ícone para aceitar size */}
     <div style={{ position: 'absolute', right: '-10px', top: '-10px', opacity: 0.15 }}>
       {React.cloneElement(icon as React.ReactElement<any>, { size: 90 })}
     </div>
