@@ -21,19 +21,17 @@ interface Cartao {
   dia_vencimento: number;
 }
 
-// Interface da tabela Compras Atualizada conforme novo Schema
 interface Compra {
   id: string;
   user_id: string;
   valor_total: number;
-  parcelas_total: number; // Antigo num_parcelas
-  parcela_numero: number; // Nova coluna
+  parcelas_total: number; // Atualizado
+  parcela_numero: number; // Atualizado
   data_compra: string;
-  data_vencimento: string; // Importante para o dashboard
+  periodo_referencia: string; // Novo campo
   cartao: string;
+  cartao_id?: number; // Novo campo
   forma_pagamento: string;
-  periodo_referencia: string; // Nova coluna: 'YYYY-MM-01'
-  status_pagamento: string; // Nova coluna
 }
 
 interface DetalhePessoa {
@@ -69,8 +67,8 @@ const Dashboard: React.FC = () => {
   const mesAtual = hoje.getMonth();
   const anoAtual = hoje.getFullYear();
   
-  // Chave baseada no primeiro dia do mês para bater com 'periodo_referencia'
-  const mesAtualReferencia = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-01`;
+  // Chave de comparação com a nova coluna periodo_referencia (YYYY-MM-DD)
+  const mesAtualChave = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-01`;
 
   const colors = {
     primary: '#4361ee',
@@ -85,39 +83,40 @@ const Dashboard: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: perfilData } = await supabase.from('profiles').select('*').eq('id', user.id).single() as { data: Perfil | null };
-      const { data: cartoes } = await supabase.from('cartoes').select('*') as { data: Cartao[] | null };
-      const { data: todosPerfis } = await supabase.from('profiles').select('id, nome') as { data: { id: string, nome: string }[] | null };
+      const { data: perfilData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data: cartoes } = await supabase.from('cartoes').select('*');
+      const { data: todosPerfis } = await supabase.from('profiles').select('id, nome');
       
-      setPerfil(perfilData);
+      setPerfil(perfilData as Perfil);
 
       const isMaster = user.email === 'gleidson.fig@gmail.com';
-      const isProprietario = perfilData?.tipo_usuario === 'proprietario' || isMaster;
+      const isProprietario = (perfilData as Perfil)?.tipo_usuario === 'proprietario' || isMaster;
 
       const mapaNomes: Record<string, string> = {};
-      todosPerfis?.forEach(p => {
+      (todosPerfis as any[])?.forEach(p => {
         mapaNomes[p.id] = p.nome.split(' ')[0];
       });
 
       let query = supabase.from('compras').select('*');
-      if (!isProprietario && perfilData?.tipo_usuario !== 'administrador') {
+      if (!isProprietario && (perfilData as Perfil)?.tipo_usuario !== 'administrador') {
         query = query.eq('user_id', user.id);
       }
       
-      const { data: compras } = await query as { data: Compra[] | null };
+      const { data: compras } = await query;
+      const listaCompras = (compras as unknown as Compra[]) || [];
 
       let resumo: Stats = {
         totalMes: 0, totalEmAbertoFuturo: 0, qtdComprasMes: 0,
         maiorParcelaMes: 0, detalhesPorPessoa: {}
       };
 
-      compras?.forEach(item => {
-        const valorLinha = parseFloat(item.valor_total.toString()) || 0;
+      listaCompras.forEach(item => {
+        const valorParcela = parseFloat(item.valor_total.toString()) || 0;
         const responsavel = mapaNomes[item.user_id] || 'Outro';
-
-        // O vencimento agora vem direto da linha, ou do cartão se for crédito
-        const infoCartao = cartoes?.find(c => c.nome === item.cartao);
-        const diaVencimento = infoCartao?.dia_vencimento || 0;
+        
+        // Busca info do cartão pelo ID ou Nome
+        const infoCartao = (cartoes as Cartao[])?.find(c => c.id === item.cartao_id || c.nome === item.cartao);
+        const vencimento = infoCartao?.dia_vencimento || 0;
 
         if (!resumo.detalhesPorPessoa[responsavel]) {
           resumo.detalhesPorPessoa[responsavel] = {
@@ -127,30 +126,28 @@ const Dashboard: React.FC = () => {
         }
 
         const p = resumo.detalhesPorPessoa[responsavel];
-        const dataVencimentoObjeto = new Date(item.data_vencimento + 'T12:00:00');
+        const dataCompraObj = new Date(item.data_compra + 'T00:00:00');
 
-        // Atualiza última parcela para saber quando a pessoa "fica livre"
-        if (dataVencimentoObjeto > p.ultimaParcelaDate) {
-          p.ultimaParcelaDate = dataVencimentoObjeto;
-        }
-
-        // Lógica: Se o período de referência é este mês
-        if (item.periodo_referencia === mesAtualReferencia) {
-          resumo.totalMes += valorLinha;
+        // 1. Lógica para o Mês Atual (Baseado no periodo_referencia)
+        if (item.periodo_referencia === mesAtualChave) {
+          resumo.totalMes += valorParcela;
           resumo.qtdComprasMes++;
-          p.valorNoMes += valorLinha;
+          p.valorNoMes += valorParcela;
           p.qtdComprasMes++;
 
-          // Lógica de Badges (Dia 15 ou 20)
-          if (diaVencimento > 0 && diaVencimento <= 15) p.vencimentoAte15 += valorLinha;
-          else if (diaVencimento > 15) p.vencimentoAte20 += valorLinha;
+          if (vencimento > 0 && vencimento <= 15) p.vencimentoAte15 += valorParcela;
+          else if (vencimento > 15) p.vencimentoAte20 += valorParcela;
         }
 
-        // Dívida Futura: Tudo que tem vencimento após o último dia deste mês e não está pago
-        const fimDoMesAtual = new Date(anoAtual, mesAtual + 1, 0);
-        if (dataVencimentoObjeto > fimDoMesAtual && item.status_pagamento !== 'pago') {
-          resumo.totalEmAbertoFuturo += valorLinha;
-          p.totalRestanteFuturo += valorLinha;
+        // 2. Lógica para Dívida Futura (Tudo que o periodo_referencia for maior que hoje)
+        if (item.periodo_referencia > mesAtualChave) {
+          resumo.totalEmAbertoFuturo += valorParcela;
+          p.totalRestanteFuturo += valorParcela;
+        }
+
+        // Atualiza a data da última parcela conhecida para este usuário
+        if (dataCompraObj > p.ultimaParcelaDate) {
+          p.ultimaParcelaDate = dataCompraObj;
         }
       });
 
@@ -160,7 +157,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [mesAtualReferencia, anoAtual, mesAtual]);
+  }, [mesAtualChave]);
 
   useEffect(() => {
     carregarDados();
@@ -189,8 +186,8 @@ const Dashboard: React.FC = () => {
 
       <div className="dashboard-grid">
         <Card title="Fatura Mês" icon={<Calendar size={20} />} value={formatMoney(stats.totalMes)} gradient={`linear-gradient(135deg, ${colors.primary}, #3f37c9)`} />
-        <Card title="Dívida Futura" icon={<Clock size={20} />} value={formatMoney(stats.totalEmAbertoFuturo)} gradient={`linear-gradient(135deg, ${colors.secondary}, #560bad)`} footer="Somente pendentes" />
-        <Card title="Itens no Mês" icon={<ShoppingCart size={20} />} value={stats.qtdComprasMes.toString()} gradient={`linear-gradient(135deg, ${colors.accent2}, ${colors.primary})`} />
+        <Card title="Dívida Futura" icon={<Clock size={20} />} value={formatMoney(stats.totalEmAbertoFuturo)} gradient={`linear-gradient(135deg, ${colors.secondary}, #560bad)`} footer="Parcelas dos próximos meses" />
+        <Card title="Compras no Mês" icon={<ShoppingCart size={20} />} value={stats.qtdComprasMes.toString()} gradient={`linear-gradient(135deg, ${colors.accent2}, ${colors.primary})`} />
       </div>
 
       <div style={{ margin: '45px 0 20px 0' }}>
@@ -232,15 +229,15 @@ const Dashboard: React.FC = () => {
 
               <div className="mini-stat-grid">
                 <div className="mini-stat-box">
-                  <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Lançamentos</span>
+                  <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Compras</span>
                   <div style={{ fontWeight: 800, color: '#334155' }}>{dados.qtdComprasMes}</div>
                 </div>
                 <div className="mini-stat-box">
-                  <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Quitação</span>
+                  <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Última Parcela</span>
                   <div style={{ fontWeight: 800, color: '#334155', textTransform: 'capitalize', fontSize: '0.85rem' }}>
                     {dados.ultimaParcelaDate.getTime() > 0 
-                      ? dados.ultimaParcelaDate.toLocaleDateString('pt-BR', { month: 'long', year: '2-digit' }).replace('.', '')
-                      : '--'}
+                      ? dados.ultimaParcelaDate.toLocaleDateString('pt-BR', { month: 'long', year: '2-digit' }).replace('.', '') 
+                      : '-'}
                   </div>
                 </div>
               </div>
