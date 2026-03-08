@@ -13,7 +13,7 @@ import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
 
-// --- Interfaces Refinadas ---
+// --- Interfaces ---
 interface Perfil {
   id: string;
   nome: string;
@@ -224,9 +224,26 @@ const Listagem: React.FC = () => {
 
     try {
         const frequenciaTratada = (itemParaEditar.intervalo_frequencia || 'mensal').toLowerCase().trim();
-        const dataRef = new Date(itemParaEditar.data_compra + 'T00:00:00');
+        const dataRefBase = new Date(itemParaEditar.data_compra + 'T00:00:00');
 
         if (isRecorrenteOuParcelado) {
+          let tipoDespesaBanco = 'Gastos Variáveis';
+          if (itemParaEditar.tipo_lancamento === 'fixo') {
+            tipoDespesaBanco = 'Gastos Fixos';
+          } else if (itemParaEditar.forma_pagamento === 'Crédito') {
+            tipoDespesaBanco = 'Compra no Crédito';
+          }
+
+          let totalParcelasCalculado = itemParaEditar.parcelas_total || 1;
+          if (itemParaEditar.tipo_lancamento === 'fixo' && itemParaEditar.data_fim) {
+            const inicio = new Date(itemParaEditar.data_compra + 'T00:00:00');
+            const fim = new Date(itemParaEditar.data_fim + 'T00:00:00');
+            const anosDiff = fim.getFullYear() - inicio.getFullYear();
+            const mesesDiff = fim.getMonth() - inicio.getMonth();
+            totalParcelasCalculado = (anosDiff * 12) + mesesDiff + 1;
+            if (totalParcelasCalculado < 1) totalParcelasCalculado = 1;
+          }
+
           const dadosRecorrencia = {
             user_id: itemParaEditar.user_id,
             descricao: itemParaEditar.descricao,
@@ -235,25 +252,72 @@ const Listagem: React.FC = () => {
             categoria_id: itemParaEditar.categoria_id,
             forma_pagamento: itemParaEditar.forma_pagamento,
             cartao_id: isCredito ? itemParaEditar.cartao_id : null,
-            dia_vencimento: dataRef.getDate(),
+            dia_vencimento: dataRefBase.getDate(),
             intervalo_frequencia: frequenciaTratada,
             tipo_lancamento: itemParaEditar.tipo_lancamento,
+            tipo_despesa: tipoDespesaBanco,
             data_fim: itemParaEditar.data_fim || null,
-            parcelas_total: itemParaEditar.parcelas_total || 1,
+            parcelas_total: totalParcelasCalculado, 
             ativo: true
           };
 
           if (!recorrenciaIdFinal) {
             const novoUuid = crypto.randomUUID();
-            const { error: errorRec } = await supabase.from('recorrencias').insert({ id: novoUuid, ...dadosRecorrencia, data_inicio: itemParaEditar.data_compra });
+            const { error: errorRec } = await supabase.from('recorrencias').insert({ 
+              id: novoUuid, 
+              ...dadosRecorrencia, 
+              data_inicio: itemParaEditar.data_compra 
+            });
             if (errorRec) throw errorRec;
             recorrenciaIdFinal = novoUuid;
           } else {
             const { error: errorUpdateRec } = await supabase.from('recorrencias').update(dadosRecorrencia).eq('id', recorrenciaIdFinal);
             if (errorUpdateRec) throw errorUpdateRec;
+            
+            // Limpar parcelas futuras existentes para evitar duplicidade ao regenerar
+            await supabase.from('compras').delete().eq('recorrencia_id', recorrenciaIdFinal).gt('parcela_numero', itemParaEditar.parcela_numero || 1);
+          }
+
+          // --- GERAÇÃO DAS PARCELAS NA TABELA COMPRAS ---
+          if (totalParcelasCalculado > 1) {
+            const novasParcelas = [];
+            const pAtual = itemParaEditar.parcela_numero || 1;
+
+            for (let i = pAtual + 1; i <= totalParcelasCalculado; i++) {
+              const dataParcela = new Date(dataRefBase);
+              dataParcela.setMonth(dataParcela.getMonth() + (i - pAtual));
+              
+              const periodoRef = `${dataParcela.getFullYear()}-${String(dataParcela.getMonth() + 1).padStart(2, '0')}-01`;
+              
+              novasParcelas.push({
+                user_id: itemParaEditar.user_id,
+                usuario_criacao: currentUserId,
+                descricao: itemParaEditar.descricao,
+                loja: itemParaEditar.loja,
+                valor_total: itemParaEditar.valor_total,
+                categoria_id: itemParaEditar.categoria_id,
+                forma_pagamento: itemParaEditar.forma_pagamento,
+                cartao: itemParaEditar.cartao,
+                cartao_id: itemParaEditar.cartao_id,
+                data_compra: dataParcela.toISOString().split('T')[0],
+                status_pagamento: 'pendente',
+                tipo_lancamento: itemParaEditar.tipo_lancamento,
+                tipo_despesa: tipoDespesaBanco,
+                recorrencia_id: recorrenciaIdFinal,
+                parcela_numero: i,
+                parcelas_total: totalParcelasCalculado,
+                periodo_referencia: periodoRef
+              });
+            }
+
+            if (novasParcelas.length > 0) {
+              const { error: errIns } = await supabase.from('compras').insert(novasParcelas);
+              if (errIns) throw errIns;
+            }
           }
         }
 
+        // Atualiza a parcela atual
         const { error: errorCompra } = await supabase.from('compras').update({
           descricao: itemParaEditar.descricao,
           loja: itemParaEditar.loja,
@@ -266,13 +330,14 @@ const Listagem: React.FC = () => {
           data_compra: itemParaEditar.data_compra,
           status_pagamento: itemParaEditar.status_pagamento,
           tipo_lancamento: itemParaEditar.tipo_lancamento,
-          recorrencia_id: recorrenciaIdFinal || null
+          recorrencia_id: recorrenciaIdFinal || null,
+          parcelas_total: isRecorrenteOuParcelado ? itemParaEditar.parcelas_total : 1
         }).eq('id', itemParaEditar.id);
 
         if (errorCompra) throw errorCompra;
         
         setItemParaEditar(null);
-        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Registro e recorrências sincronizados.' });
+        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Registro e parcelas futuras sincronizadas.' });
         carregarDadosIniciais();
     } catch (err: any) {
         setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha: ' + (err.message || "Erro desconhecido") });
@@ -313,9 +378,7 @@ const Listagem: React.FC = () => {
       if (errCompras) throw errCompras;
 
       const { error: errRec } = await supabase
-        .from('recorrencias')
-        .delete()
-        .eq('id', recorrenciaId);
+        .from('recorrencias').delete().eq('id', recorrenciaId);
 
       if (errRec) throw errRec;
 
