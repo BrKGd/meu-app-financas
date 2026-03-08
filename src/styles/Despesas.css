@@ -26,6 +26,7 @@
   /* Ou use 2fr 1fr se quiser o título maior que o sumário */
   gap: 20px;
 }
+
 .desp-panel-list {
   background: white;
   border-radius: 32px;
@@ -34,7 +35,6 @@
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.02);
   box-sizing: border-box;
 }
-
 
 .desp-header-area {
   display: flex;
@@ -82,14 +82,14 @@
   margin-top: 5px;
 }
 
-/* --- LISTAGEM DE ITENS (Refatorada para coerência com Proventos) --- */
+/* --- LISTAGEM DE ITENS --- */
 .desp-list-panel {
   padding: 0;
   overflow: hidden;
 }
 
 .list-header {
-  padding: 10px 10px;
+  padding: 12px 20px;
   border-bottom: 1px solid #f1f5f9;
   display: flex;
   justify-content: space-between;
@@ -128,7 +128,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Background dinâmico vem do Inline Style no JSX */
 }
 
 /* Conteúdo Principal */
@@ -150,6 +149,9 @@
   font-size: 1.1rem;
   font-weight: 700;
   color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .desp-value {
@@ -181,10 +183,9 @@
 .meta-divider {
   color: #e2e8f0;
   font-size: 0.8rem;
-  gap: 15px;
 }
 
-/* --- MODAL DE EDIÇÃO --- */
+/* --- MODAL DE EDIÇÃO E FORMULÁRIOS --- */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -196,26 +197,44 @@
   z-index: 9999;
 }
 
-.edit-modal {
-  background: white;
+.edit-modal-container {
   width: 95%;
-  max-width: 520px;
-  border-radius: 30px;
-  padding: 35px;
-  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+  max-width: 550px;
+  background: white;
+  border-radius: 32px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-height: 90vh;
   animation: modalIn 0.3s ease-out;
 }
 
-.close-btn-desp {
-  background: #f1f5f9;
-  border: none;
-  padding: 10px;
-  border-radius: 12px;
-  cursor: pointer;
-  color: #64748b;
+.edit-modal-header {
+  padding: 24px 28px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
 }
 
-/* Formulário */
+.edit-modal-body {
+  padding: 28px;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
+}
+
+.edit-modal-footer {
+  padding: 20px 28px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .form-group label {
   font-size: 0.7rem;
   font-weight: 800;
@@ -223,6 +242,7 @@
   text-transform: uppercase;
   margin-bottom: 8px;
   display: block;
+  letter-spacing: 0.8px;
 }
 
 .form-group input, 
@@ -237,6 +257,7 @@
   color: #1e293b;
   width: 100%;
   box-sizing: border-box;
+  transition: all 0.2s;
 }
 
 .form-group input:focus, 
@@ -244,53 +265,50 @@
   border-color: #ef4444;
   background: white;
   outline: none;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
 }
 
-.modal-footer-actions {
+.form-row-2 {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-  margin-top: 30px;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
-.btn-save-full {
-  background: #006837;
-  color: white;
+.edit-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* --- BOTÕES E AÇÕES (Ícones PNG) --- */
+.btn-png-action {
+  background: none;
   border: none;
-  height: 56px;
-  border-radius: 18px;
-  font-weight: 800;
-  font-size: 1rem;
   cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  transition: all 0.2s;
-  margin-top: 30px;
 }
 
-.btn-save-full:hover {
-  background: #dc2626;
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+.btn-png-action img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
 }
 
-.btn-delete-full {
-  background: #ef4444;
-  color: white;
-  border: none;
-  height: 56px;
-  border-radius: 18px;
-  font-weight: 800;
-  font-size: 1rem;
-  cursor: pointer;
+.btn-png-action:hover { transform: scale(1.15); }
+.btn-png-action:active { transform: scale(0.95); }
+
+.parcela-preview-box {
+  background: #fef2f2;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px dashed #ef4444;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: all 0.2s;
-  margin-top: 30px;
+  margin-top: 8px;
 }
 
 /* --- FAB --- */
@@ -310,7 +328,6 @@
   align-items: center;
   justify-content: center;
   z-index: 100;
-  animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -319,36 +336,15 @@
   background: #dc2626;
 }
 
-/* Customização da Barra de Scroll */
-.edit-modal::-webkit-scrollbar {
-  width: 10px;               /* Largura da barra */
+/* --- ANIMAÇÕES --- */
+@keyframes blink-alert {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
-.edit-modal::-webkit-scrollbar-track {
-  background: transparent;    /* Fundo da trilha transparente para não sobrepor o arredondamento */
-  margin: 20px;               /* Margem para o scroll não encostar nas bordas superior/inferior */
-}
-
-.edit-modal::-webkit-scrollbar-thumb {
-  background: #cbd5e1;        /* Cor da barra (um cinza suave) */
-  border-radius: 10px;        /* Bordas bem arredondadas */
-  border: 2px solid white;    /* Cria um espaçamento visual entre a barra e a borda do modal */
-}
-
-.edit-modal::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;        /* Cor um pouco mais escura ao passar o mouse */
-}
-
-/* Garante que o conteúdo não cole na borda direita por causa da barra */
-.edit-modal {
-  scrollbar-gutter: stable;   /* Evita que o layout "pule" quando a barra aparece */
-  padding-right: 15px;        /* Espaço interno para o conteúdo respirar */
-}
-
-/* --- ANIMAÇÕES E MOBILE --- */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.blinking-badge { 
+  animation: blink-alert 1.5s infinite ease-in-out; 
 }
 
 @keyframes modalIn {
@@ -356,6 +352,23 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+/* Customização da Barra de Scroll */
+.edit-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.edit-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 10px;
+}
+
+.edit-modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+  border: 2px solid white;
+}
+
+/* --- RESPONSIVIDADE --- */
 @media (max-width: 768px) {
   .desp-top-layout { grid-template-columns: 1fr; }
   .desp-premium-wrapper { padding: 20px 15px; }
@@ -363,7 +376,18 @@
   .desp-item-row { padding: 15px 20px; }
   .desp-icon-column { margin-right: 15px; }
   .desp-icon-box { width: 42px; height: 42px; }
-  .desp-desc { font-size: 0.75rem; }
-  .desp-value { font-size: 0.95rem; }
-  .desp-meta-line { gap: 8px; }
+  .desp-desc { font-size: 0.9rem; }
+  .desp-value { font-size: 1rem; }
+}
+
+@media (max-width: 480px) {
+  .edit-modal-container { 
+    width: 100%; 
+    border-radius: 32px 32px 0 0; 
+    max-height: 95vh;
+    position: fixed;
+    bottom: 0;
+  }
+  .modal-overlay { align-items: flex-end; }
+  .form-row-2 { grid-template-columns: 1fr; }
 }

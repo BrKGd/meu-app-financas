@@ -10,7 +10,7 @@ import { TipoUsuario } from '../types/database';
 import '../styles/Menu.css';
 import '../styles/Cartoes.css';
 
-// --- INTERFACES ESTREITAS PARA O TYPESCRIPT ---
+// --- INTERFACES ---
 interface Profile {
   id: string;
   nome: string | null;
@@ -18,6 +18,7 @@ interface Profile {
 }
 
 interface Cartao {
+  id: number;
   nome: string;
   dia_fechamento: number | null;
 }
@@ -25,11 +26,12 @@ interface Cartao {
 interface Compra {
   id: string;
   user_id: string;
-  valor_total: number;
-  num_parcelas: number | string;
+  valor_total: string | number;
   data_compra: string;
   forma_pagamento: string;
-  cartao: string;
+  cartao: string | null;
+  periodo_referencia: string;
+  parcela_numero: number;
 }
 
 interface GastoPorUsuario {
@@ -69,10 +71,9 @@ const Menu: React.FC = () => {
       const user = authData?.user;
       if (!user) return;
 
-      const [resPerfil, resTodosPerfis, resCartoes, resCompras] = await Promise.all([
+      const [resPerfil, resTodosPerfis, resCompras] = await Promise.all([
         supabase.from('profiles').select('nome, tipo_usuario').eq('id', user.id).single(),
         supabase.from('profiles').select('id, nome'),
-        supabase.from('cartoes').select('nome, dia_fechamento'),
         supabase.from('compras').select('*')
       ]);
 
@@ -93,56 +94,38 @@ const Menu: React.FC = () => {
         if (p.id && p.nome) mapaNomes[p.id] = p.nome.split(' ')[0];
       });
 
-      const cacheFechamentoCartoes: Record<string, number> = {};
-      (resCartoes.data as Cartao[] | null)?.forEach(c => {
-        if (c.nome) cacheFechamentoCartoes[c.nome] = c.dia_fechamento || 0;
-      });
-
       const comprasBrutas = resCompras.data as Compra[] | null;
       const todasCompras = temAcessoGestao 
         ? comprasBrutas 
         : comprasBrutas?.filter(c => c.user_id === user.id);
 
       const agora = new Date();
+      // Chave do mês atual baseada no primeiro dia do mês para comparar com periodo_referencia
       const mesAtualChave = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+      
       const mapaHistorico: Record<string, { total: number, porUsuario: Record<string, number> }> = {}; 
       let contadorItensFaturadosNoMes = 0; 
       
       todasCompras?.forEach(item => {
-        const numP = Number(item.num_parcelas) || 1;
-        const valorTotal = Number(item.valor_total) || 0;
-        const dataCompraStr = item.data_compra || '';
-        const partesData = dataCompraStr.split('-');
-        
-        if (partesData.length < 3) return;
-
-        const anoC = parseInt(partesData[0]);
-        const mesC = parseInt(partesData[1]);
-        const diaC = parseInt(partesData[2]);
-        const valorP = parseFloat((valorTotal / numP).toFixed(2));
+        // No novo esquema, valor_total da linha já é o valor daquela parcela/item
+        const valorParcela = parseFloat(String(item.valor_total)) || 0;
         const nomeResponsavel = mapaNomes[item.user_id] || 'Outros';
         
-        let delayMes = 0;
-        if (item.forma_pagamento === 'Crédito' && item.cartao !== 'À Vista') {
-          const diaFechamento = cacheFechamentoCartoes[item.cartao];
-          if (diaFechamento && diaC > diaFechamento) delayMes = 1;
+        // Usamos o periodo_referencia para o histórico, pois ele define quando a conta "vence" ou aparece no extrato
+        // Se periodo_referencia for "2026-03-01", a chave será "2026-03"
+        if (!item.periodo_referencia) return;
+        const chaveMes = item.periodo_referencia.substring(0, 7);
+
+        if (!mapaHistorico[chaveMes]) {
+          mapaHistorico[chaveMes] = { total: 0, porUsuario: {} };
         }
 
-        for (let i = 0; i < numP; i++) {
-          let mesAlvoZeroIndexed = (mesC - 1) + delayMes + i;
-          let anoAlvo = anoC + Math.floor(mesAlvoZeroIndexed / 12);
-          let mesAlvoReal = (mesAlvoZeroIndexed % 12) + 1;
-          const chaveMes = `${anoAlvo}-${String(mesAlvoReal).padStart(2, '0')}`;
-          
-          if (!mapaHistorico[chaveMes]) {
-            mapaHistorico[chaveMes] = { total: 0, porUsuario: {} };
-          }
+        const ref = mapaHistorico[chaveMes];
+        ref.total += valorParcela;
+        ref.porUsuario[nomeResponsavel] = (ref.porUsuario[nomeResponsavel] || 0) + valorParcela;
 
-          const ref = mapaHistorico[chaveMes];
-          ref.total += valorP;
-          ref.porUsuario[nomeResponsavel] = (ref.porUsuario[nomeResponsavel] || 0) + valorP;
-
-          if (chaveMes === mesAtualChave) contadorItensFaturadosNoMes++;
+        if (chaveMes === mesAtualChave) {
+          contadorItensFaturadosNoMes++;
         }
       });
 
@@ -234,7 +217,6 @@ const Menu: React.FC = () => {
            <QuickActionLink to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" sub="Renda" color="#16a34a" />
         )}
 
-        {/* Liberado para todos: Gastos Fixos */}
         <QuickActionLink to="/despesas" icon={<ArrowDownCircle />} label="Gastos" sub="Fixos" color="#ef4444" />
         
         {perfil.tipo === 'proprietario' && (
@@ -243,7 +225,6 @@ const Menu: React.FC = () => {
         
         <QuickActionLink to="/listagem" icon={<ShoppingBag />} label="Extrato" sub="Compras" color="#00cc66" />
         
-        {/* Liberado para todos: Novo Lançamento */}
         <QuickActionLink to="/lancamento" icon={<Plus />} label="Novo" sub="Lançar" color="#fff" isPrimary />
       </div>
 
