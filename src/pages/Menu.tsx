@@ -1,38 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   ShoppingBag, CreditCard, LayoutDashboard, Plus, TrendingUp, 
-  ChevronRight, User as UserIcon, Users, X, Calendar, History, 
+  ChevronRight, User as UserIcon, Users, Calendar, History, 
   PiggyBank, ArrowUpCircle, ArrowDownCircle, Target, Shield, LucideProps
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { TipoUsuario } from '../types/database'; 
 import '../styles/Menu.css';
-import '../styles/Cartoes.css';
 
-// Importação de ícones de ação para manter o padrão visual dos modais
+// Importação do ícone de fechar seguindo o padrão Cartoes.tsx
 import iconFechar from '../assets/fechar.png';
 
-// --- INTERFACES ESTREITAS PARA O TYPESCRIPT ---
+// --- INTERFACES ---
 interface Profile {
   id: string;
   nome: string | null;
   tipo_usuario: TipoUsuario | null;
 }
 
-interface Cartao {
-  nome: string;
-  dia_fechamento: number | null;
-}
-
 interface Compra {
   id: string;
   user_id: string;
-  valor_total: number;
-  num_parcelas: number | string;
+  valor_total: string | number;
   data_compra: string;
   forma_pagamento: string;
-  cartao: string;
+  cartao: string | null;
+  periodo_referencia: string;
+  parcela_numero: number;
 }
 
 interface GastoPorUsuario {
@@ -59,23 +54,18 @@ const Menu: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [showModalHistorico, setShowModalHistorico] = useState<boolean>(false);
 
-  useEffect(() => {
-    buscarDados();
-  }, []);
-
   const formatMoney = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  async function buscarDados() {
+  const buscarDados = useCallback(async () => {
     setLoading(true);
     try {
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
       if (!user) return;
 
-      const [resPerfil, resTodosPerfis, resCartoes, resCompras] = await Promise.all([
+      const [resPerfil, resTodosPerfis, resCompras] = await Promise.all([
         supabase.from('profiles').select('nome, tipo_usuario').eq('id', user.id).single(),
         supabase.from('profiles').select('id, nome'),
-        supabase.from('cartoes').select('nome, dia_fechamento'),
         supabase.from('compras').select('*')
       ]);
 
@@ -96,11 +86,6 @@ const Menu: React.FC = () => {
         if (p.id && p.nome) mapaNomes[p.id] = p.nome.split(' ')[0];
       });
 
-      const cacheFechamentoCartoes: Record<string, number> = {};
-      (resCartoes.data as Cartao[] | null)?.forEach(c => {
-        if (c.nome) cacheFechamentoCartoes[c.nome] = c.dia_fechamento || 0;
-      });
-
       const comprasBrutas = resCompras.data as Compra[] | null;
       const todasCompras = temAcessoGestao 
         ? comprasBrutas 
@@ -108,44 +93,27 @@ const Menu: React.FC = () => {
 
       const agora = new Date();
       const mesAtualChave = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+      
       const mapaHistorico: Record<string, { total: number, porUsuario: Record<string, number> }> = {}; 
       let contadorItensFaturadosNoMes = 0; 
       
       todasCompras?.forEach(item => {
-        const numP = Number(item.num_parcelas) || 1;
-        const valorTotal = Number(item.valor_total) || 0;
-        const dataCompraStr = item.data_compra || '';
-        const partesData = dataCompraStr.split('-');
-        
-        if (partesData.length < 3) return;
-
-        const anoC = parseInt(partesData[0]);
-        const mesC = parseInt(partesData[1]);
-        const diaC = parseInt(partesData[2]);
-        const valorP = parseFloat((valorTotal / numP).toFixed(2));
+        const valorParcela = parseFloat(String(item.valor_total)) || 0;
         const nomeResponsavel = mapaNomes[item.user_id] || 'Outros';
         
-        let delayMes = 0;
-        if (item.forma_pagamento === 'Crédito' && item.cartao !== 'À Vista') {
-          const diaFechamento = cacheFechamentoCartoes[item.cartao];
-          if (diaFechamento && diaC > diaFechamento) delayMes = 1;
+        if (!item.periodo_referencia) return;
+        const chaveMes = item.periodo_referencia.substring(0, 7);
+
+        if (!mapaHistorico[chaveMes]) {
+          mapaHistorico[chaveMes] = { total: 0, porUsuario: {} };
         }
 
-        for (let i = 0; i < numP; i++) {
-          let mesAlvoZeroIndexed = (mesC - 1) + delayMes + i;
-          let anoAlvo = anoC + Math.floor(mesAlvoZeroIndexed / 12);
-          let mesAlvoReal = (mesAlvoZeroIndexed % 12) + 1;
-          const chaveMes = `${anoAlvo}-${String(mesAlvoReal).padStart(2, '0')}`;
-          
-          if (!mapaHistorico[chaveMes]) {
-            mapaHistorico[chaveMes] = { total: 0, porUsuario: {} };
-          }
+        const ref = mapaHistorico[chaveMes];
+        ref.total += valorParcela;
+        ref.porUsuario[nomeResponsavel] = (ref.porUsuario[nomeResponsavel] || 0) + valorParcela;
 
-          const ref = mapaHistorico[chaveMes];
-          ref.total += valorP;
-          ref.porUsuario[nomeResponsavel] = (ref.porUsuario[nomeResponsavel] || 0) + valorP;
-
-          if (chaveMes === mesAtualChave) contadorItensFaturadosNoMes++;
+        if (chaveMes === mesAtualChave) {
+          contadorItensFaturadosNoMes++;
         }
       });
 
@@ -164,7 +132,11 @@ const Menu: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    buscarDados();
+  }, [buscarDados]);
 
   if (loading) return null;
 
@@ -182,8 +154,8 @@ const Menu: React.FC = () => {
         </div>
       </header>
 
-      {/* Card Principal */}
-      <div className="main-card" onClick={() => setShowModalHistorico(true)} style={{ cursor: 'pointer' }}>
+      {/* Card Principal - Clique abre histórico */}
+      <div className="main-card" onClick={() => setShowModalHistorico(true)}>
         <div className="main-card-content">
           <div className="card-label-row">
             {isGestor ? <Users size={18} /> : <UserIcon size={18} />}
@@ -210,7 +182,7 @@ const Menu: React.FC = () => {
               <span style={{fontWeight: 800}}>{resumo.quantidade}</span>
             </div>
             {perfil.tipo === 'administrador' && (
-              <div className="pill" style={{background: 'rgba(255,255,255,0.2)'}}>
+              <div className="pill admin-pill-style">
                 <Shield size={10} style={{marginRight: 4}}/>
                 <span style={{fontSize: '0.7rem'}}>MODO ADMIN</span>
               </div>
@@ -224,120 +196,83 @@ const Menu: React.FC = () => {
       
       <div className="actions-grid">
         <QuickActionLink to="/dashboard" icon={<LayoutDashboard />} label="Painel" sub="Análise" color="#4361ee" />
-        
-        {isGestor && (
-          <QuickActionLink to="/categoriasMetas" icon={<Target />} label="Metas" sub="Planejar" color="#8b5cf6" />
-        )}
-
-        {isGestor && (
-           <QuickActionLink to="/orcamento" icon={<PiggyBank />} label="Orçamento" sub="Gestão" color="#ff9900" />
-        )}
-
-        {isGestor && (
-           <QuickActionLink to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" sub="Renda" color="#16a34a" />
-        )}
-
-        {/* Liberado para todos: Gastos Fixos */}
+        {isGestor && <QuickActionLink to="/categoriasMetas" icon={<Target />} label="Metas" sub="Planejar" color="#8b5cf6" />}
+        {isGestor && <QuickActionLink to="/orcamento" icon={<PiggyBank />} label="Orçamento" sub="Gestão" color="#ff9900" />}
+        {isGestor && <QuickActionLink to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" sub="Renda" color="#16a34a" />}
         <QuickActionLink to="/despesas" icon={<ArrowDownCircle />} label="Gastos" sub="Fixos" color="#ef4444" />
-        
-        {perfil.tipo === 'proprietario' && (
-          <QuickActionLink to="/cartoes" icon={<CreditCard />} label="Cartões" sub="Bancos" color="#7209b7" />
-        )}
-        
+        {perfil.tipo === 'proprietario' && <QuickActionLink to="/cartoes" icon={<CreditCard />} label="Cartões" sub="Bancos" color="#7209b7" />}
         <QuickActionLink to="/listagem" icon={<ShoppingBag />} label="Extrato" sub="Compras" color="#00cc66" />
-        
-        {/* Liberado para todos: Novo Lançamento */}
         <QuickActionLink to="/lancamento" icon={<Plus />} label="Novo" sub="Lançar" color="#fff" isPrimary />
       </div>
 
-      <Link to="/perfil" style={{ textDecoration: 'none' }}>
+      <Link to="/perfil" className="footer-link-reset">
         <div className="footer-action">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div className="footer-info-group">
             <div className="footer-icon-box">
               {perfil.tipo === 'comum' ? <UserIcon size={20} color="#4361ee" /> : <Shield size={20} color="#4361ee" />}
             </div>
             <div>
-              <span style={{ display: 'block', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>Perfil</span>
-              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Ajustes de {perfil.tipo}</span>
+              <span className="footer-label-main">Perfil</span>
+              <span className="footer-label-sub">Ajustes de {perfil.tipo}</span>
             </div>
           </div>
           <ChevronRight size={20} color="#64748b" />
         </div>
       </Link>
 
-      {/* Modal de Histórico Mensal - ESTILO PREMIUM ALINHADO AOS CARTOES */}
+      {/* Modal de Histórico Mensal - Estilo Refatorado */}
       {showModalHistorico && (
         <div className="modal-overlay" onClick={() => setShowModalHistorico(false)}>
-          <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ padding: 0, maxWidth: '520px', borderRadius: '45px' }}>
-            
-            <div className="modal-details-header" style={{ background: '#1e293b', padding: '35px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                   <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white', fontWeight: 800 }}>Competências</h2>
-                   <button onClick={() => setShowModalHistorico(false)} className="btn-icon-action">
-                      <img src={iconFechar} alt="Fechar" style={{ width: '32px', height: '32px' }} />
+          <div className="modal-content history-modal-container fade-in" onClick={e => e.stopPropagation()}>
+            <div className="history-header-bg">
+                <div className="history-header-row">
+                   <div>
+                     <h2 className="history-title">Histórico Mensal</h2>
+                     <p className="history-subtitle">
+                       {isGestor ? 'Visão consolidada do grupo' : 'Meus gastos faturados'}
+                     </p>
+                   </div>
+                   <button onClick={() => setShowModalHistorico(false)} className="btn-close-round">
+                     <img src={iconFechar} alt="Fechar" />
                    </button>
                 </div>
-                <p style={{ color: 'rgba(255,255,255,0.7)', margin: '10px 0 0 0', fontSize: '0.9rem', fontWeight: 500 }}>
-                  {isGestor ? 'Visão consolidada de todos os membros' : 'Meus gastos faturados por mês'}
-                </p>
             </div>
 
-            <div style={{ padding: '35px', maxHeight: '500px', overflowY: 'auto' }}>
-              {historicoMensal.map((mesObj, idx) => {
-                const [ano, mes] = mesObj.chave.split('-');
-                const dataFormatada = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(parseInt(ano), parseInt(mes) - 1));
-                const isAtual = (new Date().getMonth() + 1) === parseInt(mes) && new Date().getFullYear() === parseInt(ano);
+            <div className="modal-scroll-area">
+              {historicoMensal.length > 0 ? (
+                historicoMensal.map((mesObj, idx) => {
+                  const [ano, mes] = mesObj.chave.split('-');
+                  const dataFormatada = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(parseInt(ano), parseInt(mes) - 1));
+                  const isAtual = (new Date().getMonth() + 1) === parseInt(mes) && new Date().getFullYear() === parseInt(ano);
 
-                return (
-                  <div key={idx} style={{ 
-                    marginBottom: '15px',
-                    background: isAtual ? '#f8fafc' : '#fff',
-                    borderRadius: '24px',
-                    border: isAtual ? '2px solid #4361ee' : '1px solid #f1f5f9',
-                    overflow: 'hidden',
-                    boxShadow: isAtual ? '0 10px 15px -3px rgba(67, 97, 238, 0.1)' : 'none'
-                  }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      padding: '20px', 
-                      alignItems: 'center',
-                      borderBottom: isGestor ? '1px dashed #e2e8f0' : 'none'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ 
-                          width: '40px', 
-                          height: '40px', 
-                          borderRadius: '12px', 
-                          background: isAtual ? '#4361ee15' : '#f1f5f9',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <Calendar size={20} color={isAtual ? '#4361ee' : '#64748b'} />
+                  return (
+                    <div key={idx} className={`history-item-card ${isAtual ? 'active' : ''}`}>
+                      <div className={`history-item-main ${isGestor ? 'has-divider' : ''}`}>
+                        <div className="history-item-info">
+                          <Calendar size={18} color={isAtual ? '#4361ee' : '#64748b'} />
+                          <span className="history-item-date">{dataFormatada}</span>
                         </div>
-                        <span style={{ fontWeight: '800', textTransform: 'capitalize', color: '#1e293b', fontSize: '1rem' }}>
-                          {dataFormatada}
+                        <span className={`history-item-total ${isAtual ? 'text-primary' : ''}`}>
+                          {formatMoney(mesObj.total)}
                         </span>
                       </div>
-                      <span style={{ fontWeight: '900', color: isAtual ? '#4361ee' : '#0f172a', fontSize: '1.1rem' }}>
-                        {formatMoney(mesObj.total)}
-                      </span>
-                    </div>
 
-                    {isGestor && (
-                      <div style={{ padding: '15px 20px', background: 'rgba(241, 245, 249, 0.5)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                        {Object.entries(mesObj.porUsuario).map(([nome, valor]) => (
-                          <div key={nome} style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{nome}</span>
-                            <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#334155' }}>{formatMoney(valor)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {isGestor && (
+                        <div className="history-user-grid">
+                          {Object.entries(mesObj.porUsuario).map(([nome, valor]) => (
+                            <div key={nome} className="user-spend-col">
+                              <span className="user-spend-name">{nome}</span>
+                              <span className="user-spend-value">{formatMoney(valor)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>Nenhum histórico encontrado.</p>
+              )}
             </div>
           </div>
         </div>
@@ -365,9 +300,9 @@ const QuickActionLink: React.FC<QuickActionProps> = ({ to, icon, label, sub, col
       }}>
         {React.isValidElement<LucideProps>(icon) ? React.cloneElement(icon, { size: 22 }) : icon}
       </div>
-      <div>
-        <span>{label}</span>
-        <span>{sub}</span>
+      <div className="action-label-container">
+        <span className="action-label-title">{label}</span>
+        <span className="action-label-sub">{sub}</span>
       </div>
     </div>
   </Link>
