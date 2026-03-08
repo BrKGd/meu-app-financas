@@ -24,10 +24,12 @@ interface Compra {
   descricao: string;
   loja?: string;
   valor_total: number;
-  num_parcelas: number;
+  parcela_numero: number;
+  parcelas_total: number;
   data_compra: string; 
-  cartao: string; 
+  cartao_id: number; // Alterado para ID
   forma_pagamento: string;
+  periodo_referencia: string;
 }
 
 const Cartoes: React.FC = () => {
@@ -42,8 +44,9 @@ const Cartoes: React.FC = () => {
     nome: '', limite: '', dia_fechamento: '', dia_vencimento: '', cor: '#4361ee'
   });
 
-  const mesAtual = new Date().getMonth();
+  const mesAtual = new Date().getMonth() + 1;
   const anoAtual = new Date().getFullYear();
+  const periodoAtual = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
 
   // --- FUNÇÃO EXCLUSIVA PARA O SETTINGS2 ---
   const getSettingsColor = (hexcolor: string) => {
@@ -52,7 +55,6 @@ const Cartoes: React.FC = () => {
     const r = parseInt(hex.substring(0, 2), 16);
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
-    // Fórmula YIQ para decidir se o ícone deve ser preto ou branco
     const yiq = (r * 299 + g * 587 + b * 114) / 1000;
     return yiq >= 128 ? '#000000' : '#ffffff';
   };
@@ -71,10 +73,12 @@ const Cartoes: React.FC = () => {
   async function fetchDados() {
     setLoading(true);
     try {
-      const { data: cData } = await supabase.from('cartoes').select('*').order('nome');
-      const { data: compData } = await supabase.from('compras').select('*');
-      setCartoes((cData as any[]) || []);
-      setCompras((compData as any[]) || []);
+      const [cData, compData] = await Promise.all([
+        supabase.from('cartoes').select('*').order('nome'),
+        supabase.from('compras').select('*').eq('forma_pagamento', 'Crédito')
+      ]);
+      setCartoes((cData.data as any[]) || []);
+      setCompras((compData.data as any[]) || []);
     } catch (error) {
       console.error("Erro:", error);
     } finally {
@@ -82,40 +86,28 @@ const Cartoes: React.FC = () => {
     }
   }
 
-  // --- Cálculos ---
-  const getMesInicioCobranca = (item: Compra, cartoesReferencia: Cartao[]) => {
-    const [anoC, mesC, diaC] = item.data_compra.split('-').map(Number);
-    let mesInicio = mesC - 1; 
-    let anoInicio = anoC;
-    if (item.forma_pagamento === 'Crédito') {
-      const info = cartoesReferencia.find(c => c.nome === item.cartao);
-      if (info && diaC > info.dia_fechamento) mesInicio += 1;
-    }
-    return { mesInicio, anoInicio };
-  };
-
+  // --- Cálculos Atualizados para Novo Esquema ---
+  
   const calcularDisponivel = (cartao: Cartao, limite: number | string) => {
     const limNum = Number(limite);
+    // Soma todas as compras no crédito deste cartão que ainda não foram pagas
+    // (Ou simplificando: todas as parcelas futuras + atual vinculadas a este ID)
     const totalComprometido = compras.reduce((acc, item) => {
-      if (item.cartao !== cartao.nome) return acc;
-      const { mesInicio, anoInicio } = getMesInicioCobranca(item, cartoes);
-      const dataUltimaParcela = new Date(anoInicio, mesInicio + ((item.num_parcelas || 1) - 1), 1);
-      if (dataUltimaParcela >= new Date(anoAtual, mesAtual, 1)) return acc + Number(item.valor_total);
+      if (item.cartao_id !== cartao.id) return acc;
+      
+      // Consideramos comprometido o que vence no mês atual ou futuro
+      if (item.periodo_referencia >= periodoAtual) {
+         return acc + Number(item.valor_total);
+      }
       return acc;
     }, 0);
     return Number((limNum - totalComprometido).toFixed(2));
   };
 
-  const calcularTotalMes = (cartaoNome: string) => {
+  const calcularTotalMes = (cartaoId: number) => {
     const total = compras.reduce((acc, item) => {
-      if (item.cartao !== cartaoNome) return acc;
-      const { mesInicio, anoInicio } = getMesInicioCobranca(item, cartoes);
-      const numParcelas = item.num_parcelas || 1;
-      for (let i = 0; i < numParcelas; i++) {
-        const dP = new Date(anoInicio, mesInicio + i, 1);
-        if (dP.getMonth() === mesAtual && dP.getFullYear() === anoAtual) {
-          return acc + (Number(item.valor_total) / numParcelas);
-        }
+      if (item.cartao_id === cartaoId && item.periodo_referencia === periodoAtual) {
+        return acc + Number(item.valor_total);
       }
       return acc;
     }, 0);
@@ -135,9 +127,9 @@ const Cartoes: React.FC = () => {
 
     try {
       if (isEditing && selectedCartao) {
-        await (supabase.from('cartoes') as any).update(payload).eq('id', selectedCartao.id);
+        await supabase.from('cartoes').update(payload).eq('id', selectedCartao.id);
       } else {
-        await (supabase.from('cartoes') as any).insert([payload]);
+        await supabase.from('cartoes').insert([payload]);
       }
       fetchDados();
       fecharModais();
@@ -226,7 +218,6 @@ const Cartoes: React.FC = () => {
                               cor: selectedCartao!.cor
                           }); 
                       }} className="btn-icon-action">
-                        {/* UNICO ELEMENTO MANIPULADO DINAMICAMENTE */}
                         <Settings2 
                           size={32} 
                           color={getSettingsColor(selectedCartao!.cor)} 
@@ -255,26 +246,18 @@ const Cartoes: React.FC = () => {
                   <div className="listagem-lancamentos">
                     <h4 style={{ color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.1em' }}>Lançamentos do Mês</h4>
                     {compras
-                      .filter(c => c.cartao === selectedCartao?.nome)
-                      .map((item, idx) => {
-                        const { mesInicio, anoInicio } = getMesInicioCobranca(item, cartoes);
-                        let infoMes = null;
-                        for (let i = 0; i < (item.num_parcelas || 1); i++) {
-                          const dP = new Date(anoInicio, mesInicio + i, 1);
-                          if (dP.getMonth() === mesAtual && dP.getFullYear() === anoAtual) {
-                            infoMes = { atual: i + 1, total: item.num_parcelas, valor: item.valor_total / (item.num_parcelas || 1) };
-                          }
-                        }
-                        return infoMes && (
+                      .filter(c => c.cartao_id === selectedCartao?.id && c.periodo_referencia === periodoAtual)
+                      .map((item, idx) => (
                           <div key={idx} className="fatura-item">
                             <div>
-                              <div className="fatura-item-desc">{item.descricao ||item.loja }</div>
-                              <div className="fatura-item-sub">{item.num_parcelas > 1 ? `Parcela ${infoMes.atual}/${infoMes.total}` : 'À Vista'}</div>
+                              <div className="fatura-item-desc">{item.descricao || item.loja}</div>
+                              <div className="fatura-item-sub">
+                                {item.parcelas_total > 1 ? `Parcela ${item.parcela_numero}/${item.parcelas_total}` : 'À Vista'}
+                              </div>
                             </div>
-                            <div className="fatura-item-valor">{formatMoney(infoMes.valor)}</div>
+                            <div className="fatura-item-valor">{formatMoney(item.valor_total)}</div>
                           </div>
-                        );
-                      })}
+                      ))}
                   </div>
                   <div className="fatura-resumo">
                     <div>
@@ -282,7 +265,7 @@ const Cartoes: React.FC = () => {
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Vence dia {selectedCartao?.dia_vencimento}</span>
                     </div>
                     <div className="fatura-valor" style={{ color: selectedCartao?.cor }}>
-                      {formatMoney(calcularTotalMes(selectedCartao!.nome))}
+                      {formatMoney(calcularTotalMes(selectedCartao!.id))}
                     </div>
                   </div>
                 </>
