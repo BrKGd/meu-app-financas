@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Save, Calendar, ShoppingBag, Hash, Receipt, CreditCard, 
-  User, Lock, Wallet, Info, Tag 
+  User, Lock, Wallet, Info, Tag, RefreshCcw, Clock, Target
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Lancamento.css';
 
-// --- Interfaces para garantir a tipagem correta ---
+// --- Interfaces ---
 interface Cartao {
   id: number;
   nome: string;
@@ -45,6 +45,15 @@ const Lancamento: React.FC = () => {
   }>({ isOpen: false, type: 'success', title: '', message: '' });
 
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
+  
+  // Lista oficial de frequências aceitas pelo banco
+  const frequenciasAceitas = [
+    { value: 'mensal', label: 'Mensal' },
+    { value: 'bimestral', label: 'Bimestral' },
+    { value: 'trimestral', label: 'Trimestral' },
+    { value: 'semestral', label: 'Semestral' },
+    { value: 'anual', label: 'Anual' }
+  ];
 
   const [form, setForm] = useState({
     descricao: '', 
@@ -57,10 +66,19 @@ const Lancamento: React.FC = () => {
     categoria_id: '', 
     num_parcelas: 1, 
     cartao: '', 
-    data_compra: new Date().toISOString().split('T')[0]
+    data_compra: new Date().toISOString().split('T')[0],
+    tipo_lancamento: 'unico',
+    intervalo_frequencia: 'mensal',
+    data_limite: '' 
   });
 
-  // Cálculo inteligente da fatura
+  // Regra de Parcelas > 1 implica em tipo_lancamento = parcelado
+  useEffect(() => {
+    if (form.num_parcelas > 1 && form.tipo_lancamento !== 'parcelado' && form.tipo_lancamento !== 'fixo') {
+      setForm(prev => ({ ...prev, tipo_lancamento: 'parcelado' }));
+    }
+  }, [form.num_parcelas]);
+
   const infoFechamento = useMemo(() => {
     if (form.forma_pagamento !== 'Crédito' || !form.cartao || !form.data_compra) return null;
     const cartaoSelecionado = cartoes.find(c => c.nome === form.cartao);
@@ -92,15 +110,9 @@ const Lancamento: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: perfil } = await supabase
-        .from('profiles')
-        .select('tipo_usuario')
-        .eq('id', user.id)
-        .single();
-
+      const { data: perfil } = await supabase.from('profiles').select('tipo_usuario').eq('id', user.id).single();
       const isMaster = user.email === 'gleidson.fig@gmail.com';
       const tipoFinal = isMaster ? 'proprietario' : ((perfil as any)?.tipo_usuario || 'comum');
-      
       setPerfilLogado({ id: user.id, tipo_usuario: tipoFinal });
 
       const [dC, dU, dCat] = await Promise.all([
@@ -113,10 +125,7 @@ const Lancamento: React.FC = () => {
       setUsuarios((dU.data as Perfil[]) || []);
       setCategorias((dCat.data as Categoria[]) || []);
 
-      if (tipoFinal !== 'proprietario') {
-        setForm(prev => ({ ...prev, user_id: user.id }));
-      }
-
+      if (tipoFinal !== 'proprietario') setForm(prev => ({ ...prev, user_id: user.id }));
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
     } finally {
@@ -140,93 +149,101 @@ const Lancamento: React.FC = () => {
     setLoading(true);
 
     const isCredito = form.forma_pagamento === 'Crédito';
-    const numP = isCredito ? Number(form.num_parcelas) : 1;
-    const isEfetivamenteParcelado = numP > 1;
     const valorTotalNum = parseFloat(form.valor_total);
 
     if (valorTotalNum <= 0) {
-      setModal({ isOpen: true, type: 'warning', title: 'Atenção', message: 'O valor total deve ser maior que zero.' });
+      setModal({ isOpen: true, type: 'warning', title: 'Atenção', message: 'O valor deve ser maior que zero.' });
       setLoading(false); return;
     }
 
-    const cartaoObjeto = cartoes.find(c => c.nome === form.cartao);
-    const recorrenciaId = isEfetivamenteParcelado ? crypto.randomUUID() : null;
-    const valorParcela = (valorTotalNum / numP).toFixed(2);
-    
     const comprasParaInserir = [];
+    const cartaoObjeto = cartoes.find(c => c.nome === form.cartao);
+    let tipoFinalPayload = form.tipo_lancamento;
 
-    for (let i = 1; i <= numP; i++) {
-      let dataVencimento = form.data_compra;
+    if (tipoFinalPayload === 'fixo' && form.data_limite) {
+      const inicio = new Date(form.data_compra + 'T12:00:00');
+      const fim = new Date(form.data_limite + 'T12:00:00');
+      let dataCorrente = new Date(inicio);
       
-      if (isCredito && infoFechamento) {
-        let d = new Date(infoFechamento.dataBaseVencimento);
-        d.setMonth(d.getMonth() + (i - 1));
-        dataVencimento = d.toISOString().split('T')[0];
+      // Mapeamento de saltos conforme intervalo
+      const saltos: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+      const mesesSalto = saltos[form.intervalo_frequencia] || 1;
+
+      while (dataCorrente <= fim) {
+        comprasParaInserir.push({
+          user_id: form.user_id,
+          usuario_criacao: perfilLogado?.id,
+          descricao: form.descricao,
+          loja: form.loja,
+          pedido: form.pedido,
+          nota_fiscal: completarNF(form.nota_fiscal),
+          valor_total: valorTotalNum,
+          parcelado: false,
+          parcelas_total: 1,
+          parcela_numero: 1,
+          data_compra: form.data_compra,
+          forma_pagamento: form.forma_pagamento,
+          cartao_id: isCredito && cartaoObjeto ? cartaoObjeto.id : null,
+          categoria_id: form.categoria_id,
+          tipo_despesa: 'Gastos Fixos',
+          data_vencimento: dataCorrente.toISOString().split('T')[0],
+          status_pagamento: 'pendente',
+          tipo_lancamento: 'fixo',
+          periodo_referencia: `${dataCorrente.getFullYear()}-${String(dataCorrente.getMonth() + 1).padStart(2, '0')}-01`,
+          intervalo_frequencia: form.intervalo_frequencia,
+          recorrencia_id: null
+        });
+        dataCorrente.setMonth(dataCorrente.getMonth() + mesesSalto);
       }
+    } else {
+      const numP = (isCredito || tipoFinalPayload === 'parcelado') ? Number(form.num_parcelas) : 1;
+      const valorLinha = (valorTotalNum / numP).toFixed(2);
 
-      // Cálculo do período de referência (Sempre dia 01 do mês do vencimento)
-      const refDate = new Date(dataVencimento);
-      const periodoReferencia = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, '0')}-01`;
+      for (let i = 1; i <= numP; i++) {
+        let dVenc = new Date(form.data_compra + 'T12:00:00');
+        if (isCredito && infoFechamento) {
+          dVenc = new Date(infoFechamento.dataBaseVencimento);
+          dVenc.setMonth(dVenc.getMonth() + (i - 1));
+        } else {
+          dVenc.setMonth(dVenc.getMonth() + (i - 1));
+        }
 
-      comprasParaInserir.push({
-        user_id: form.user_id,
-        usuario_criacao: perfilLogado?.id,
-        descricao: numP > 1 ? `${form.descricao} (${i}/${numP})` : form.descricao,
-        loja: form.loja,
-        pedido: form.pedido,
-        nota_fiscal: completarNF(form.nota_fiscal),
-        valor_total: valorParcela, // Agora o valor total de cada linha é o valor da parcela
-        parcelado: isEfetivamenteParcelado,
-        parcelas_total: numP,
-        parcela_numero: i,
-        data_compra: form.data_compra,
-        forma_pagamento: form.forma_pagamento,
-        cartao: isCredito ? form.cartao : null,
-        cartao_id: isCredito && cartaoObjeto ? cartaoObjeto.id : null,
-        categoria_id: form.categoria_id,
-        tipo_despesa: isCredito ? 'Compra no Crédito' : 'Gastos Variáveis',
-        data_vencimento: dataVencimento,
-        status_pagamento: 'pendente',
-        cor_pagamento: '#f59e0b',
-        tipo_lancamento: isEfetivamenteParcelado ? 'parcelado' : 'unico',
-        recorrencia_id: recorrenciaId,
-        periodo_referencia: periodoReferencia
-      });
+        comprasParaInserir.push({
+          user_id: form.user_id,
+          usuario_criacao: perfilLogado?.id,
+          descricao: numP > 1 ? `${form.descricao} (${i}/${numP})` : form.descricao,
+          loja: form.loja,
+          pedido: form.pedido,
+          nota_fiscal: completarNF(form.nota_fiscal),
+          valor_total: valorLinha,
+          parcelado: numP > 1,
+          parcelas_total: numP,
+          parcela_numero: i,
+          data_compra: form.data_compra,
+          forma_pagamento: form.forma_pagamento,
+          cartao_id: isCredito && cartaoObjeto ? cartaoObjeto.id : null,
+          categoria_id: form.categoria_id,
+          tipo_despesa: isCredito ? 'Compra no Crédito' : 'Gastos Variáveis',
+          data_vencimento: dVenc.toISOString().split('T')[0],
+          status_pagamento: 'pendente',
+          tipo_lancamento: tipoFinalPayload,
+          periodo_referencia: `${dVenc.getFullYear()}-${String(dVenc.getMonth() + 1).padStart(2, '0')}-01`,
+          intervalo_frequencia: null,
+          recorrencia_id: null
+        });
+      }
     }
 
-    const { error: errorCompra } = await (supabase.from('compras') as any).insert(comprasParaInserir);
+    const { error } = await supabase.from('compras').insert(comprasParaInserir);
 
-    if (errorCompra) {
-      setModal({ isOpen: true, type: 'error', title: 'Erro ao salvar compra', message: errorCompra.message });
-      setLoading(false);
-      return;
+    if (error) setModal({ isOpen: true, type: 'error', title: 'Erro', message: error.message });
+    else {
+      setModal({ isOpen: true, type: 'success', title: 'Sucesso!', message: 'Lançamentos gerados com sucesso.' });
+      setForm({ ...form, descricao: '', valor_total: '', loja: '', pedido: '', nota_fiscal: '', num_parcelas: 1, data_limite: '', tipo_lancamento: 'unico' });
     }
-
-    setModal({ 
-      isOpen: true, 
-      type: 'success', 
-      title: 'Sucesso!', 
-      message: isEfetivamenteParcelado ? `Gasto e ${numP} parcelas registradas na tabela compras.` : `Gasto registrado com sucesso.` 
-    });
-    
-    setForm({ 
-      ...form, 
-      descricao: '', 
-      valor_total: '', 
-      loja: '', 
-      pedido: '', 
-      nota_fiscal: '', 
-      num_parcelas: 1, 
-      cartao: '', 
-      categoria_id: '',
-      user_id: perfilLogado?.tipo_usuario !== 'proprietario' ? (perfilLogado?.id || '') : ''
-    });
-
     setLoading(false);
   };
 
-  if (fetching) return <div className="loading-state">CARREGANDO...</div>;
-  
   return (
     <div className="lancamento-container fade-in">
       <header className="lancamento-header">
@@ -236,9 +253,23 @@ const Lancamento: React.FC = () => {
       
       <div className="card lancamento-card">
         <form onSubmit={handleSubmit}>
+          <div className="input-group" style={{ marginBottom: '20px' }}>
+            <label className="input-label"><Clock size={14} /> Tipo de Lançamento</label>
+            <select 
+              className="form-control" 
+              value={form.tipo_lancamento} 
+              onChange={e => setForm({...form, tipo_lancamento: e.target.value})}
+              disabled={form.num_parcelas > 1}
+            >
+              <option value="unico">Pagamento Único</option>
+              <option value="parcelado">Parcelado</option>
+              <option value="fixo">Fixo / Recorrente</option>
+            </select>
+          </div>
+
           <div className="form-row-top">
             <div className="input-group">
-              <label className="input-label"><Calendar size={14} /> Data da Compra</label>
+              <label className="input-label"><Calendar size={14} /> Data Inicial</label>
               <input type="date" className="form-control" value={form.data_compra} required onChange={e => setForm({...form, data_compra: e.target.value})} />
             </div>
             <div className="input-group">
@@ -247,23 +278,34 @@ const Lancamento: React.FC = () => {
             </div>
             <div className="input-group">
               <label className="input-label"><User size={14} /> Responsável</label>
-              <select 
-                className="form-control" 
-                required 
-                value={form.user_id} 
-                disabled={perfilLogado?.tipo_usuario !== 'proprietario'}
-                onChange={e => setForm({...form, user_id: e.target.value})}
-              >
+              <select className="form-control" required value={form.user_id} disabled={perfilLogado?.tipo_usuario !== 'proprietario'} onChange={e => setForm({...form, user_id: e.target.value})}>
                 <option value="">Quem comprou?</option>
                 {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
-              {perfilLogado?.tipo_usuario !== 'proprietario' && (
-                <span style={{ fontSize: '10px', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Lock size={10} /> Travado para seu perfil
-                </span>
-              )}
             </div>
           </div>
+
+          {/* CAMPOS DE RECORRÊNCIA SEM FUNDO CINZA */}
+          {form.tipo_lancamento === 'fixo' && (
+            <div className="form-row-top animate-in" style={{ marginTop: '15px' }}>
+              <div className="input-group">
+                <label className="input-label"><RefreshCcw size={14} /> Frequência</label>
+                <select 
+                  className="form-control" 
+                  value={form.intervalo_frequencia} 
+                  onChange={e => setForm({...form, intervalo_frequencia: e.target.value})}
+                >
+                  {frequenciasAceitas.map(freq => (
+                    <option key={freq.value} value={freq.value}>{freq.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="input-group">
+                <label className="input-label"><Target size={14} /> Data Limite</label>
+                <input type="date" className="form-control" required value={form.data_limite} onChange={e => setForm({...form, data_limite: e.target.value})} />
+              </div>
+            </div>
+          )}
 
           <div className="form-grid-desc-cat">
             <div className="input-group">
@@ -286,22 +328,16 @@ const Lancamento: React.FC = () => {
             </div>
             <div className="input-group">
               <label className="input-label"><Receipt size={14} /> Nota Fiscal</label>
-              <input 
-                placeholder="000.000.000" 
-                className="form-control" 
-                value={form.nota_fiscal} 
-                onChange={e => setForm({...form, nota_fiscal: formatarNF(e.target.value)})}
-                onBlur={e => setForm({...form, nota_fiscal: completarNF(e.target.value)})}
-              />
+              <input placeholder="000.000.000" className="form-control" value={form.nota_fiscal} onChange={e => setForm({...form, nota_fiscal: formatarNF(e.target.value)})} onBlur={e => setForm({...form, nota_fiscal: completarNF(e.target.value)})} />
             </div>
           </div>
 
-          <div className="form-row-bottom">
+          <div className="form-row-bottom" style={{ marginTop: '20px' }}>
             <div className="input-group flex-item-valor">
-              <label className="input-label">Valor Total</label>
+              <label className="input-label">{form.tipo_lancamento === 'fixo' ? 'Valor por Mês' : 'Valor Total'}</label>
               <div className="input-with-prefix">
                 <span className="prefix-icon">R$</span>
-                <input type="number" step="0.01" placeholder="0,00" className="form-control" required value={form.valor_total} onChange={e => setForm({...form, valor_total: e.target.value})} />
+                <input type="number" step="0.01" className="form-control" required value={form.valor_total} onChange={e => setForm({...form, valor_total: e.target.value})} />
               </div>
             </div>
             <div className="input-group flex-item-forma">
@@ -312,43 +348,31 @@ const Lancamento: React.FC = () => {
             </div>
           </div>
 
-          {form.forma_pagamento === 'Crédito' && (
+          {(form.forma_pagamento === 'Crédito' || form.tipo_lancamento === 'parcelado') && (
             <div className="form-row-credito animate-in">
               <div className="input-group flex-item-cartao">
                 <label className="input-label"><CreditCard size={14} /> Cartão</label>
-                <select className="form-control" required value={form.cartao} onChange={e => setForm({...form, cartao: e.target.value})}>
+                <select className="form-control" required={form.forma_pagamento === 'Crédito'} value={form.cartao} onChange={e => setForm({...form, cartao: e.target.value})}>
                   <option value="">Qual?</option>
                   {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                 </select>
               </div>
-              <div className="input-group flex-item-parcela">
-                <label className="input-label">Parc.</label>
-                <input type="number" min="1" className="form-control" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} style={{ textAlign: 'center', fontWeight: '800' }} />
-              </div>
+              {form.tipo_lancamento !== 'fixo' && (
+                <div className="input-group flex-item-parcela">
+                  <label className="input-label">Parc.</label>
+                  <input type="number" min="1" className="form-control" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} style={{ textAlign: 'center', fontWeight: '800' }} />
+                </div>
+              )}
             </div>
           )}
 
-          {infoFechamento && (
-            <div className={`info-fechamento-badge animate-in ${infoFechamento.vaiParaProximoMes ? 'next-month' : 'current-month'}`}>
-              <Info size={16} />
-              <span>
-                {infoFechamento.vaiParaProximoMes 
-                  ? `Fatura fechada (dia ${infoFechamento.diaFechamento}). 1ª parcela em ${infoFechamento.mesCobranca}.`
-                  : `Compra antes do fechamento. Vencimento em ${infoFechamento.mesCobranca}.`}
-              </span>
-            </div>
-          )}
-
-          <button type="submit" className="btn-submit" disabled={loading}>
+          <button type="submit" className="btn-submit" disabled={loading} style={{ marginTop: '25px' }}>
             {loading ? 'Salvando...' : <><Save size={20} style={{ marginRight: '10px' }} /> Confirmar Lançamento</>}
           </button>
         </form>
       </div>
 
-      <ModalFeedback 
-        isOpen={modal.isOpen} type={modal.type} title={modal.title} message={modal.message}
-        onClose={() => setModal({ ...modal, isOpen: false })}
-      />
+      <ModalFeedback isOpen={modal.isOpen} type={modal.type} title={modal.title} message={modal.message} onClose={() => setModal({ ...modal, isOpen: false })} />
     </div>
   );
 };

@@ -358,6 +358,18 @@
   cursor: not-allowed;
 }
 
+.btn-delete-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.btn-delete-all:hover {
+  background-color: #fca5a5 !important;
+  transform: scale(1.1);
+}
+
 /* KEYFRAMES */
 @keyframes popIn {
   from { transform: scale(0.8); opacity: 0; }

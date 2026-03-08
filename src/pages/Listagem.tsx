@@ -43,9 +43,9 @@ interface ItemCompra {
   pedido: string;
   valor_total: number;
   parcelado: boolean;
-  parcelas_total: number; // Alinhado com o Banco
+  parcelas_total: number;
   data_compra: string;
-  data_vencimento?: string; // Adicionado para refletir o cálculo do banco
+  data_vencimento?: string;
   periodo_referencia?: string; 
   recorrencia_id?: string | null;     
   cartao: string | null;
@@ -53,12 +53,11 @@ interface ItemCompra {
   forma_pagamento: string;
   categoria_id: string;
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
-  tipo_lancamento: 'unico' | 'parcelado' | 'fixo'; // Alinhado com o Banco
+  tipo_lancamento: 'unico' | 'parcelado' | 'fixo';
   intervalo_frequencia?: 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | null;
   data_fim?: string | null; 
-  parcela_numero?: number; // Alinhado com o Banco
+  parcela_numero?: number;
   valorVisual?: string; 
-  // Propriedades auxiliares de visualização
   nomeResponsavel?: string;
   nomeCriador?: string; 
   nomeCategoria?: string;
@@ -91,7 +90,7 @@ const Listagem: React.FC = () => {
   ], []);
 
   const formasPagamento = useMemo(() => ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort(), []);
-  const tiposLancamento = ["unico", "parcelado", "fixo"]; // Alinhado
+  const tiposLancamento = ["unico", "parcelado", "fixo"];
   const frequenciasRecorrencia = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
   const statusPagamento = ["pendente", "pago", "vencido", "cancelado"];
 
@@ -127,13 +126,12 @@ const Listagem: React.FC = () => {
   };
 
   const fetchDespesas = useCallback(async (perfil: Perfil, mapaNomes: Record<string, string>, listaCartoes: Cartao[], mapaCats: Record<string, {nome: string, cor: string}>) => {
-    // Filtro de data via RPC ou via Periodo Referencia no banco
     const primeiroDia = `${filtroData.ano}-${String(filtroData.mes + 1).padStart(2, '0')}-01`;
     
     let query = supabase
       .from('compras')
       .select('*')
-      .eq('periodo_referencia', primeiroDia) // Busca exata pelo período gerado
+      .eq('periodo_referencia', primeiroDia)
       .order('data_compra', { ascending: false });
     
     if (perfil.tipo_usuario !== 'proprietario' && perfil.tipo_usuario !== 'administrador') {
@@ -143,7 +141,6 @@ const Listagem: React.FC = () => {
     const { data, error } = await query;
     if (error) return;
 
-    // Mapa de data_fim vindo da tabela mestra (Recorrências)
     const { data: recs } = await supabase.from('recorrencias').select('id, data_fim');
     const mapaDataFim: Record<string, string> = {};
     recs?.forEach((r: any) => { if(r.id) mapaDataFim[r.id] = r.data_fim; });
@@ -229,13 +226,12 @@ const Listagem: React.FC = () => {
         const frequenciaTratada = (itemParaEditar.intervalo_frequencia || 'mensal').toLowerCase().trim();
         const dataRef = new Date(itemParaEditar.data_compra + 'T00:00:00');
 
-        // Se for recorrente/parcelado, atualizamos o "Piloto" e o banco cuida do resto via Trigger
         if (isRecorrenteOuParcelado) {
           const dadosRecorrencia = {
             user_id: itemParaEditar.user_id,
             descricao: itemParaEditar.descricao,
             loja: itemParaEditar.loja,
-            valor: itemParaEditar.valor_total, // Valor base da recorrência
+            valor: itemParaEditar.valor_total,
             categoria_id: itemParaEditar.categoria_id,
             forma_pagamento: itemParaEditar.forma_pagamento,
             cartao_id: isCredito ? itemParaEditar.cartao_id : null,
@@ -258,7 +254,6 @@ const Listagem: React.FC = () => {
           }
         }
 
-        // Atualiza a compra específica (ou única)
         const { error: errorCompra } = await supabase.from('compras').update({
           descricao: itemParaEditar.descricao,
           loja: itemParaEditar.loja,
@@ -284,25 +279,50 @@ const Listagem: React.FC = () => {
     }
   };
 
-  const confirmDelete = (id: string) => {
+  const finalizarExclusao = () => {
+    setItemParaEditar(null);
+    setModal(prev => ({ ...prev, isOpen: false }));
+    carregarDadosIniciais();
+  };
+
+  const confirmDelete = (item: ItemCompra) => {
     setModal({
       isOpen: true,
       type: 'danger',
-      title: 'Remover?',
-      message: 'Se este item for parte de uma recorrência, as parcelas futuras não pagas também serão removidas.',
+      title: 'Remover Item?',
+      message: 'Tem certeza que deseja remover este lançamento? Esta ação não pode ser desfeita.',
       onConfirm: async () => {
         try {
-          // O Banco deletará em cascata ou via trigger se configurado
-          const { error } = await supabase.from('compras').delete().eq('id', id);
+          const { error } = await supabase.from('compras').delete().eq('id', item.id);
           if (error) throw error;
-          setItemParaEditar(null); 
-          setModal(prev => ({ ...prev, isOpen: false }));
-          carregarDadosIniciais();
+          finalizarExclusao();
         } catch (error: any) {
           setModal({ isOpen: true, type: 'error', title: 'Erro ao excluir', message: error.message });
         }
       }
     });
+  };
+
+  const excluirSerieCompleta = async (recorrenciaId: string) => {
+    try {
+      const { error: errCompras } = await supabase
+        .from('compras')
+        .delete()
+        .eq('recorrencia_id', recorrenciaId);
+      
+      if (errCompras) throw errCompras;
+
+      const { error: errRec } = await supabase
+        .from('recorrencias')
+        .delete()
+        .eq('id', recorrenciaId);
+
+      if (errRec) throw errRec;
+
+      finalizarExclusao();
+    } catch (error: any) {
+      setModal({ isOpen: true, type: 'error', title: 'Erro na Série', message: error.message });
+    }
   };
 
   const mudarMes = (direcao: number) => {
@@ -558,9 +578,32 @@ const Listagem: React.FC = () => {
 
             {temPermissaoEscrita(itemParaEditar) ? (
               <div className="modal-footer-icons">
-                <button type="button" className="btn-icon-action btn-delete" title='Excluir Registro' onClick={() => confirmDelete(itemParaEditar.id)}>
-                  <img src={iconExcluir} alt="Excluir" />
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="button" className="btn-icon-action btn-delete" title='Excluir apenas este mês' onClick={() => confirmDelete(itemParaEditar)}>
+                    <img src={iconExcluir} alt="Excluir" />
+                  </button>
+
+                  {itemParaEditar.recorrencia_id && (
+                    <button 
+                      type="button" 
+                      className="btn-icon-action" 
+                      style={{ backgroundColor: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '42px' }}
+                      title='Excluir TODA a série (todos os meses)' 
+                      onClick={() => {
+                        setModal({
+                          isOpen: true,
+                          type: 'danger',
+                          title: 'Excluir SÉRIE COMPLETA',
+                          message: 'Isso removerá TODOS os lançamentos passados e futuros vinculados a esta recorrência. Confirma?',
+                          onConfirm: () => excluirSerieCompleta(itemParaEditar.recorrencia_id!)
+                        });
+                      }}
+                    >
+                      <Repeat size={20} color="#ef4444" />
+                    </button>
+                  )}
+                </div>
+
                 <div className="footer-right-actions">
                   <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
                     <img src={iconCancelar} alt="Cancelar" />
