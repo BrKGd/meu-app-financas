@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Calendar, Tag, Trash2, X, Save, 
   ShoppingCart, Loader2, Filter, CreditCard, Banknote, Landmark, ChevronLeft, ChevronRight,
-  QrCode, Receipt, AlertTriangle, User, Store, Lock, UserPlus
+  QrCode, Receipt, AlertTriangle, User, Store, Lock, UserPlus, Repeat
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
@@ -41,18 +41,23 @@ interface Compra {
   parcela_numero?: number; 
   tipo_lancamento?: string;
   periodo_referencia?: string;
+  recorrencia_id?: string; 
   nota_fiscal?: string;
   pedido?: string;
   valor_projetado?: number;
   nomeCriador?: string; 
   parcelado?: boolean;      
   parcela_atual?: number;   
+  status_pagamento?: string;
   categorias?: {
     nome: string;
     cor: string;
   } | null;
   profiles?: {
     nome: string;
+  } | null;
+  recorrencias?: {
+    valor: number;
   } | null;
 }
 
@@ -154,7 +159,13 @@ const Despesas: React.FC = () => {
       const mapaNomes: any = {};
       profRes.data?.forEach(p => mapaNomes[p.id] = p.nome);
 
-      let query = supabase.from('compras').select(`*, categorias (nome, cor), profiles!fk_compras_profiles (nome)`).eq('periodo_referencia', periodoAlvoStr);
+      let query = supabase.from('compras').select(`
+        *, 
+        categorias (nome, cor), 
+        profiles!fk_compras_profiles (nome),
+        recorrencias (valor)
+      `).eq('periodo_referencia', periodoAlvoStr);
+
       if (tipoFinal === 'comum') query = query.eq('user_id', user.id);
 
       const { data: dataCompras, error } = await query.order('data_compra', { ascending: false });
@@ -179,6 +190,12 @@ const Despesas: React.FC = () => {
 
   const totalGastoFinal = useMemo(() => despesas.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0), [despesas]);
   const extrapolou = totalGastoFinal > metaTotalPlanejada && metaTotalPlanejada > 0;
+  
+  // Lógica de cálculo do excedente
+  const valorExcedente = totalGastoFinal - metaTotalPlanejada;
+  const percentualExcedente = metaTotalPlanejada > 0 
+    ? Math.round((valorExcedente / metaTotalPlanejada) * 100) 
+    : 0;
 
   const secoesAgrupadas = useMemo(() => {
     const filtradas = despesas.filter(d => {
@@ -198,7 +215,15 @@ const Despesas: React.FC = () => {
 
   const handleAbrirModal = (item: Compra) => {
     const valorParaEdicao = item.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-    setItemEditando({ ...item, valor_exibicao: valorParaEdicao });
+    
+    const valorPai = item.recorrencias?.valor || item.valor_total;
+    const valorPaiExibicao = valorPai.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+    setItemEditando({ 
+      ...item, 
+      valor_exibicao: valorParaEdicao,
+      valor_pai_exibicao: valorPaiExibicao 
+    });
     setIsModalOpen(true);
   };
 
@@ -210,31 +235,92 @@ const Despesas: React.FC = () => {
   const handleSalvarEdicao = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!itemEditando?.id || !temPermissaoEscrita(itemEditando)) return;
+    
+    setLoading(true);
     try {
-      const valorLimpo = typeof itemEditando.valor_exibicao === 'string' ? Number(itemEditando.valor_exibicao.replace(/\D/g, '')) / 100 : itemEditando.valor_total;
-      const { error } = await (supabase.from('compras') as any).update({
-        descricao: itemEditando.descricao, loja: itemEditando.loja, user_id: itemEditando.user_id,
-        categoria_id: itemEditando.categoria_id, valor_total: valorLimpo, forma_pagamento: itemEditando.forma_pagamento,
+      const valorParcelaLimpo = typeof itemEditando.valor_exibicao === 'string' 
+        ? Number(itemEditando.valor_exibicao.replace(/\D/g, '')) / 100 
+        : itemEditando.valor_total;
+  
+      if (itemEditando.recorrencia_id) {
+        const valorPaiLimpo = typeof itemEditando.valor_pai_exibicao === 'string' 
+          ? Number(itemEditando.valor_pai_exibicao.replace(/\D/g, '')) / 100 
+          : itemEditando.recorrencias?.valor;
+  
+        const { error: errorRec } = await supabase.from('recorrencias').update({
+          valor: valorPaiLimpo,
+          descricao: itemEditando.descricao,
+          loja: itemEditando.loja,
+          categoria_id: itemEditando.categoria_id,
+          forma_pagamento: itemEditando.forma_pagamento,
+          user_id: itemEditando.user_id
+        }).eq('id', itemEditando.recorrencia_id);
+  
+        if (errorRec) throw errorRec;
+      }
+  
+      const dadosUpdate: any = {
+        descricao: itemEditando.descricao, 
+        loja: itemEditando.loja, 
+        categoria_id: itemEditando.categoria_id, 
+        forma_pagamento: itemEditando.forma_pagamento,
         cartao: itemEditando.forma_pagamento === 'Crédito' ? itemEditando.cartao : null,
-        data_compra: itemEditando.data_compra, nota_fiscal: itemEditando.nota_fiscal, pedido: itemEditando.pedido
-      }).eq('id', itemEditando.id);
+        data_compra: itemEditando.data_compra, 
+        nota_fiscal: itemEditando.nota_fiscal, 
+        pedido: itemEditando.pedido
+      };
+  
+      if (!itemEditando.recorrencia_id || itemEditando.status_pagamento === 'pago') {
+        dadosUpdate.valor_total = valorParcelaLimpo;
+      }
+  
+      const { error } = await (supabase.from('compras') as any)
+        .update(dadosUpdate)
+        .eq('id', itemEditando.id);
+  
       if (error) throw error;
+      
       setIsModalOpen(false);
       buscarDados();
-      alertar('success', 'Atualizado', 'Registro atualizado com sucesso!');
-    } catch (error: any) { alertar('error', 'Erro ao Salvar', 'Não foi possível salvar.'); }
+      alertar('success', 'Atualizado', 'Registro atualizado e parcelas pendentes sincronizadas!');
+    } catch (error: any) { 
+      alertar('error', 'Erro ao Salvar', 'Não foi possível salvar as alterações.'); 
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleExcluir = () => {
     if (!itemEditando?.id || !podeExcluir(itemEditando)) return;
-    alertar('danger', 'Confirmar Exclusão', `Deseja realmente apagar?`, async () => {
-      const { error } = await (supabase.from('compras') as any).delete().eq('id', itemEditando.id);
-      if (!error) {
-        setIsModalOpen(false);
-        setFeedback(prev => ({ ...prev, isOpen: false }));
-        buscarDados();
-      }
-    });
+    
+    if (itemEditando.recorrencia_id) {
+      alertar('danger', 'Excluir Recorrência', 'Este item faz parte de uma série. Deseja excluir apenas este registro ou TODA a série de parcelas pendentes?', async () => {
+        setLoading(true);
+        try {
+          const { error } = await supabase.rpc('excluir_lancamento_recorrente', { 
+            p_recorrencia_id: itemEditando.recorrencia_id 
+          });
+          if (error) throw error;
+          
+          setIsModalOpen(false);
+          setFeedback(prev => ({ ...prev, isOpen: false }));
+          buscarDados();
+        } catch (err: any) {
+          alertar('error', 'Erro ao excluir série', err.message);
+        } finally {
+          setLoading(false);
+        }
+      });
+    } else {
+      alertar('danger', 'Confirmar Exclusão', 'Deseja realmente apagar este registro?', async () => {
+        const { error } = await (supabase.from('compras') as any).delete().eq('id', itemEditando.id);
+        if (!error) {
+          setIsModalOpen(false);
+          setFeedback(prev => ({ ...prev, isOpen: false }));
+          buscarDados();
+        }
+      });
+    }
   };
 
   return (
@@ -253,12 +339,21 @@ const Despesas: React.FC = () => {
                 <AlertTriangle size={12} fill="#ef4444" color="white" /> Excedido
               </div>
             )}
-            <section className="desp-panel desp-summary-card">
-              <span className="summary-label">Total Gasto no Mês</span>
+            <section className={`desp-panel desp-summary-card ${extrapolou ? 'bg-danger' : ''}`}>
+              <span className="summary-label">TOTAL GASTO NO MÊS</span>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                 <h2 className="summary-value">{formatarMoeda(totalGastoFinal)}</h2>
-                {temPermissaoGeral() && <span style={{ fontSize: '1rem', opacity: 0.8 }}>/ {formatarMoeda(metaTotalPlanejada)}</span>}
+                {temPermissaoGeral() && <span className="summary-goal">/ {formatarMoeda(metaTotalPlanejada)}</span>}
               </div>
+
+              {extrapolou && temPermissaoGeral() && (
+                <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                    Você ultrapassou o planejado em <strong>{percentualExcedente}%</strong>
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.85rem' }}>({formatarMoeda(valorExcedente)})</p>
+                </div>
+              )}
             </section>
           </div>
         </div>
@@ -290,6 +385,7 @@ const Despesas: React.FC = () => {
         </div>
 
         <main className="desp-list-panel">
+          {loading && <div style={{textAlign: 'center', padding: '20px'}}><Loader2 className="animate-spin" /></div>}
           {!loading && Object.entries(secoesAgrupadas).map(([titulo, itens]) => (
             <div key={titulo} style={{marginBottom: '25px'}}>
               <div className="list-header" style={{ background: '#ffffff', borderRadius: '16px 16px 0 0' }}>
@@ -304,7 +400,12 @@ const Despesas: React.FC = () => {
                     </div>
                     <div className="desp-main-content">
                       <div className="desp-top-line">
-                        <span className="desp-desc">{item.descricao} {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px'}}>{item.parcela_atual}/{item.parcelas_total}</span>} {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.4}} />}</span>
+                        <span className="desp-desc">
+                          {item.descricao} 
+                          {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px'}}>{item.parcela_atual}/{item.parcelas_total}</span>}
+                          {item.recorrencia_id && !item.parcelado && <Repeat size={12} style={{marginLeft: '6px', color: '#6366f1'}} />}
+                          {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.4, marginLeft: '6px'}} />}
+                        </span>
                         <span className="desp-value value-negative">{formatarMoeda(item.valor_projetado || 0)}</span>
                       </div>
                       <div className="desp-meta-line">
@@ -325,6 +426,7 @@ const Despesas: React.FC = () => {
               <div className="edit-modal-header">
                 <div>
                   <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.25rem'}}>{ temPermissaoEscrita(itemEditando) ? 'Editar Lançamento' : 'Visualizar Detalhes' }</h2>
+                  { itemEditando.recorrencia_id && <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}><Repeat size={10} color="#6366f1" /><span style={{fontSize: '0.65rem', color: '#6366f1', fontWeight: 700}}>LANÇAMENTO RECORRENTE</span></div>}
                   { !temPermissaoEscrita(itemEditando) && <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}><Lock size={10} color="#ef4444" /><span style={{fontSize: '0.65rem', color: '#ef4444', fontWeight: 700}}>APENAS VISUALIZAÇÃO</span></div>}
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="btn-png-action"><img src={iconFechar} alt="Fechar" style={{width: '32px'}} /></button>
@@ -332,20 +434,65 @@ const Despesas: React.FC = () => {
               <div className="edit-modal-body">
                 <form id="edit-form" className="edit-form-grid" onSubmit={handleSalvarEdicao}>
                   <div className="form-group"><label>Descrição</label><input type="text" value={itemEditando.descricao || ''} onChange={e => handleChangeEdit('descricao', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} required /></div>
+                  
+                  {itemEditando.recorrencia_id && (
+                    <div className="form-group" style={{background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1px dashed #6366f1', marginBottom: '10px'}}>
+                      <label style={{color: '#6366f1', fontWeight: 800}}>{itemEditando.parcelado ? 'Ajustar Valor Total (Contrato)' : 'Valor Base da Recorrência'}</label>
+                      <input 
+                        type="text" 
+                        style={{color: '#6366f1', fontWeight: 900, fontSize: '1.1rem', borderBottom: '2px solid #6366f1'}}
+                        value={itemEditando.valor_pai_exibicao || ''} 
+                        onChange={e => { 
+                          let val = e.target.value.replace(/\D/g, ""); 
+                          val = (Number(val) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }); 
+                          handleChangeEdit('valor_pai_exibicao', val); 
+                        }} 
+                        disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'} 
+                        required 
+                      />
+                      <small style={{fontSize: '0.6rem', color: '#64748b'}}>
+                        {itemEditando.status_pagamento === 'pago' 
+                          ? 'Não é possível alterar o contrato de um item já pago.' 
+                          : 'Ao alterar aqui, as DEMAIS parcelas serão atualizadas proporcionalmente.'}
+                      </small>
+                    </div>
+                  )}
+
                   <div className="form-row-2">
-                    <div className="form-group"><label>Valor Total</label><input type="text" value={itemEditando.valor_exibicao || ''} onChange={e => { let val = e.target.value.replace(/\D/g, ""); val = (Number(val) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }); handleChangeEdit('valor_exibicao', val); }} disabled={!temPermissaoEscrita(itemEditando)} required /></div>
-                    <div className="form-group"><label>Data</label><input type="date" value={itemEditando.data_compra || ''} onChange={e => handleChangeEdit('data_compra', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} required /></div>
+                    <div className="form-group">
+                      <label>Valor {itemEditando.parcelado ? 'da Parcela Atual' : 'Deste Registro'}</label>
+                      <input 
+                        type="text" 
+                        value={itemEditando.valor_exibicao || ''} 
+                        onChange={e => { 
+                          let val = e.target.value.replace(/\D/g, ""); 
+                          val = (Number(val) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }); 
+                          handleChangeEdit('valor_exibicao', val); 
+                        }} 
+                        disabled={!temPermissaoEscrita(itemEditando) || (itemEditando.recorrencia_id && itemEditando.status_pagamento !== 'pago')} 
+                        required 
+                      />
+                      {itemEditando.recorrencia_id && (
+                        <small style={{fontSize: '0.6rem', color: '#ef4444', fontWeight: 700}}>
+                          {itemEditando.status_pagamento === 'pago' 
+                            ? 'Parcela quitada: valor bloqueado.' 
+                            : 'Para pendentes, altere o valor total acima para recalcular.'}
+                        </small>
+                      )}
+                    </div>
+                    <div className="form-group"><label>Data</label><input type="date" value={itemEditando.data_compra || ''} onChange={e => handleChangeEdit('data_compra', e.target.value)} disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'} required /></div>
                   </div>
+
                   <div className="form-group"><label>Loja</label><div style={{position: 'relative'}}><Store size={18} style={{position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8'}} /><input style={{paddingLeft: '44px'}} type="text" value={itemEditando.loja || ''} onChange={e => handleChangeEdit('loja', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} /></div></div>
                   <div className="form-row-2">
                     <div className="form-group"><label>Categoria</label><select value={itemEditando.categoria_id} onChange={e => handleChangeEdit('categoria_id', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)}>{categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}</select></div>
                     <div className="form-group"><label>Responsável</label><select value={itemEditando.user_id} onChange={e => handleChangeEdit('user_id', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)}>{responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}</select></div>
                   </div>
                   <div className="form-row-2">
-                    <div className="form-group"><label>Pagamento</label><select value={itemEditando.forma_pagamento} onChange={e => handleChangeEdit('forma_pagamento', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)}>{formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
-                    {itemEditando.forma_pagamento === 'Crédito' && <div className="form-group"><label>Cartão</label><select value={itemEditando.cartao || ''} onChange={e => handleChangeEdit('cartao', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)}><option value="">Selecione</option>{cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}</select></div>}
+                    <div className="form-group"><label>Pagamento</label><select value={itemEditando.forma_pagamento} onChange={e => handleChangeEdit('forma_pagamento', e.target.value)} disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'}>{formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
+                    {itemEditando.forma_pagamento === 'Crédito' && <div className="form-group"><label>Cartão</label><select value={itemEditando.cartao || ''} onChange={e => handleChangeEdit('cartao', e.target.value)} disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'}><option value="">Selecione</option>{cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}</select></div>}
                   </div>
-                  {itemEditando.forma_pagamento === 'Crédito' && <div className="form-group"><label>Parcelas</label><input type="number" value={itemEditando.parcelas_total || 1} onChange={e => handleChangeEdit('parcelas_total', Number(e.target.value))} disabled={!temPermissaoEscrita(itemEditando)} /></div>}
+                  {itemEditando.parcelado && <div className="form-group"><label>Parcelas Totais</label><input type="number" value={itemEditando.parcelas_total || 1} disabled={true} /> <small style={{fontSize: '0.65rem', color: '#64748b'}}>Edite a recorrência para mudar o parcelamento</small></div>}
                   <div className="form-row-2">
                     <div className="form-group"><label>Nota Fiscal</label><input type="text" value={itemEditando.nota_fiscal || ''} onChange={e => handleChangeEdit('nota_fiscal', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} /></div>
                     <div className="form-group"><label>Pedido</label><input type="text" value={itemEditando.pedido || ''} onChange={e => handleChangeEdit('pedido', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} /></div>

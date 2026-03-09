@@ -22,8 +22,7 @@
 /* Header Grid */
 .desp-top-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* Agora os dois cards dividem a tela 50/50 */
-  /* Ou use 2fr 1fr se quiser o título maior que o sumário */
+  grid-template-columns: 2fr 1fr; 
   gap: 20px;
 }
 

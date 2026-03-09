@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Save, Calendar, ShoppingBag, Hash, Receipt, CreditCard, 
-  User, Lock, Wallet, Info, Tag, RefreshCcw, Clock, Target
+  User, Wallet, Tag, RefreshCcw, Clock, Target
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Lancamento.css';
@@ -12,6 +12,7 @@ interface Cartao {
   id: number;
   nome: string;
   dia_fechamento: number;
+  dia_vencimento: number;
 }
 
 interface Perfil {
@@ -46,7 +47,6 @@ const Lancamento: React.FC = () => {
 
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
   
-  // Lista oficial de frequências aceitas pelo banco
   const frequenciasAceitas = [
     { value: 'mensal', label: 'Mensal' },
     { value: 'bimestral', label: 'Bimestral' },
@@ -72,33 +72,11 @@ const Lancamento: React.FC = () => {
     data_limite: '' 
   });
 
-  // Regra de Parcelas > 1 implica em tipo_lancamento = parcelado
   useEffect(() => {
-    if (form.num_parcelas > 1 && form.tipo_lancamento !== 'parcelado' && form.tipo_lancamento !== 'fixo') {
+    if (form.num_parcelas > 1 && form.tipo_lancamento === 'unico') {
       setForm(prev => ({ ...prev, tipo_lancamento: 'parcelado' }));
     }
   }, [form.num_parcelas]);
-
-  const infoFechamento = useMemo(() => {
-    if (form.forma_pagamento !== 'Crédito' || !form.cartao || !form.data_compra) return null;
-    const cartaoSelecionado = cartoes.find(c => c.nome === form.cartao);
-    if (!cartaoSelecionado) return null;
-
-    const [ano, mes, dia] = form.data_compra.split('-').map(Number);
-    const diaFechamento = cartaoSelecionado.dia_fechamento;
-    const vaiParaProximoMes = dia > diaFechamento;
-    
-    let dataVencimento = new Date(ano, mes - 1, 15);
-    if (vaiParaProximoMes) dataVencimento.setMonth(dataVencimento.getMonth() + 1);
-
-    const nomeMes = dataVencimento.toLocaleString('pt-BR', { month: 'long' });
-    return { 
-      vaiParaProximoMes, 
-      mesCobranca: nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1), 
-      diaFechamento,
-      dataBaseVencimento: dataVencimento 
-    };
-  }, [form.cartao, form.data_compra, form.forma_pagamento, cartoes]);
 
   useEffect(() => {
     verificarAcessoEBucarDados();
@@ -116,7 +94,7 @@ const Lancamento: React.FC = () => {
       setPerfilLogado({ id: user.id, tipo_usuario: tipoFinal });
 
       const [dC, dU, dCat] = await Promise.all([
-        supabase.from('cartoes').select('id, nome, dia_fechamento').order('nome'),
+        supabase.from('cartoes').select('id, nome, dia_fechamento, dia_vencimento').order('nome'),
         supabase.from('profiles').select('id, nome').order('nome'),
         supabase.from('categorias').select('id, nome').eq('tipo', 'despesa').order('nome')
       ]);
@@ -144,101 +122,99 @@ const Lancamento: React.FC = () => {
     return apenasNumeros.padStart(9, '0').replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
   };
 
+  const handleExcluirRecorrencia = async (recorrenciaId: string) => {
+    if (!recorrenciaId) return;
+    if (!window.confirm("Isso excluirá todas as parcelas pendentes desta série. As parcelas já pagas serão mantidas no histórico, mas perderão o vínculo. Confirmar?")) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.rpc('excluir_lancamento_recorrente', { 
+        p_recorrencia_id: recorrenciaId 
+      });
+      if (error) throw error;
+      setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Lançamento recorrente e parcelas pendentes excluídos corretamente.' });
+    } catch (err: any) {
+      setModal({ isOpen: true, type: 'error', title: 'Erro na Exclusão', message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const isCredito = form.forma_pagamento === 'Crédito';
     const valorTotalNum = parseFloat(form.valor_total);
-
     if (valorTotalNum <= 0) {
       setModal({ isOpen: true, type: 'warning', title: 'Atenção', message: 'O valor deve ser maior que zero.' });
       setLoading(false); return;
     }
 
-    const comprasParaInserir = [];
     const cartaoObjeto = cartoes.find(c => c.nome === form.cartao);
-    let tipoFinalPayload = form.tipo_lancamento;
+    const isCredito = form.forma_pagamento === 'Crédito';
+    const isRecorrente = form.tipo_lancamento === 'fixo' || form.tipo_lancamento === 'parcelado';
+    const tabelaAlvo = isRecorrente ? 'recorrencias' : 'compras';
 
-    if (tipoFinalPayload === 'fixo' && form.data_limite) {
-      const inicio = new Date(form.data_compra + 'T12:00:00');
-      const fim = new Date(form.data_limite + 'T12:00:00');
-      let dataCorrente = new Date(inicio);
+    const payload: any = {
+      user_id: form.user_id,
+      descricao: form.descricao,
+      loja: form.loja,
+      categoria_id: form.categoria_id,
+      forma_pagamento: form.forma_pagamento,
+      tipo_lancamento: form.tipo_lancamento,
+    };
+
+    if (isRecorrente) {
+      payload.valor = valorTotalNum;
+      payload.data_inicio = form.data_compra;
+      payload.parcelas_total = Number(form.num_parcelas);
+      payload.intervalo_frequencia = form.intervalo_frequencia;
+      payload.tipo_despesa = form.tipo_lancamento === 'fixo' ? 'Gastos Fixos' : (isCredito ? 'Compra no Crédito' : 'Gastos Variáveis');
+      payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
       
-      // Mapeamento de saltos conforme intervalo
-      const saltos: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
-      const mesesSalto = saltos[form.intervalo_frequencia] || 1;
-
-      while (dataCorrente <= fim) {
-        comprasParaInserir.push({
-          user_id: form.user_id,
-          usuario_criacao: perfilLogado?.id,
-          descricao: form.descricao,
-          loja: form.loja,
-          pedido: form.pedido,
-          nota_fiscal: completarNF(form.nota_fiscal),
-          valor_total: valorTotalNum,
-          parcelado: false,
-          parcelas_total: 1,
-          parcela_numero: 1,
-          data_compra: form.data_compra,
-          forma_pagamento: form.forma_pagamento,
-          cartao_id: isCredito && cartaoObjeto ? cartaoObjeto.id : null,
-          categoria_id: form.categoria_id,
-          tipo_despesa: 'Gastos Fixos',
-          data_vencimento: dataCorrente.toISOString().split('T')[0],
-          status_pagamento: 'pendente',
-          tipo_lancamento: 'fixo',
-          periodo_referencia: `${dataCorrente.getFullYear()}-${String(dataCorrente.getMonth() + 1).padStart(2, '0')}-01`,
-          intervalo_frequencia: form.intervalo_frequencia,
-          recorrencia_id: null
-        });
-        dataCorrente.setMonth(dataCorrente.getMonth() + mesesSalto);
-      }
+      // Envia o dia de vencimento do cartão para a Trigger usar no cálculo das parcelas
+      payload.dia_vencimento = isCredito && cartaoObjeto 
+        ? cartaoObjeto.dia_vencimento 
+        : new Date(form.data_compra).getDate();
     } else {
-      const numP = (isCredito || tipoFinalPayload === 'parcelado') ? Number(form.num_parcelas) : 1;
-      const valorLinha = (valorTotalNum / numP).toFixed(2);
+      payload.valor_total = valorTotalNum;
+      payload.data_compra = form.data_compra;
+      payload.nota_fiscal = completarNF(form.nota_fiscal);
+      payload.pedido = form.pedido;
+      payload.status_pagamento = 'pendente';
+      payload.parcelado = false;
+      payload.parcelas_total = 1;
+      payload.parcela_numero = 1;
+      payload.usuario_criacao = perfilLogado?.id;
+      payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
+      payload.tipo_despesa = isCredito ? 'Compra no Crédito' : 'Gastos Variáveis';
 
-      for (let i = 1; i <= numP; i++) {
-        let dVenc = new Date(form.data_compra + 'T12:00:00');
-        if (isCredito && infoFechamento) {
-          dVenc = new Date(infoFechamento.dataBaseVencimento);
-          dVenc.setMonth(dVenc.getMonth() + (i - 1));
-        } else {
-          dVenc.setMonth(dVenc.getMonth() + (i - 1));
+      // Cálculo de Melhor dia de compra para o lançamento único (Front-end)
+      if (isCredito && cartaoObjeto) {
+        const dataCompraObj = new Date(form.data_compra + 'T00:00:00');
+        const diaCompra = dataCompraObj.getDate();
+        let dataVenc = new Date(dataCompraObj);
+
+        // Se o dia da compra for após o fechamento, joga para o mês seguinte
+        if (diaCompra > cartaoObjeto.dia_fechamento) {
+          dataVenc.setMonth(dataVenc.getMonth() + 1);
         }
-
-        comprasParaInserir.push({
-          user_id: form.user_id,
-          usuario_criacao: perfilLogado?.id,
-          descricao: numP > 1 ? `${form.descricao} (${i}/${numP})` : form.descricao,
-          loja: form.loja,
-          pedido: form.pedido,
-          nota_fiscal: completarNF(form.nota_fiscal),
-          valor_total: valorLinha,
-          parcelado: numP > 1,
-          parcelas_total: numP,
-          parcela_numero: i,
-          data_compra: form.data_compra,
-          forma_pagamento: form.forma_pagamento,
-          cartao_id: isCredito && cartaoObjeto ? cartaoObjeto.id : null,
-          categoria_id: form.categoria_id,
-          tipo_despesa: isCredito ? 'Compra no Crédito' : 'Gastos Variáveis',
-          data_vencimento: dVenc.toISOString().split('T')[0],
-          status_pagamento: 'pendente',
-          tipo_lancamento: tipoFinalPayload,
-          periodo_referencia: `${dVenc.getFullYear()}-${String(dVenc.getMonth() + 1).padStart(2, '0')}-01`,
-          intervalo_frequencia: null,
-          recorrencia_id: null
-        });
+        dataVenc.setDate(cartaoObjeto.dia_vencimento);
+        
+        payload.data_vencimento = dataVenc.toISOString().split('T')[0];
+        payload.periodo_referencia = dataVenc.toISOString().slice(0, 7) + "-01";
+      } else {
+        payload.data_vencimento = form.data_compra;
+        payload.periodo_referencia = form.data_compra.slice(0, 7) + "-01";
       }
     }
 
-    const { error } = await supabase.from('compras').insert(comprasParaInserir);
+    const { error } = await supabase.from(tabelaAlvo).insert([payload]);
 
-    if (error) setModal({ isOpen: true, type: 'error', title: 'Erro', message: error.message });
-    else {
-      setModal({ isOpen: true, type: 'success', title: 'Sucesso!', message: 'Lançamentos gerados com sucesso.' });
+    if (error) {
+      setModal({ isOpen: true, type: 'error', title: 'Erro no Backend', message: error.message });
+    } else {
+      setModal({ isOpen: true, type: 'success', title: 'Sucesso!', message: 'Lançamento registrado com sucesso.' });
       setForm({ ...form, descricao: '', valor_total: '', loja: '', pedido: '', nota_fiscal: '', num_parcelas: 1, data_limite: '', tipo_lancamento: 'unico' });
     }
     setLoading(false);
@@ -269,7 +245,7 @@ const Lancamento: React.FC = () => {
 
           <div className="form-row-top">
             <div className="input-group">
-              <label className="input-label"><Calendar size={14} /> Data Inicial</label>
+              <label className="input-label"><Calendar size={14} /> {form.tipo_lancamento === 'unico' ? 'Data da Compra' : 'Data de Início'}</label>
               <input type="date" className="form-control" value={form.data_compra} required onChange={e => setForm({...form, data_compra: e.target.value})} />
             </div>
             <div className="input-group">
@@ -285,7 +261,6 @@ const Lancamento: React.FC = () => {
             </div>
           </div>
 
-          {/* CAMPOS DE RECORRÊNCIA SEM FUNDO CINZA */}
           {form.tipo_lancamento === 'fixo' && (
             <div className="form-row-top animate-in" style={{ marginTop: '15px' }}>
               <div className="input-group">
@@ -301,8 +276,8 @@ const Lancamento: React.FC = () => {
                 </select>
               </div>
               <div className="input-group">
-                <label className="input-label"><Target size={14} /> Data Limite</label>
-                <input type="date" className="form-control" required value={form.data_limite} onChange={e => setForm({...form, data_limite: e.target.value})} />
+                <label className="input-label"><Target size={14} /> Quantidade de Meses</label>
+                <input type="number" min="1" className="form-control" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
               </div>
             </div>
           )}
