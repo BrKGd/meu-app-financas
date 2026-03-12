@@ -15,6 +15,8 @@ const Login: React.FC = () => {
     setLoading(true);
     setError(null);
 
+    console.log("Tentando login com:", email);
+
     try {
       // O .trim() evita erros de espaços acidentais no e-mail
       const { data, error: authError } = await supabase.auth.signInWithPassword({
@@ -33,11 +35,30 @@ const Login: React.FC = () => {
         } else {
           setError(authError.message);
         }
+
       } else {
+
         console.log("Login bem-sucedido!", data);
+
+        if (data?.user) {
+          console.log("Usuário autenticado ID:", data.user.id);
+          console.log("Email do usuário:", data.user.email);
+        }
+
+        if (data?.session) {
+          console.log("Sessão criada:", data.session);
+          console.log("Access Token:", data.session.access_token);
+        }
+
+        // Conferir sessão ativa (debug importante para RLS)
+        const { data: sessionData } = await supabase.auth.getSession();
+        console.log("Sessão atual confirmada:", sessionData);
+
         // O App detectará a sessão automaticamente.
       }
+
     } catch (err) {
+      console.error("Erro inesperado:", err);
       setError("Erro de conexão. Verifique sua internet.");
     } finally {
       setLoading(false);

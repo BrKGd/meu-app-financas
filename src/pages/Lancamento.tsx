@@ -31,22 +31,24 @@ interface PerfilLogado {
 }
 
 const Lancamento: React.FC = () => {
+
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
-  const [usuarios, setUsuarios] = useState<Perfil[]>([]); 
-  const [categorias, setCategorias] = useState<Categoria[]>([]); 
+  const [usuarios, setUsuarios] = useState<Perfil[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [perfilLogado, setPerfilLogado] = useState<PerfilLogado | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
-  const [modal, setModal] = useState<{
-    isOpen: boolean;
-    type: 'success' | 'error' | 'warning' | 'danger';
-    title: string;
-    message: string;
-  }>({ isOpen: false, type: 'success', title: '', message: '' });
+  const [modal, setModal] = useState({
+    isOpen: false,
+    type: 'success' as 'success' | 'error' | 'warning' | 'danger',
+    title: '',
+    message: ''
+  });
 
   const formasPagamento = ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort();
-  
+
   const frequenciasAceitas = [
     { value: 'mensal', label: 'Mensal' },
     { value: 'bimestral', label: 'Bimestral' },
@@ -56,20 +58,20 @@ const Lancamento: React.FC = () => {
   ];
 
   const [form, setForm] = useState({
-    descricao: '', 
-    valor_total: '', 
-    loja: '', 
-    pedido: '', 
-    nota_fiscal: '', 
-    user_id: '', 
+    descricao: '',
+    valor_total: '',
+    loja: '',
+    pedido: '',
+    nota_fiscal: '',
+    user_id: '',
     forma_pagamento: 'Crédito',
-    categoria_id: '', 
-    num_parcelas: 1, 
-    cartao: '', 
+    categoria_id: '',
+    num_parcelas: 1,
+    cartao: '',
     data_compra: new Date().toISOString().split('T')[0],
     tipo_lancamento: 'unico',
     intervalo_frequencia: 'mensal',
-    data_limite: '' 
+    data_limite: ''
   });
 
   useEffect(() => {
@@ -83,27 +85,46 @@ const Lancamento: React.FC = () => {
   }, []);
 
   async function verificarAcessoEBucarDados() {
+
     try {
+
       setFetching(true);
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: perfil } = await supabase.from('profiles').select('tipo_usuario').eq('id', user.id).single();
+      const { data: perfil } = await supabase
+        .from('profiles')
+        .select('tipo_usuario')
+        .eq('id', user.id)
+        .single();
+
       const isMaster = user.email === 'gleidson.fig@gmail.com';
-      const tipoFinal = isMaster ? 'proprietario' : ((perfil as any)?.tipo_usuario || 'comum');
-      setPerfilLogado({ id: user.id, tipo_usuario: tipoFinal });
+
+      const tipoFinal =
+        isMaster
+          ? 'proprietario'
+          : ((perfil as any)?.tipo_usuario || 'comum');
+
+      setPerfilLogado({
+        id: user.id,
+        tipo_usuario: tipoFinal
+      });
 
       const [dC, dU, dCat] = await Promise.all([
-        supabase.from('cartoes').select('id, nome, dia_fechamento, dia_vencimento').order('nome'),
-        supabase.from('profiles').select('id, nome').order('nome'),
-        supabase.from('categorias').select('id, nome').eq('tipo', 'despesa').order('nome')
+        supabase.from('cartoes').select('id,nome,dia_fechamento,dia_vencimento').order('nome'),
+        supabase.from('profiles').select('id,nome').order('nome'),
+        supabase.from('categorias').select('id,nome').eq('tipo', 'despesa').order('nome')
       ]);
-      
+
       setCartoes((dC.data as Cartao[]) || []);
       setUsuarios((dU.data as Perfil[]) || []);
       setCategorias((dCat.data as Categoria[]) || []);
 
-      if (tipoFinal !== 'proprietario') setForm(prev => ({ ...prev, user_id: user.id }));
+      if (tipoFinal !== 'proprietario') {
+        setForm(prev => ({ ...prev, user_id: user.id }));
+      }
+
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
     } finally {
@@ -113,120 +134,193 @@ const Lancamento: React.FC = () => {
 
   const formatarNF = (valor: string) => {
     const apenasNumeros = valor.replace(/\D/g, '').slice(0, 9);
-    return apenasNumeros.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2');
+    return apenasNumeros
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2');
   };
 
   const completarNF = (valor: string) => {
     const apenasNumeros = valor.replace(/\D/g, '');
     if (!apenasNumeros) return '';
-    return apenasNumeros.padStart(9, '0').replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
-  };
-
-  const handleExcluirRecorrencia = async (recorrenciaId: string) => {
-    if (!recorrenciaId) return;
-    if (!window.confirm("Isso excluirá todas as parcelas pendentes desta série. As parcelas já pagas serão mantidas no histórico, mas perderão o vínculo. Confirmar?")) return;
-    
-    setLoading(true);
-    try {
-      const { error } = await supabase.rpc('excluir_lancamento_recorrente', { 
-        p_recorrencia_id: recorrenciaId 
-      });
-      if (error) throw error;
-      setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Lançamento recorrente e parcelas pendentes excluídos corretamente.' });
-    } catch (err: any) {
-      setModal({ isOpen: true, type: 'error', title: 'Erro na Exclusão', message: err.message });
-    } finally {
-      setLoading(false);
-    }
+    return apenasNumeros
+      .padStart(9, '0')
+      .replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault();
+
     setLoading(true);
 
     const valorTotalNum = parseFloat(form.valor_total);
+
     if (valorTotalNum <= 0) {
-      setModal({ isOpen: true, type: 'warning', title: 'Atenção', message: 'O valor deve ser maior que zero.' });
-      setLoading(false); return;
+
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Atenção',
+        message: 'O valor deve ser maior que zero.'
+      });
+
+      setLoading(false);
+      return;
     }
 
     const cartaoObjeto = cartoes.find(c => c.nome === form.cartao);
+
     const isCredito = form.forma_pagamento === 'Crédito';
-    const isRecorrente = form.tipo_lancamento === 'fixo' || form.tipo_lancamento === 'parcelado';
-    const tabelaAlvo = isRecorrente ? 'recorrencias' : 'compras';
+
+    const isRecorrente =
+      form.tipo_lancamento === 'fixo' ||
+      form.tipo_lancamento === 'parcelado';
+
+    const tabelaAlvo =
+      isRecorrente
+        ? 'recorrencias'
+        : 'compras';
 
     const payload: any = {
+
       user_id: form.user_id,
       descricao: form.descricao,
       loja: form.loja,
       categoria_id: form.categoria_id,
       forma_pagamento: form.forma_pagamento,
-      tipo_lancamento: form.tipo_lancamento,
+      tipo_lancamento: form.tipo_lancamento
     };
 
     if (isRecorrente) {
-      payload.valor = valorTotalNum;
-      payload.data_inicio = form.data_compra;
-      payload.parcelas_total = Number(form.num_parcelas);
-      payload.intervalo_frequencia = form.intervalo_frequencia;
-      payload.tipo_despesa = form.tipo_lancamento === 'fixo' ? 'Gastos Fixos' : (isCredito ? 'Compra no Crédito' : 'Gastos Variáveis');
-      payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
-      
-      // Envia o dia de vencimento do cartão para a Trigger usar no cálculo das parcelas
-      payload.dia_vencimento = isCredito && cartaoObjeto 
-        ? cartaoObjeto.dia_vencimento 
-        : new Date(form.data_compra).getDate();
-    } else {
-      payload.valor_total = valorTotalNum;
-      payload.data_compra = form.data_compra;
-      payload.nota_fiscal = completarNF(form.nota_fiscal);
-      payload.pedido = form.pedido;
-      payload.status_pagamento = 'pendente';
-      payload.parcelado = false;
-      payload.parcelas_total = 1;
-      payload.parcela_numero = 1;
-      payload.usuario_criacao = perfilLogado?.id;
-      payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
-      payload.tipo_despesa = isCredito ? 'Compra no Crédito' : 'Gastos Variáveis';
 
-      // Cálculo de Melhor dia de compra para o lançamento único (Front-end)
+      payload.valor = valorTotalNum;
+
+      payload.data_inicio = form.data_compra;
+
+      payload.parcelas_total = Number(form.num_parcelas);
+
+      payload.intervalo_frequencia = form.intervalo_frequencia;
+
+      payload.tipo_despesa =
+        form.tipo_lancamento === 'fixo'
+          ? 'Gastos Fixos'
+          : (isCredito ? 'Compra no Crédito' : 'Gastos Variáveis');
+
+      payload.cartao_id =
+        isCredito && cartaoObjeto
+          ? cartaoObjeto.id
+          : null;
+
+      payload.dia_vencimento =
+        isCredito && cartaoObjeto
+          ? cartaoObjeto.dia_vencimento
+          : new Date(form.data_compra).getDate();
+
+    } else {
+
+      payload.valor_total = valorTotalNum;
+
+      payload.data_compra = form.data_compra;
+
+      payload.nota_fiscal = completarNF(form.nota_fiscal);
+
+      payload.pedido = form.pedido;
+
+      payload.status_pagamento = 'pendente';
+
+      payload.parcelado = false;
+
+      payload.parcelas_total = 1;
+
+      payload.parcela_numero = 1;
+
+      payload.usuario_criacao = perfilLogado?.id;
+
+      payload.cartao_id =
+        isCredito && cartaoObjeto
+          ? cartaoObjeto.id
+          : null;
+
+      payload.tipo_despesa =
+        isCredito
+          ? 'Compra no Crédito'
+          : 'Gastos Variáveis';
+
       if (isCredito && cartaoObjeto) {
+
         const dataCompraObj = new Date(form.data_compra + 'T00:00:00');
+
         const diaCompra = dataCompraObj.getDate();
+
         let dataVenc = new Date(dataCompraObj);
 
-        // Se o dia da compra for após o fechamento, joga para o mês seguinte
         if (diaCompra > cartaoObjeto.dia_fechamento) {
           dataVenc.setMonth(dataVenc.getMonth() + 1);
         }
+
         dataVenc.setDate(cartaoObjeto.dia_vencimento);
-        
+
         payload.data_vencimento = dataVenc.toISOString().split('T')[0];
-        payload.periodo_referencia = dataVenc.toISOString().slice(0, 7) + "-01";
+
+        payload.periodo_referencia =
+          dataVenc.toISOString().slice(0, 7) + "-01";
+
       } else {
+
         payload.data_vencimento = form.data_compra;
-        payload.periodo_referencia = form.data_compra.slice(0, 7) + "-01";
+
+        payload.periodo_referencia =
+          form.data_compra.slice(0, 7) + "-01";
       }
     }
 
-    const { error } = await supabase.from(tabelaAlvo).insert([payload]);
+    const { error } =
+      await supabase
+        .from(tabelaAlvo)
+        .insert([payload]);
 
     if (error) {
-      setModal({ isOpen: true, type: 'error', title: 'Erro no Backend', message: error.message });
+
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Erro no Backend',
+        message: error.message
+      });
+
     } else {
-      setModal({ isOpen: true, type: 'success', title: 'Sucesso!', message: 'Lançamento registrado com sucesso.' });
-      setForm({ ...form, descricao: '', valor_total: '', loja: '', pedido: '', nota_fiscal: '', num_parcelas: 1, data_limite: '', tipo_lancamento: 'unico' });
+
+      setModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Sucesso!',
+        message: 'Lançamento registrado com sucesso.'
+      });
+
+      setForm({
+        ...form,
+        descricao: '',
+        valor_total: '',
+        loja: '',
+        pedido: '',
+        nota_fiscal: '',
+        num_parcelas: 1,
+        data_limite: '',
+        tipo_lancamento: 'unico'
+      });
     }
+
     setLoading(false);
   };
 
   return (
     <div className="lancamento-container fade-in">
+
       <header className="lancamento-header">
         <h2>Novo Lançamento</h2>
         <p>Registre um gasto para a unidade</p>
       </header>
-      
+
       <div className="card lancamento-card">
         <form onSubmit={handleSubmit}>
           <div className="input-group" style={{ marginBottom: '20px' }}>
@@ -347,7 +441,14 @@ const Lancamento: React.FC = () => {
         </form>
       </div>
 
-      <ModalFeedback isOpen={modal.isOpen} type={modal.type} title={modal.title} message={modal.message} onClose={() => setModal({ ...modal, isOpen: false })} />
+      <ModalFeedback
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+      />
+
     </div>
   );
 };
