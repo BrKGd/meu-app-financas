@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   PiggyBank, AlertCircle, ArrowUpCircle, 
-  Calendar, TrendingUp, X, ArrowDownCircle, CheckCircle2, Info
+  Calendar, TrendingUp, X, ArrowDownCircle, CheckCircle2, Info, Settings
 } from 'lucide-react';
 import '../styles/Orcamento.css';
 import { useNavigate } from 'react-router-dom';
@@ -85,36 +85,41 @@ const Orcamento: React.FC = () => {
       const agora = new Date();
       const anoAtual = agora.getFullYear();
       const mesAtual = agora.getMonth() + 1;
-      const refPeriodo = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
       const primeiroDia = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
       const ultimoDia = new Date(anoAtual, mesAtual, 0).toISOString().split('T')[0];
 
       const [
         { data: metasData },
         { data: proventos },
-        { data: comprasDoMes },
+        { data: comprasNaoParceladas },
+        { data: parcelasDoMes },
         { data: cats }
       ] = await Promise.all([
         (supabase.from('metas') as any).select('*').eq('mes_referencia', mesAtual).eq('ano_referencia', anoAtual),
         (supabase.from('proventos') as any).select('*').gte('data_recebimento', primeiroDia).lte('data_recebimento', ultimoDia),
-        (supabase.from('compras') as any).select('valor_total, categoria_id').eq('periodo_referencia', refPeriodo),
+        (supabase.from('compras') as any).select('valor_total, categoria_id').eq('parcelado', false).gte('data_vencimento', primeiroDia).lte('data_vencimento', ultimoDia),
+        (supabase.from('parcelas') as any).select('valor_parcela, compras!inner(categoria_id)').gte('data_vencimento', primeiroDia).lte('data_vencimento', ultimoDia),
         (supabase.from('categorias') as any).select('*').order('nome', { ascending: true })
       ]);
 
       const gastosPorCat: Record<string, number> = {};
       let totalGastoFinal = 0;
 
-      comprasDoMes?.forEach((c: any) => {
+      comprasNaoParceladas?.forEach((c: any) => {
         const v = parseFloat(c.valor_total) || 0;
         totalGastoFinal += v;
-        if (c.categoria_id) {
-          gastosPorCat[c.categoria_id] = (gastosPorCat[c.categoria_id] || 0) + v;
-        }
+        if (c.categoria_id) gastosPorCat[c.categoria_id] = (gastosPorCat[c.categoria_id] || 0) + v;
+      });
+
+      parcelasDoMes?.forEach((p: any) => {
+        const v = parseFloat(p.valor_parcela) || 0;
+        totalGastoFinal += v;
+        const catId = p.compras?.categoria_id;
+        if (catId) gastosPorCat[catId] = (gastosPorCat[catId] || 0) + v;
       });
 
       const totalReceitaReal = proventos?.reduce((acc: number, cur: any) => acc + Number(cur.valor), 0) || 0;
 
-      // Mapeia categorias injetando os valores reais e os valores das metas buscados no banco
       const todasCategoriasConsolidadas: CategoriaConsolidada[] = (cats || []).map((cat: any) => {
         const metaEncontrada = metasData?.find((m: any) => m.categoria_id === cat.id);
         return {
@@ -125,17 +130,10 @@ const Orcamento: React.FC = () => {
         };
       });
 
-      // Consolidação dos totais das metas para os cards principais
-      const metaReceitaTotal = metasData?.filter((m: any) => m.tipo_meta === 'provento')
-        .reduce((a: number, b: any) => a + Number(b.valor_meta), 0) || 0;
-      
-      const metaGastoTotal = metasData?.filter((m: any) => m.tipo_meta === 'despesa')
-        .reduce((a: number, b: any) => a + Number(b.valor_meta), 0) || 0;
-
       setDados({
-        metaReceita: metaReceitaTotal,
+        metaReceita: metasData?.filter((m: any) => m.tipo_meta === 'provento').reduce((a: number, b: any) => a + Number(b.valor_meta), 0) || 0,
         receitaReal: totalReceitaReal,
-        metaGasto: metaGastoTotal,
+        metaGasto: metasData?.filter((m: any) => m.tipo_meta === 'despesa').reduce((a: number, b: any) => a + Number(b.valor_meta), 0) || 0,
         gastoReal: totalGastoFinal,
         categoriasDespesa: todasCategoriasConsolidadas.filter(c => c.tipo === 'despesa' && c.tipoMeta !== 'pessoal'),
         objetivosPessoais: todasCategoriasConsolidadas.filter(c => c.tipoMeta === 'pessoal'),
@@ -166,7 +164,7 @@ const Orcamento: React.FC = () => {
   }, [porcGastoOrcamento, dados]);
 
   return (
-    <div className="orcamento-container fade-in">
+    <div className="orcamento-container">
       <header className="orcamento-header">
         <div className="header-info">
           <h2>Gestão Estratégica</h2>
@@ -175,9 +173,6 @@ const Orcamento: React.FC = () => {
             <span>{new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date()).toUpperCase()}</span>
           </div>
         </div>
-        <button className="btn-ajuste-premium" onClick={() => navigate('/CategoriasMetas')}>
-          Definir Metas
-        </button>
       </header>
 
       {loading ? (
@@ -323,6 +318,13 @@ const Orcamento: React.FC = () => {
           </div>
         </div>
       )}
+      <button 
+        className="btn-ajuste-premium" 
+        onClick={() => navigate('/CategoriasMetas')}
+        title="Configurar Metas"
+      >
+        <Settings size={26} />
+      </button>
     </div>
   );
 };
