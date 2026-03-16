@@ -304,10 +304,7 @@ const CategoriasMetas: React.FC = () => {
   return (
     <>
       <div className="cat-page-wrapper metas-container fade-in">
-        {perfil?.tipo_usuario !== 'comum' && (
-          <button className="cat-fab" onClick={() => openModal()} title="Nova Categoria"><Plus size={30} /></button>
-        )}
-
+        
         <header className="metas-header">
           <div className="cat-title-area">
             <div className="titulo-secao">
@@ -516,6 +513,18 @@ const CategoriasMetas: React.FC = () => {
           onConfirm={feedback.onConfirm} 
         />
       </div>
+
+      {/* FAB REPLICADO DO PROVENTOS - POSICIONADO FORA DO WRAPPER PRINCIPAL PARA FLUTUAR */}
+      {perfil?.tipo_usuario !== 'comum' && (
+        <button 
+          className="cat-fab" 
+          onClick={() => openModal()} 
+          title="Nova Categoria"
+          style={{ background: activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee' }}
+        >
+          <Plus size={30} />
+        </button>
+      )}
     </>
   );
 };
