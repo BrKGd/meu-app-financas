@@ -1,5 +1,3 @@
-/* CategoriasMetas.css - Versão Unificada e Consolidada */
-
 /* --- LAYOUT E CONTAINER --- */
 .cat-page-wrapper.metas-container {
   max-width: 1400px;
@@ -153,43 +151,53 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* --- GRID E CARDS (FLUX DESIGN) --- */
+/* --- GRID E CARDS (FLUX FINTECH DESIGN) --- */
 .grid-metas-modern {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 24px;
   width: 100%;
 }
 
 .card-financeiro-flux {
   position: relative;
-  background: white;
+  /* Gradiente dinâmico baseado na cor da categoria */
+  background: linear-gradient(135deg, var(--card-color) 0%, rgba(0, 0, 0, 0.25) 150%);
   border-radius: 32px;
   padding: 24px;
   overflow: hidden;
-  border: 1px solid #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   cursor: pointer;
-  min-height: 180px;
+  min-height: 170px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
 .card-financeiro-flux:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  transform: translateY(-6px);
+  filter: brightness(1.05);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
 }
 
+/* ÍCONE DE FUNDO (MARCA D'ÁGUA) */
 .card-bg-icon {
   position: absolute;
-  right: -20px;
-  bottom: -20px;
-  font-size: 120px;
-  opacity: 0.05;
-  color: var(--card-color);
-  transform: rotate(-15deg);
+  right: -15px;
+  top: -10px;
+  font-size: 140px;
+  opacity: 0.15; /* Transparência característica da foto */
+  color: white;
+  transform: rotate(-10deg);
   pointer-events: none;
+  z-index: 1;
+}
+
+.card-bg-icon svg {
+  width: 140px;
+  height: 140px;
 }
 
 .card-content-top {
@@ -200,67 +208,47 @@
 }
 
 .card-icon-small {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--card-color);
   color: white;
-  box-shadow: 0 8px 16px -4px var(--card-color);
 }
 
 .card-label-top {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 900;
   letter-spacing: 1px;
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.9);
+  text-transform: uppercase;
 }
 
 .card-main-info {
-  margin-top: 20px;
+  margin-top: auto;
   z-index: 2;
 }
 
 .card-value-display {
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   font-weight: 900;
-  color: #1e293b;
+  color: white;
   margin: 0;
 }
 
 .card-subtitle-bottom {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.7);
   margin-top: 4px;
   font-weight: 500;
 }
 
 .card-edit-indicator {
   position: absolute;
-  top: 24px;
+  bottom: 24px;
   right: 24px;
-  color: #cbd5e1;
-}
-
-/* Mantendo a classe antiga para compatibilidade caso necessário */
-.grid-metas-expanded {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
-  width: 100%;
-}
-
-.cat-card-modern {
-  background: white;
-  border-radius: 24px;
-  padding: 22px;
-  border: 1px solid #eef2f6;
-  transition: all 0.3s;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
+  color: rgba(255, 255, 255, 0.3);
+  z-index: 3;
 }
 
 /* --- SELETOR DE ÍCONES NO MODAL --- */
@@ -272,6 +260,8 @@
   padding: 15px;
   border-radius: 18px;
   border: 1.5px solid #e2e8f0;
+  max-height: 250px;
+  overflow-y: auto;
 }
 
 .icon-option-btn {
@@ -317,7 +307,7 @@
   background: white;
   width: 100%;
   max-width: 520px;
-  border-radius: 45px;
+  border-radius: 40px;
   overflow: hidden;
   padding: 0;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);

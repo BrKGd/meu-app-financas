@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
-  Plus, Edit2, Target, Loader2,
-  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star, Settings2, Lock, Wallet,
-  ShoppingBag, Utensils, Car, Heart, Home, Gamepad2, Smartphone, Dumbbell, Plane, Music, GraduationCap
+  Plus, Edit2, Target, Loader2, ChevronLeft, ChevronRight, TrendingDown, 
+  DollarSign, Star, Settings2, Lock, Wallet, ShoppingBag, Utensils, Car, 
+  Heart, Home, Gamepad2, Smartphone, Dumbbell, Plane, Music, GraduationCap,
+  Coffee, ShoppingCart, Zap, Fuel, Stethoscope, Briefcase, Gift, Tv, 
+  Wifi, ShieldCheck, PiggyBank, Landmark, Baby, PawPrint, Hammer, HardHat,
+  Cpu, Camera, Globe, Users, Receipt, Ticket, Bike, Bus
 } from 'lucide-react';
 
 // Componentes e Estilos
@@ -28,7 +31,7 @@ interface Categoria {
   nome: string;
   tipo: string;
   cor: string;
-  icone?: string; // Nova coluna
+  icone?: string;
 }
 
 interface Meta {
@@ -43,20 +46,55 @@ interface Meta {
   cor_meta: string | null;
 }
 
-// Opções de ícones para o usuário escolher
+// Opções de ícones expandida - Padrão Fintech
 const ICON_OPTIONS = [
+  // Essenciais e Gastos
   { name: 'Wallet', icon: Wallet },
+  { name: 'ShoppingCart', icon: ShoppingCart },
   { name: 'ShoppingBag', icon: ShoppingBag },
   { name: 'Utensils', icon: Utensils },
+  { name: 'Coffee', icon: Coffee },
   { name: 'Car', icon: Car },
-  { name: 'Heart', icon: Heart },
+  { name: 'Bus', icon: Bus },
+  { name: 'Bike', icon: Bike },
+  { name: 'Fuel', icon: Fuel },
+  { name: 'Zap', icon: Zap },
   { name: 'Home', icon: Home },
-  { name: 'Gamepad2', icon: Gamepad2 },
-  { name: 'Smartphone', icon: Smartphone },
+  { name: 'Wifi', icon: Wifi },
+  
+  // Saúde e Estilo de Vida
+  { name: 'Heart', icon: Heart },
+  { name: 'Stethoscope', icon: Stethoscope },
   { name: 'Dumbbell', icon: Dumbbell },
-  { name: 'Plane', icon: Plane },
+  { name: 'Baby', icon: Baby },
+  { name: 'PawPrint', icon: PawPrint },
+  
+  // Lazer e Tecnologia
+  { name: 'Gamepad2', icon: Gamepad2 },
+  { name: 'Tv', icon: Tv },
+  { name: 'Smartphone', icon: Smartphone },
+  { name: 'Cpu', icon: Cpu },
+  { name: 'Camera', icon: Camera },
   { name: 'Music', icon: Music },
+  { name: 'Ticket', icon: Ticket },
+  { name: 'Plane', icon: Plane },
+  { name: 'Globe', icon: Globe },
+  
+  // Trabalho e Educação
   { name: 'GraduationCap', icon: GraduationCap },
+  { name: 'Briefcase', icon: Briefcase },
+  { name: 'Hammer', icon: Hammer },
+  { name: 'HardHat', icon: HardHat },
+  
+  // Financeiro e Metas
+  { name: 'PiggyBank', icon: PiggyBank },
+  { name: 'Landmark', icon: Landmark },
+  { name: 'DollarSign', icon: DollarSign },
+  { name: 'Receipt', icon: Receipt },
+  { name: 'Gift', icon: Gift },
+  { name: 'Star', icon: Star },
+  { name: 'ShieldCheck', icon: ShieldCheck },
+  { name: 'Users', icon: Users },
 ];
 
 const CategoriasMetas: React.FC = () => {
@@ -76,7 +114,7 @@ const CategoriasMetas: React.FC = () => {
   const [form, setForm] = useState({ 
     nome: '', 
     cor: '#4361ee', 
-    icone: 'Wallet', // Novo campo no form
+    icone: 'Wallet',
     valor_meta: '' as string | number
   });
 
@@ -149,7 +187,7 @@ const CategoriasMetas: React.FC = () => {
         id_meta: metaEncontrada?.id || null,
         nome: cat.nome,
         cor: cat.cor,
-        icone: cat.icone || 'Wallet', // Novo campo
+        icone: cat.icone || 'Wallet',
         valor_meta: metaEncontrada?.valor_meta || 0,
         existe_meta: !!metaEncontrada
       };
@@ -206,7 +244,7 @@ const CategoriasMetas: React.FC = () => {
           nome: form.nome, 
           tipo: activeTab, 
           cor: form.cor, 
-          icone: form.icone, // Incluído no payload
+          icone: form.icone,
           user_id: user.id 
         };
         if (currentCatId) {
@@ -310,7 +348,7 @@ const CategoriasMetas: React.FC = () => {
           {loading ? (
             <div className="cat-status"><Loader2 className="spinner" /></div>
           ) : (
-            <div className="grid-metas-modern"> {/* Classe atualizada para o novo Grid */}
+            <div className="grid-metas-modern">
               {cardsParaExibir.map((item) => (
                 <div 
                   key={item.categoria_id} 
@@ -413,6 +451,7 @@ const CategoriasMetas: React.FC = () => {
                             onClick={() => isEditing && setForm({...form, icone: opt.name})}
                             style={{ '--active-color': form.cor } as any}
                             disabled={!isEditing}
+                            title={opt.name}
                           >
                             <opt.icon size={20} />
                           </button>
@@ -480,4 +519,5 @@ const CategoriasMetas: React.FC = () => {
     </>
   );
 };
+
 export default CategoriasMetas;
