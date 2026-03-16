@@ -2,7 +2,8 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Edit2, Target, Loader2,
-  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star, Settings2, Lock, Wallet
+  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star, Settings2, Lock, Wallet,
+  ShoppingBag, Utensils, Car, Heart, Home, Gamepad2, Smartphone, Dumbbell, Plane, Music, GraduationCap
 } from 'lucide-react';
 
 // Componentes e Estilos
@@ -27,6 +28,7 @@ interface Categoria {
   nome: string;
   tipo: string;
   cor: string;
+  icone?: string; // Nova coluna
 }
 
 interface Meta {
@@ -40,6 +42,22 @@ interface Meta {
   ano_referencia: number;
   cor_meta: string | null;
 }
+
+// Opções de ícones para o usuário escolher
+const ICON_OPTIONS = [
+  { name: 'Wallet', icon: Wallet },
+  { name: 'ShoppingBag', icon: ShoppingBag },
+  { name: 'Utensils', icon: Utensils },
+  { name: 'Car', icon: Car },
+  { name: 'Heart', icon: Heart },
+  { name: 'Home', icon: Home },
+  { name: 'Gamepad2', icon: Gamepad2 },
+  { name: 'Smartphone', icon: Smartphone },
+  { name: 'Dumbbell', icon: Dumbbell },
+  { name: 'Plane', icon: Plane },
+  { name: 'Music', icon: Music },
+  { name: 'GraduationCap', icon: GraduationCap },
+];
 
 const CategoriasMetas: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -58,6 +76,7 @@ const CategoriasMetas: React.FC = () => {
   const [form, setForm] = useState({ 
     nome: '', 
     cor: '#4361ee', 
+    icone: 'Wallet', // Novo campo no form
     valor_meta: '' as string | number
   });
 
@@ -130,6 +149,7 @@ const CategoriasMetas: React.FC = () => {
         id_meta: metaEncontrada?.id || null,
         nome: cat.nome,
         cor: cat.cor,
+        icone: cat.icone || 'Wallet', // Novo campo
         valor_meta: metaEncontrada?.valor_meta || 0,
         existe_meta: !!metaEncontrada
       };
@@ -157,13 +177,14 @@ const CategoriasMetas: React.FC = () => {
       setForm({
         nome: item.nome,
         cor: item.cor,
+        icone: item.icone || 'Wallet',
         valor_meta: item.existe_meta ? item.valor_meta : ''
       });
       setIsEditing(false);
     } else {
       setSelectedItem(null);
       const corPadrao = activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee';
-      setForm({ nome: '', cor: corPadrao, valor_meta: '' });
+      setForm({ nome: '', cor: corPadrao, icone: 'Wallet', valor_meta: '' });
       setIsEditing(true);
     }
     setIsModalOpen(true);
@@ -181,7 +202,13 @@ const CategoriasMetas: React.FC = () => {
       let currentCatId = selectedItem?.categoria_id;
 
       if (!currentCatId || isEditing) {
-        const catPayload = { nome: form.nome, tipo: activeTab, cor: form.cor, user_id: user.id };
+        const catPayload = { 
+          nome: form.nome, 
+          tipo: activeTab, 
+          cor: form.cor, 
+          icone: form.icone, // Incluído no payload
+          user_id: user.id 
+        };
         if (currentCatId) {
           const { error: errUp } = await supabase.from('categorias').update(catPayload).eq('id', currentCatId);
           if (errUp) throw errUp;
@@ -262,13 +289,13 @@ const CategoriasMetas: React.FC = () => {
             </div>
 
             <div className="badge-planejado-modern">
-               <div className={`badge-icon-wrapper ${activeTab === 'despesa' ? 'bg-red' : 'bg-green'}`}>
+                <div className={`badge-icon-wrapper ${activeTab === 'despesa' ? 'bg-red' : 'bg-green'}`}>
                   {activeTab === 'despesa' ? <TrendingDown size={14} color="#ef4444" /> : <Wallet size={14} color="#22c55e" />}
-               </div>
-               <span className="badge-text">
+                </div>
+                <span className="badge-text">
                   Total {activeTab === 'despesa' ? 'Planejado' : 'Esperado'}: 
                   <strong> {totalPlanejado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
-               </span>
+                </span>
             </div>
           </div>
         </header>
@@ -283,25 +310,38 @@ const CategoriasMetas: React.FC = () => {
           {loading ? (
             <div className="cat-status"><Loader2 className="spinner" /></div>
           ) : (
-            <div className="grid-metas-expanded">
+            <div className="grid-metas-modern"> {/* Classe atualizada para o novo Grid */}
               {cardsParaExibir.map((item) => (
-                <div key={item.categoria_id} className="cat-card-modern" onClick={() => openModal(item)}>
-                  <div className="cat-card-header">
-                    <div className="cat-status-dot" style={{ backgroundColor: item.cor }}></div>
-                    {podeEditar(item) ? <Edit2 size={16} className="cat-edit-icon-alt" /> : <Lock size={14} color="#94a3b8" />}
+                <div 
+                  key={item.categoria_id} 
+                  className="card-financeiro-flux" 
+                  style={{ '--card-color': item.cor } as any}
+                  onClick={() => openModal(item)}
+                >
+                  <div className="card-bg-icon">
+                    {React.createElement(ICON_OPTIONS.find(i => i.name === item.icone)?.icon || Wallet)}
                   </div>
-                  <div className="cat-card-body">
-                    <span className="cat-card-label">Categoria</span>
-                    <h3 className="cat-card-name">{item.nome}</h3>
-                    <div className="cat-card-value-box">
-                      {item.existe_meta ? (
-                        <span className="cat-card-amount">
-                          {Number(item.valor_meta).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
-                      ) : (
-                        <span className="txt-pendente-alt">Definir meta</span>
-                      )}
+                  
+                  <div className="card-content-top">
+                    <div className="card-icon-small">
+                      {React.createElement(ICON_OPTIONS.find(i => i.name === item.icone)?.icon || Wallet, { size: 18 })}
                     </div>
+                    <span className="card-label-top">{item.nome.toUpperCase()}</span>
+                  </div>
+
+                  <div className="card-main-info">
+                    <h2 className="card-value-display">
+                      {item.existe_meta 
+                        ? item.valor_meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                        : 'Definir Meta'}
+                    </h2>
+                    <p className="card-subtitle-bottom">
+                      {item.existe_meta ? 'Meta planejada para o período' : 'Clique para configurar'}
+                    </p>
+                  </div>
+                  
+                  <div className="card-edit-indicator">
+                    {podeEditar(item) ? <Edit2 size={14} /> : <Lock size={12} />}
                   </div>
                 </div>
               ))}
@@ -313,10 +353,10 @@ const CategoriasMetas: React.FC = () => {
           <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
             <div className="modal-content fade-in modal-expanded" onClick={(e) => e.stopPropagation()}>
               
-              <div className="modal-details-header" style={{ background: isEditing ? '#1e293b' : form.cor }}>
+              <div className="modal-details-header" style={{ background: isEditing ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : `linear-gradient(135deg, ${form.cor} 0%, #1e293b 100%)` }}>
                 <div className="modal-header-top">
-                  <h2 className="modal-title-text">
-                    {!selectedItem ? 'Nova Categoria' : isEditing ? 'Editar Configuração' : form.nome}
+                  <h2 className="modal-title-text" style={{ color: !isEditing ? getSettingsColor(form.cor) : '#fff' }}>
+                    {!selectedItem ? 'Nova Categoria' : isEditing ? 'Configurações' : form.nome}
                     {!podeEditar(selectedItem) && <Lock size={16} />}
                   </h2>
                   <div className="modal-header-actions">
@@ -360,6 +400,24 @@ const CategoriasMetas: React.FC = () => {
                         required 
                         placeholder="0,00"
                       />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label-custom">Escolha um Ícone</label>
+                      <div className="icon-grid-selector">
+                        {ICON_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.name}
+                            type="button"
+                            className={`icon-option-btn ${form.icone === opt.name ? 'selected' : ''}`}
+                            onClick={() => isEditing && setForm({...form, icone: opt.name})}
+                            style={{ '--active-color': form.cor } as any}
+                            disabled={!isEditing}
+                          >
+                            <opt.icon size={20} />
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="form-group">
