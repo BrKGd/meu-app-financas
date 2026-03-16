@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Edit2, Target, Loader2,
-  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star, Settings2
+  ChevronLeft, ChevronRight, TrendingDown, DollarSign, Star, Settings2, Lock, Wallet
 } from 'lucide-react';
 
 // Componentes e Estilos
@@ -16,6 +16,11 @@ import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
 
 // --- Interfaces ---
+interface Perfil {
+  id: string;
+  tipo_usuario: 'proprietario' | 'administrador' | 'comum';
+}
+
 interface Categoria {
   id: string;
   user_id: string;
@@ -38,6 +43,7 @@ interface Meta {
 
 const CategoriasMetas: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [metasMes, setMetasMes] = useState<Meta[]>([]);
   const [activeTab, setActiveTab] = useState<'despesa' | 'provento' | 'pessoal'>('despesa');
@@ -82,14 +88,29 @@ const CategoriasMetas: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const { data: profile } = await supabase.from('profiles').select('id, tipo_usuario').eq('id', user.id).single();
+      setPerfil(profile);
+
       const [resCats, resMetas] = await Promise.all([
         supabase.from('categorias').select('*').order('nome'),
-        supabase.from('metas').select('*').eq('mes_referencia', mes).eq('ano_referencia', ano)
+        supabase.from('metas')
+          .select('*')
+          .eq('mes_referencia', mes)
+          .eq('ano_referencia', ano)
       ]);
+
+      if (resCats.error) throw resCats.error;
+      if (resMetas.error) throw resMetas.error;
+
       setCategorias((resCats.data as Categoria[]) || []);
-      setMetasMes((resMetas.data as Meta[]) || []);
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
+      const metasFormatadas = (resMetas.data || []).map((m: any) => ({
+        ...m,
+        valor_meta: parseFloat(m.valor_meta) || 0
+      }));
+      setMetasMes(metasFormatadas);
+    } catch (error: any) {
+      console.error("Erro ao carregar dados:", error.message);
     } finally {
       setLoading(false);
     }
@@ -105,6 +126,7 @@ const CategoriasMetas: React.FC = () => {
       const metaEncontrada = metasMes.find(m => m.categoria_id === cat.id);
       return {
         categoria_id: cat.id,
+        user_id: cat.user_id,
         id_meta: metaEncontrada?.id || null,
         nome: cat.nome,
         cor: cat.cor,
@@ -113,6 +135,21 @@ const CategoriasMetas: React.FC = () => {
       };
     });
   }, [categorias, metasMes, activeTab]);
+
+  const totalPlanejado = useMemo(() => {
+    return metasMes
+      .filter(m => m.tipo_meta === activeTab)
+      .reduce((acc, curr) => acc + (Number(curr.valor_meta) || 0), 0);
+  }, [metasMes, activeTab]);
+
+  const podeEditar = (item: any) => {
+    if (!perfil) return false;
+    if (perfil.tipo_usuario === 'proprietario') return true;
+    if (perfil.tipo_usuario === 'administrador') {
+      return !item || item.user_id === perfil.id;
+    }
+    return false;
+  };
 
   const openModal = (item: any = null) => {
     if (item) {
@@ -134,6 +171,8 @@ const CategoriasMetas: React.FC = () => {
 
   async function handleSalvar(e: React.FormEvent) {
     e.preventDefault();
+    if (!podeEditar(selectedItem)) return;
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -144,7 +183,8 @@ const CategoriasMetas: React.FC = () => {
       if (!currentCatId || isEditing) {
         const catPayload = { nome: form.nome, tipo: activeTab, cor: form.cor, user_id: user.id };
         if (currentCatId) {
-          await supabase.from('categorias').update(catPayload).eq('id', currentCatId);
+          const { error: errUp } = await supabase.from('categorias').update(catPayload).eq('id', currentCatId);
+          if (errUp) throw errUp;
         } else {
           const { data: newCat, error: catErr } = await (supabase.from('categorias') as any).insert(catPayload).select().single();
           if (catErr) throw catErr;
@@ -169,7 +209,7 @@ const CategoriasMetas: React.FC = () => {
       if (metaErr) throw metaErr;
 
       setIsModalOpen(false);
-      buscarDados();
+      await buscarDados();
       alertar('success', 'Sucesso!', 'Seu planejamento foi atualizado.');
     } catch (error: any) {
       alertar('error', 'Ops!', 'Erro ao salvar: ' + error.message);
@@ -179,7 +219,7 @@ const CategoriasMetas: React.FC = () => {
   }
 
   const handleExcluirCascata = () => {
-    if (!selectedItem?.categoria_id) return;
+    if (!selectedItem?.categoria_id || !podeEditar(selectedItem)) return;
     alertar('danger', 'Confirmar Exclusão', `Isso apagará "${selectedItem.nome}" e todos os registros vinculados. Deseja continuar?`, async () => {
       setLoading(true);
       try {
@@ -199,17 +239,37 @@ const CategoriasMetas: React.FC = () => {
   return (
     <>
       <div className="cat-page-wrapper metas-container fade-in">
-        <button className="cat-fab" onClick={() => openModal()} title="Nova Categoria"><Plus size={30} /></button>
+        {perfil?.tipo_usuario !== 'comum' && (
+          <button className="cat-fab" onClick={() => openModal()} title="Nova Categoria"><Plus size={30} /></button>
+        )}
 
         <header className="metas-header">
           <div className="cat-title-area">
-            <div className="titulo-secao"><Target size={28} color="#4361ee" /><h1>Planejamento</h1></div>
-            <p style={{ color: '#94a3b8', fontWeight: 600 }}>Gerencie suas metas de {activeTab === 'despesa' ? 'gastos' : activeTab === 'provento' ? 'receitas' : 'objetivos'}</p>
+            <div className="titulo-secao">
+              <Target size={28} color="#4361ee" />
+              <h1>Planejamento</h1>
+            </div>
+            <p className="subtitulo-metas">Gerencie seu orçamento mensal</p>
           </div>
-          <div className="seletor-periodo">
-            <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}><ChevronLeft size={20}/></button>
-            <span>{new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(ano, mes - 1))} {ano}</span>
-            <button onClick={() => setMes(m => m === 12 ? 1 : m + 1)}><ChevronRight size={20}/></button>
+
+          <div className="header-controls">
+            <div className="seletor-periodo">
+              <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}><ChevronLeft size={20}/></button>
+              <span className="periodo-display">
+                {new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(ano, mes - 1))} {ano}
+              </span>
+              <button onClick={() => setMes(m => m === 12 ? 1 : m + 1)}><ChevronRight size={20}/></button>
+            </div>
+
+            <div className="badge-planejado-modern">
+               <div className={`badge-icon-wrapper ${activeTab === 'despesa' ? 'bg-red' : 'bg-green'}`}>
+                  {activeTab === 'despesa' ? <TrendingDown size={14} color="#ef4444" /> : <Wallet size={14} color="#22c55e" />}
+               </div>
+               <span className="badge-text">
+                  Total {activeTab === 'despesa' ? 'Planejado' : 'Esperado'}: 
+                  <strong> {totalPlanejado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+               </span>
+            </div>
           </div>
         </header>
 
@@ -219,26 +279,30 @@ const CategoriasMetas: React.FC = () => {
           <button className={activeTab === 'pessoal' ? 'active' : ''} onClick={() => setActiveTab('pessoal')}><Star size={18} /> Objetivos</button>
         </nav>
 
-        <div className="cat-list-container metas-content">
+        <div className="metas-content">
           {loading ? (
             <div className="cat-status"><Loader2 className="spinner" /></div>
           ) : (
-            <div className="grid-metas-cats">
+            <div className="grid-metas-expanded">
               {cardsParaExibir.map((item) => (
-                <div key={item.categoria_id} className="cat-item-row" onClick={() => openModal(item)}>
-                  <div className="cat-item-main">
+                <div key={item.categoria_id} className="cat-card-modern" onClick={() => openModal(item)}>
+                  <div className="cat-card-header">
                     <div className="cat-status-dot" style={{ backgroundColor: item.cor }}></div>
-                    <div className="cat-info-text">
-                      <span className="cat-item-name" style={{ color: item.cor }}>{item.nome}</span>
-                      <span className="cat-item-meta">
-                        {item.existe_meta 
-                          ? <strong>{Number(item.valor_meta).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
-                          : <span className="txt-pendente">Definir meta</span>
-                        }
-                      </span>
+                    {podeEditar(item) ? <Edit2 size={16} className="cat-edit-icon-alt" /> : <Lock size={14} color="#94a3b8" />}
+                  </div>
+                  <div className="cat-card-body">
+                    <span className="cat-card-label">Categoria</span>
+                    <h3 className="cat-card-name">{item.nome}</h3>
+                    <div className="cat-card-value-box">
+                      {item.existe_meta ? (
+                        <span className="cat-card-amount">
+                          {Number(item.valor_meta).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                      ) : (
+                        <span className="txt-pendente-alt">Definir meta</span>
+                      )}
                     </div>
                   </div>
-                  <Edit2 size={16} className="cat-edit-icon" />
                 </div>
               ))}
             </div>
@@ -247,40 +311,32 @@ const CategoriasMetas: React.FC = () => {
 
         {isModalOpen && (
           <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-            <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ padding: 0, maxWidth: '520px', borderRadius: '45px', overflow: 'hidden' }}>
+            <div className="modal-content fade-in modal-expanded" onClick={(e) => e.stopPropagation()}>
               
-              {/* HEADER DO MODAL - ESTILO IGUAL AO DE CARTÕES */}
-              <div className="modal-details-header" style={{ background: isEditing ? '#1e293b' : form.cor, padding: '30px', color: 'white' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 style={{ margin: 0, fontSize: '1.5rem'}}>
+              <div className="modal-details-header" style={{ background: isEditing ? '#1e293b' : form.cor }}>
+                <div className="modal-header-top">
+                  <h2 className="modal-title-text">
                     {!selectedItem ? 'Nova Categoria' : isEditing ? 'Editar Configuração' : form.nome}
+                    {!podeEditar(selectedItem) && <Lock size={16} />}
                   </h2>
-                  <div style={{ display: 'flex', gap: '10px'}}>
-                    {selectedItem && !isEditing && (
+                  <div className="modal-header-actions">
+                    {selectedItem && !isEditing && podeEditar(selectedItem) && (
                       <button type="button" className="btn-icon-action" onClick={() => setIsEditing(true)}>
                         <Settings2 size={32} color={getSettingsColor(form.cor)} />
                       </button>
                     )}
                     <button type="button" onClick={() => setIsModalOpen(false)} className="btn-icon-action">
-                      <img src={iconFechar} alt="Fechar" style={{ width: '32px', height: '32px' }} />
+                      <img src={iconFechar} alt="Fechar" className="icon-32" />
                     </button>
                   </div>
                 </div>
-                {selectedItem && !isEditing && (
-                  <div style={{ marginTop: '10px', fontWeight: 700, opacity: 0.9}}>
-                    Planejamento Mensal
-                  </div>
-                )}
               </div>
 
-              {/* CONTEÚDO DO MODAL */}
-              <div style={{ padding: '35px' }}>
+              <div className="modal-body-padding">
                 <form id="meta-form" onSubmit={handleSalvar}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div className="form-flex-column">
                     <div className="form-group">
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
-                        Nome da Categoria
-                      </label>
+                      <label className="form-label-custom">Nome da Categoria</label>
                       <input 
                         className="form-control"
                         type="text" 
@@ -289,37 +345,33 @@ const CategoriasMetas: React.FC = () => {
                         onChange={e => setForm({...form, nome: e.target.value})} 
                         required 
                         placeholder="Ex: Alimentação, Lazer..."
-                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0' }}
                       />
                     </div>
 
                     <div className="form-group">
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
-                        Valor da Meta (R$)
-                      </label>
+                      <label className="form-label-custom">Valor da Meta (R$)</label>
                       <input 
                         className="form-control"
                         type="number" 
                         step="0.01" 
                         value={form.valor_meta} 
+                        disabled={!podeEditar(selectedItem)}
                         onChange={e => setForm({...form, valor_meta: e.target.value})} 
                         required 
                         placeholder="0,00"
-                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0' }}
                       />
                     </div>
 
                     <div className="form-group">
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
-                        Cor de Identificação
-                      </label>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <label className="form-label-custom">Cor de Identificação</label>
+                      <div className="color-picker-wrapper">
                         <input 
                           type="color" 
                           value={form.cor} 
                           disabled={!isEditing}
                           onChange={e => setForm({...form, cor: e.target.value})} 
-                          style={{ width: '60px', height: '50px', padding: '5px', borderRadius: '10px', border: '1.5px solid #e2e8f0', cursor: isEditing ? 'pointer' : 'default' }}
+                          className="input-color-square"
+                          style={{ cursor: isEditing ? 'pointer' : 'default' }}
                         />
                         <input 
                           type="text" 
@@ -327,7 +379,7 @@ const CategoriasMetas: React.FC = () => {
                           disabled={!isEditing}
                           onChange={e => setForm({...form, cor: e.target.value})}
                           maxLength={7}
-                          style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', fontFamily: 'monospace', fontWeight: 'bold' }}
+                          className="form-control hex-input"
                         />
                       </div>
                     </div>
@@ -335,21 +387,22 @@ const CategoriasMetas: React.FC = () => {
                 </form>
               </div>
 
-              {/* FOOTER DO MODAL - ESTILO IGUAL AO DE CARTÕES */}
-              <div className="modal-footer-icons" style={{ padding: '0 35px 35px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                {selectedItem && isEditing ? (
+              <div className="modal-footer-icons-container">
+                {selectedItem && isEditing && podeEditar(selectedItem) ? (
                   <button type="button" className="btn-icon-action" onClick={handleExcluirCascata}>
-                    <img src={iconExcluir} alt="Excluir" style={{ width: '38px', height: '38px' }} />
+                    <img src={iconExcluir} alt="Excluir" className="icon-38" />
                   </button>
                 ) : <div />}
                 
-                <div style={{ display: 'flex', gap: '15px' }}>
+                <div className="footer-right-actions">
                   <button type="button" className="btn-icon-action" onClick={() => isEditing && selectedItem ? setIsEditing(false) : setIsModalOpen(false)}>
-                    <img src={iconCancelar} alt="Cancelar" style={{ width: '38px', height: '38px' }} />
+                    <img src={iconCancelar} alt="Cancelar" className="icon-38" />
                   </button>
-                  <button type="submit" form="meta-form" className="btn-icon-action">
-                    <img src={iconConfirme} alt="Confirmar" style={{ width: '38px', height: '38px' }} />
-                  </button>
+                  {podeEditar(selectedItem) && (
+                    <button type="submit" form="meta-form" className="btn-icon-action">
+                      <img src={iconConfirme} alt="Confirmar" className="icon-38" />
+                    </button>
+                  )}
                 </div>
               </div>
 

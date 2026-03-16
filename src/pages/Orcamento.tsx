@@ -34,7 +34,7 @@ interface DadosOrcamento {
 }
 
 const Orcamento: React.FC = () => {
-  const navigate = useNavigate(); // Inicialize o hook
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [modalDetalhe, setModalDetalhe] = useState<{aberto: boolean, tipo: string, dados: any[]}>({ 
     aberto: false, tipo: '', dados: [] 
@@ -85,42 +85,36 @@ const Orcamento: React.FC = () => {
       const agora = new Date();
       const anoAtual = agora.getFullYear();
       const mesAtual = agora.getMonth() + 1;
+      const refPeriodo = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
       const primeiroDia = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
       const ultimoDia = new Date(anoAtual, mesAtual, 0).toISOString().split('T')[0];
 
-      // Uso de (supabase.from(...) as any) para evitar erros de tipagem 'never'
       const [
         { data: metasData },
         { data: proventos },
-        { data: comprasNaoParceladas },
-        { data: parcelasDoMes },
+        { data: comprasDoMes },
         { data: cats }
       ] = await Promise.all([
         (supabase.from('metas') as any).select('*').eq('mes_referencia', mesAtual).eq('ano_referencia', anoAtual),
         (supabase.from('proventos') as any).select('*').gte('data_recebimento', primeiroDia).lte('data_recebimento', ultimoDia),
-        (supabase.from('compras') as any).select('valor_total, categoria_id').eq('parcelado', false).gte('data_vencimento', primeiroDia).lte('data_vencimento', ultimoDia),
-        (supabase.from('parcelas') as any).select('valor_parcela, compras!inner(categoria_id)').gte('data_vencimento', primeiroDia).lte('data_vencimento', ultimoDia),
+        (supabase.from('compras') as any).select('valor_total, categoria_id').eq('periodo_referencia', refPeriodo),
         (supabase.from('categorias') as any).select('*').order('nome', { ascending: true })
       ]);
 
       const gastosPorCat: Record<string, number> = {};
       let totalGastoFinal = 0;
 
-      comprasNaoParceladas?.forEach((c: any) => {
+      comprasDoMes?.forEach((c: any) => {
         const v = parseFloat(c.valor_total) || 0;
         totalGastoFinal += v;
-        if (c.categoria_id) gastosPorCat[c.categoria_id] = (gastosPorCat[c.categoria_id] || 0) + v;
-      });
-
-      parcelasDoMes?.forEach((p: any) => {
-        const v = parseFloat(p.valor_parcela) || 0;
-        totalGastoFinal += v;
-        const catId = p.compras?.categoria_id;
-        if (catId) gastosPorCat[catId] = (gastosPorCat[catId] || 0) + v;
+        if (c.categoria_id) {
+          gastosPorCat[c.categoria_id] = (gastosPorCat[c.categoria_id] || 0) + v;
+        }
       });
 
       const totalReceitaReal = proventos?.reduce((acc: number, cur: any) => acc + Number(cur.valor), 0) || 0;
 
+      // Mapeia categorias injetando os valores reais e os valores das metas buscados no banco
       const todasCategoriasConsolidadas: CategoriaConsolidada[] = (cats || []).map((cat: any) => {
         const metaEncontrada = metasData?.find((m: any) => m.categoria_id === cat.id);
         return {
@@ -131,10 +125,17 @@ const Orcamento: React.FC = () => {
         };
       });
 
+      // Consolidação dos totais das metas para os cards principais
+      const metaReceitaTotal = metasData?.filter((m: any) => m.tipo_meta === 'provento')
+        .reduce((a: number, b: any) => a + Number(b.valor_meta), 0) || 0;
+      
+      const metaGastoTotal = metasData?.filter((m: any) => m.tipo_meta === 'despesa')
+        .reduce((a: number, b: any) => a + Number(b.valor_meta), 0) || 0;
+
       setDados({
-        metaReceita: metasData?.filter((m: any) => m.tipo_meta === 'provento').reduce((a: number, b: any) => a + Number(b.valor_meta), 0) || 0,
+        metaReceita: metaReceitaTotal,
         receitaReal: totalReceitaReal,
-        metaGasto: metasData?.filter((m: any) => m.tipo_meta === 'despesa').reduce((a: number, b: any) => a + Number(b.valor_meta), 0) || 0,
+        metaGasto: metaGastoTotal,
         gastoReal: totalGastoFinal,
         categoriasDespesa: todasCategoriasConsolidadas.filter(c => c.tipo === 'despesa' && c.tipoMeta !== 'pessoal'),
         objetivosPessoais: todasCategoriasConsolidadas.filter(c => c.tipoMeta === 'pessoal'),
@@ -153,7 +154,6 @@ const Orcamento: React.FC = () => {
     buscarDadosCompletos();
   }, [buscarDadosCompletos]);
 
-  // --- Métrica e Estilização ---
   const porcGasto = useMemo(() => dados.metaGasto > 0 ? (dados.gastoReal / dados.metaGasto) * 100 : 0, [dados]);
   const porcGastoOrcamento = useMemo(() => dados.receitaReal > 0 ? (dados.gastoReal / dados.receitaReal) * 100 : 0, [dados]);
   const porcReceita = useMemo(() => dados.metaReceita > 0 ? (dados.receitaReal / dados.metaReceita) * 100 : 0, [dados]);
@@ -208,7 +208,6 @@ const Orcamento: React.FC = () => {
               </span>
             </div>
 
-            {/* CONTAINER DOS BADGES (POSICIONAMENTO SOBREPOSTO E ALINHADO) */}
             <div className="status-badges-stack">
               {porcGastoOrcamento > 100 && (
                 <div className="critical-alert-badge">
