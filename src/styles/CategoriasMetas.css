@@ -470,6 +470,6 @@
 
 @media (max-width: 480px) {
   .grid-metas-modern { grid-template-columns: 1fr; }
-  .cat-fab { bottom: 20px; right: 20px; }
+  .cat-fab { bottom: 90px; right: 20px; }
   .icon-grid-selector { grid-template-columns: repeat(3, 1fr); }
 }
