@@ -181,14 +181,17 @@ const Lancamento: React.FC = () => {
         ? 'recorrencias'
         : 'compras';
 
+    // Preparação do payload comum a ambos os tipos de tabela
     const payload: any = {
-
       user_id: form.user_id,
       descricao: form.descricao,
       loja: form.loja,
       categoria_id: form.categoria_id,
       forma_pagamento: form.forma_pagamento,
-      tipo_lancamento: form.tipo_lancamento
+      tipo_lancamento: form.tipo_lancamento,
+      // Campos corrigidos para serem salvos em ambos os casos:
+      pedido: form.pedido,
+      nota_fiscal: completarNF(form.nota_fiscal)
     };
 
     if (isRecorrente) {
@@ -221,10 +224,6 @@ const Lancamento: React.FC = () => {
       payload.valor_total = valorTotalNum;
 
       payload.data_compra = form.data_compra;
-
-      payload.nota_fiscal = completarNF(form.nota_fiscal);
-
-      payload.pedido = form.pedido;
 
       payload.status_pagamento = 'pendente';
 

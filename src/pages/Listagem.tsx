@@ -48,7 +48,7 @@ interface ItemCompra {
   data_vencimento?: string;
   periodo_referencia?: string; 
   recorrencia_id?: string | null;     
-  cartao: string | null;
+  cartao: string | null; // Usado para exibição visual (derivado do cartao_id)
   cartao_id?: number | null; 
   forma_pagamento: string;
   categoria_id: string;
@@ -141,6 +141,10 @@ const Listagem: React.FC = () => {
     const { data, error } = await query;
     if (error) return;
 
+    // Criar um mapa de cartões para busca rápida por ID
+    const mapaCartoes: Record<number, string> = {};
+    listaCartoes.forEach(c => mapaCartoes[c.id] = c.nome);
+
     const formatadas: ItemCompra[] = [];
     const mapaTotais: Record<string, number> = {};
     let acumuladoGeral = 0;
@@ -150,6 +154,9 @@ const Listagem: React.FC = () => {
       const nomeResp = mapaNomes[item.user_id] || '⚠️ Pendente';
       const nomeCriador = mapaNomes[item.usuario_criacao || ''] || 'Sistema'; 
       const infoCat = mapaCats[item.categoria_id] || { nome: 'Sem Categoria', cor: '#94a3b8' };
+      
+      // Resolvemos o nome do cartão via relacionamento local usando o cartao_id
+      const nomeCartao = item.cartao_id ? mapaCartoes[item.cartao_id] : '-';
 
       formatadas.push({ 
         ...item, 
@@ -157,6 +164,7 @@ const Listagem: React.FC = () => {
         nomeCriador: nomeCriador,
         nomeCategoria: infoCat.nome,
         corCategoria: infoCat.cor,
+        cartao: nomeCartao // Atribuímos o nome resolvido para a coluna visual
       });
 
       mapaTotais[nomeResp] = (mapaTotais[nomeResp] || 0) + valorLinha;
@@ -195,9 +203,10 @@ const Listagem: React.FC = () => {
     const perfilAtualizado: Perfil = { ...meuPerfil, id: user.id, tipo_usuario: tipoFinal as any };
     
     setPerfilLogado(perfilAtualizado);
-    setCartoes((cartRes.data as Cartao[]) || []);
+    const listaCartoes = (cartRes.data as Cartao[]) || [];
+    setCartoes(listaCartoes);
 
-    fetchDespesas(perfilAtualizado, mapaNomes, (cartRes.data as Cartao[]) || [], mapaCats);
+    fetchDespesas(perfilAtualizado, mapaNomes, listaCartoes, mapaCats);
   }, [fetchDespesas]);
 
   useEffect(() => { 
@@ -223,7 +232,7 @@ const Listagem: React.FC = () => {
           categoria_id: itemParaEditar.categoria_id,
           valor_total: itemParaEditar.valor_total,
           forma_pagamento: itemParaEditar.forma_pagamento,
-          cartao: isCredito ? itemParaEditar.cartao : null,
+          // Removemos a coluna 'cartao' do update, mantemos apenas 'cartao_id'
           cartao_id: isCredito ? itemParaEditar.cartao_id : null,
           data_compra: itemParaEditar.data_compra,
           status_pagamento: itemParaEditar.status_pagamento,
@@ -273,7 +282,6 @@ const Listagem: React.FC = () => {
 
   return (
     <div className="listagem-container fade-in">
-      {/* ... Cabeçalho e Tabela permanecem os mesmos ... */}
       <div className="listagem-header">
         <div className="header-title-wrapper">
           <h2>Extrato</h2>
