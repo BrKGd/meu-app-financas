@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Users, Calendar, ShoppingCart, 
-  Clock, Banknote, Loader2 
+  Clock, Banknote, Loader2, CheckCircle2 
 } from 'lucide-react';
 import '../styles/Dashboard.css';
 
@@ -25,13 +25,14 @@ interface Compra {
   id: string;
   user_id: string;
   valor_total: number;
-  parcelas_total: number; // Atualizado
-  parcela_numero: number; // Atualizado
+  parcelas_total: number;
+  parcela_numero: number;
   data_compra: string;
-  periodo_referencia: string; // Novo campo
+  periodo_referencia: string;
   cartao: string;
-  cartao_id?: number; // Novo campo
+  cartao_id?: number;
   forma_pagamento: string;
+  status_pagamento?: string; // Adicionado para refletir o status
 }
 
 interface DetalhePessoa {
@@ -41,6 +42,7 @@ interface DetalhePessoa {
   ultimaParcelaDate: Date;
   vencimentoAte15: number;
   vencimentoAte20: number;
+  pagoNoMes: number; // Novo: para controle visual opcional
 }
 
 interface Stats {
@@ -67,13 +69,13 @@ const Dashboard: React.FC = () => {
   const mesAtual = hoje.getMonth();
   const anoAtual = hoje.getFullYear();
   
-  // Chave de comparação com a nova coluna periodo_referencia (YYYY-MM-DD)
   const mesAtualChave = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-01`;
 
   const colors = {
     primary: '#4361ee',
     secondary: '#7209b7',
     accent2: '#4cc9f0',
+    success: '#10b981',
     bg: '#f8fafc'
   };
 
@@ -113,39 +115,44 @@ const Dashboard: React.FC = () => {
       listaCompras.forEach(item => {
         const valorParcela = parseFloat(item.valor_total.toString()) || 0;
         const responsavel = mapaNomes[item.user_id] || 'Outro';
+        const estaPago = item.status_pagamento === 'pago';
         
-        // Busca info do cartão pelo ID ou Nome
         const infoCartao = (cartoes as Cartao[])?.find(c => c.id === item.cartao_id || c.nome === item.cartao);
         const vencimento = infoCartao?.dia_vencimento || 0;
 
         if (!resumo.detalhesPorPessoa[responsavel]) {
           resumo.detalhesPorPessoa[responsavel] = {
             valorNoMes: 0, qtdComprasMes: 0, totalRestanteFuturo: 0,
-            ultimaParcelaDate: new Date(0), vencimentoAte15: 0, vencimentoAte20: 0
+            ultimaParcelaDate: new Date(0), vencimentoAte15: 0, vencimentoAte20: 0,
+            pagoNoMes: 0
           };
         }
 
         const p = resumo.detalhesPorPessoa[responsavel];
         const dataCompraObj = new Date(item.data_compra + 'T00:00:00');
 
-        // 1. Lógica para o Mês Atual (Baseado no periodo_referencia)
+        // 1. Lógica para o Mês Atual (Apenas o que NÃO está pago entra no total devedor)
         if (item.periodo_referencia === mesAtualChave) {
-          resumo.totalMes += valorParcela;
           resumo.qtdComprasMes++;
-          p.valorNoMes += valorParcela;
           p.qtdComprasMes++;
 
-          if (vencimento > 0 && vencimento <= 15) p.vencimentoAte15 += valorParcela;
-          else if (vencimento > 15) p.vencimentoAte20 += valorParcela;
+          if (!estaPago) {
+            resumo.totalMes += valorParcela;
+            p.valorNoMes += valorParcela;
+
+            if (vencimento > 0 && vencimento <= 15) p.vencimentoAte15 += valorParcela;
+            else if (vencimento > 15) p.vencimentoAte20 += valorParcela;
+          } else {
+            p.pagoNoMes += valorParcela;
+          }
         }
 
-        // 2. Lógica para Dívida Futura (Tudo que o periodo_referencia for maior que hoje)
-        if (item.periodo_referencia > mesAtualChave) {
+        // 2. Lógica para Dívida Futura (Apenas o que NÃO está pago)
+        if (item.periodo_referencia > mesAtualChave && !estaPago) {
           resumo.totalEmAbertoFuturo += valorParcela;
           p.totalRestanteFuturo += valorParcela;
         }
 
-        // Atualiza a data da última parcela conhecida para este usuário
         if (dataCompraObj > p.ultimaParcelaDate) {
           p.ultimaParcelaDate = dataCompraObj;
         }
@@ -185,7 +192,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="dashboard-grid">
-        <Card title="Fatura Mês" icon={<Calendar size={20} />} value={formatMoney(stats.totalMes)} gradient={`linear-gradient(135deg, ${colors.primary}, #3f37c9)`} />
+        <Card title="Pendente Mês" icon={<Calendar size={20} />} value={formatMoney(stats.totalMes)} gradient={`linear-gradient(135deg, ${colors.primary}, #3f37c9)`} />
         <Card title="Dívida Futura" icon={<Clock size={20} />} value={formatMoney(stats.totalEmAbertoFuturo)} gradient={`linear-gradient(135deg, ${colors.secondary}, #560bad)`} footer="Parcelas dos próximos meses" />
         <Card title="Compras no Mês" icon={<ShoppingCart size={20} />} value={stats.qtdComprasMes.toString()} gradient={`linear-gradient(135deg, ${colors.accent2}, ${colors.primary})`} />
       </div>
@@ -214,12 +221,19 @@ const Dashboard: React.FC = () => {
                       <Banknote size={14} /> Até dia 20: {formatMoney(dados.vencimentoAte20)}
                     </div>
                   )}
+                  {dados.valorNoMes === 0 && dados.pagoNoMes > 0 && (
+                    <div className="badge-pay" style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}>
+                      <CheckCircle2 size={14} /> Tudo Pago
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div style={{ marginBottom: '15px' }}>
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'capitalize' }}>Total Faturado</span>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b' }}>{formatMoney(dados.valorNoMes)}</div>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'capitalize' }}>A Pagar (Mês)</span>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: dados.valorNoMes === 0 ? colors.success : '#1e293b' }}>
+                    {formatMoney(dados.valorNoMes)}
+                </div>
               </div>
 
               <div style={{ padding: '10px', background: 'linear-gradient(to right, #f8fafc, #ffffff)', borderRadius: '16px', border: '1px solid #f1f5f9', marginBottom: '15px' }}>
