@@ -100,7 +100,6 @@ const Menu: React.FC = () => {
       const mesAtualReferencia = `${mesAtualChave}-01`;
       
       const mapaHistorico: Record<string, ItemHistorico> = {}; 
-      let contadorItensNoMes = 0; 
       
       todasCompras?.forEach(item => {
         const valorParcela = parseFloat(String(item.valor_total)) || 0;
@@ -131,10 +130,6 @@ const Menu: React.FC = () => {
           ref.totalPendente += valorParcela;
           ref.porUsuario[nomeResponsavel].pendente += valorParcela;
         }
-
-        if (item.periodo_referencia === mesAtualReferencia) {
-          contadorItensNoMes++;
-        }
       });
 
       const listaHistorico = Object.values(mapaHistorico)
@@ -148,7 +143,7 @@ const Menu: React.FC = () => {
         valorPendente: dados.pendente,
         valorPago: dados.pago
       })));
-      setResumo({ totalPendente: dadosMesAtual.totalPendente, quantidade: contadorItensNoMes });
+      setResumo({ totalPendente: dadosMesAtual.totalPendente, quantidade: todasCompras?.filter(c => c.periodo_referencia === mesAtualReferencia).length || 0 });
 
     } catch (err) {
       console.error("Erro ao buscar dados do menu:", err);
@@ -195,7 +190,7 @@ const Menu: React.FC = () => {
                 return (
                   <div key={i} className={`mini-card ${isUserPago ? 'status-pago-opacidade' : ''}`}>
                     <span className="mini-card-label">
-                      {g.nome} {isUserPago && <CheckCircle2 size={12} color="#10b981" style={{ display: 'inline', marginLeft: 4 }} />}
+                      {g.nome} {isUserPago && <CheckCircle2 size={12} color="#10b981" />}
                     </span>
                     <span className="mini-card-value">
                       {isUserPago ? formatMoney(g.valorPago) : formatMoney(g.valorPendente)}
@@ -218,7 +213,6 @@ const Menu: React.FC = () => {
 
       <h3 className="section-title">Ações Rápidas</h3>
       
-      {/* Grade de Ações em 5 colunas sem cards de fundo */}
       <div className="actions-grid-minimal">
         <QuickActionIcon to="/dashboard" icon={<LayoutDashboard />} label="Painel" color="#4361ee" />
         {isGestor && <QuickActionIcon to="/categoriasMetas" icon={<Target />} label="Metas" color="#8b5cf6" />}
@@ -227,23 +221,15 @@ const Menu: React.FC = () => {
         <QuickActionIcon to="/despesas" icon={<ArrowDownCircle />} label="Fixos" color="#ef4444" />
         {perfil.tipo === 'proprietario' && <QuickActionIcon to="/cartoes" icon={<CreditCard />} label="Cartões" color="#7209b7" />}
         <QuickActionIcon to="/listagem" icon={<ShoppingBag />} label="Extrato" color="#00cc66" />
+        {/* NOVO ÍCONE DE PERFIL AQUI */}
+        <QuickActionIcon 
+          to="/perfil" 
+          icon={perfil.tipo === 'comum' ? <UserIcon /> : <Shield />} 
+          label="Perfil" 
+          color="#64748b" 
+        />
         <QuickActionIcon to="/lancamento" icon={<Plus />} label="Novo" color="#4361ee" isPrimary />
       </div>
-
-      <Link to="/perfil" className="footer-link-reset">
-        <div className="footer-action">
-          <div className="footer-info-group">
-            <div className="footer-icon-box">
-              {perfil.tipo === 'comum' ? <UserIcon size={20} color="#4361ee" /> : <Shield size={20} color="#4361ee" />}
-            </div>
-            <div>
-              <span className="footer-label-main">Perfil</span>
-              <span className="footer-label-sub">Ajustes de {perfil.tipo}</span>
-            </div>
-          </div>
-          <ChevronRight size={20} color="#64748b" />
-        </div>
-      </Link>
 
       {/* Modal de Histórico Mensal */}
       {showModalHistorico && (
@@ -251,13 +237,13 @@ const Menu: React.FC = () => {
           <div className="modal-content history-modal-container fade-in" onClick={e => e.stopPropagation()}>
             <div className="history-header-bg">
                 <div className="history-header-row">
-                   <div>
-                     <h2 className="history-title">Histórico de Faturas</h2>
-                     <p className="history-subtitle">Valores pendentes e pagos por mês</p>
-                   </div>
-                   <button onClick={() => setShowModalHistorico(false)} className="btn-close-round">
-                     <img src={iconFechar} alt="Fechar" />
-                   </button>
+                    <div>
+                      <h2 className="history-title">Histórico de Faturas</h2>
+                      <p className="history-subtitle">Valores pendentes e pagos por mês</p>
+                    </div>
+                    <button onClick={() => setShowModalHistorico(false)} className="btn-close-round">
+                      <img src={iconFechar} alt="Fechar" />
+                    </button>
                 </div>
             </div>
 
@@ -274,13 +260,11 @@ const Menu: React.FC = () => {
                         <Calendar size={18} color={tudoPago ? '#10b981' : '#64748b'} />
                         <span className="history-item-date">{dataFormatada}</span>
                         {tudoPago && (
-                          <div className="badge-pago-mini" style={{ backgroundColor: '#10b981', color: '#fff', fontSize: '0.6rem', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: 800 }}>
-                            PAGO
-                          </div>
+                          <div className="badge-pago-mini">PAGO</div>
                         )}
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <span className={`history-item-total ${tudoPago ? 'text-pago' : ''}`} style={tudoPago ? { color: '#10b981' } : {}}>
+                        <span className={`history-item-total ${tudoPago ? 'text-pago' : ''}`}>
                           {formatMoney(tudoPago ? mesObj.totalPago : mesObj.totalPendente)}
                         </span>
                         {!tudoPago && mesObj.totalPago > 0 && (
@@ -296,12 +280,11 @@ const Menu: React.FC = () => {
                         {Object.entries(mesObj.porUsuario).map(([nome, d]) => {
                           const isUserMensalPago = d.pendente === 0 && d.pago > 0;
                           return (
-                            <div key={nome} className="user-spend-col" style={{ opacity: isUserMensalPago ? 0.6 : 1 }}>
-
+                            <div key={nome} className={`user-spend-col ${isUserMensalPago ? 'status-pago-opacidade' : ''}`}>
                               <span className="mini-card-label">
-                                {nome} {isUserMensalPago && (<CheckCircle2 size={12} color="#10b981"style={{ display: 'inline' }}/>)}
+                                {nome} {isUserMensalPago && (<CheckCircle2 size={12} color="#10b981" />)}
                               </span>
-                              <span className="user-spend-value" style={isUserMensalPago ? { color: '#10b981' } : {}}>
+                              <span className="user-spend-value">
                                 {formatMoney(isUserMensalPago ? d.pago : d.pendente)}
                               </span>
                             </div>
