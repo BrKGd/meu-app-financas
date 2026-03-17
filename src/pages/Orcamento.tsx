@@ -315,7 +315,7 @@ const Orcamento: React.FC = () => {
             {/* Header com classe dinâmica para cor de fundo */}
             <div className={`modal-header-premium ${modalDetalhe.tipo === 'Receitas' ? 'header-receitas' : 'header-despesas'}`}>
               <div className="header-info">
-                <h3>Detalhamento de {modalDetalhe.tipo}</h3>
+                <h3>{modalDetalhe.tipo}</h3>
                 <p>Confira os lançamentos deste mês</p>
               </div>
               <button className="btn-close-clean" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
