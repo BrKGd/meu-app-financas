@@ -267,6 +267,10 @@
   overflow-y: auto;
 }
 
+/* Custom Scrollbar para Grid de Ícones */
+.icon-grid-selector::-webkit-scrollbar { width: 6px; }
+.icon-grid-selector::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
 .icon-option-btn {
   aspect-ratio: 1;
   border: 1.5px solid #e2e8f0;
@@ -293,58 +297,61 @@
   box-shadow: 0 8px 15px -4px var(--active-color);
 }
 
-/* --- MODAL EXPANDIDO --- */
+/* --- MODAL EXPANDIDO (FIXED HEADER/FOOTER & SCROLL) --- */
 .modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  padding: 0px;
 }
 
 .modal-content.modal-expanded {
   background: white;
   width: 100%;
   max-width: 520px;
-  border-radius: 40px;
+  max-height: 85vh; /* Limita a altura a 85% da tela */
+  border-radius: 45px;
+  display: flex;
+  flex-direction: column; /* Essencial para fixar topo e base */
   overflow: hidden;
-  padding: 0;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+  padding: 0;
 }
 
 .modal-details-header {
-  padding: 30px;
+  padding: 40px;
   color: white;
+  flex-shrink: 0; /* Impede que o header encolha */
 }
 
-.modal-header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* ÁREA DE SCROLL (ONDE FICA O FORMULÁRIO) */
+.modal-body-padding {
+  padding: 35px;
+  overflow-y: auto; /* Ativa o scroll interno */
+  flex-grow: 1; /* Ocupa o espaço disponível entre header e footer */
 }
+
+/* Custom Scrollbar para o corpo do Modal */
+.modal-body-padding::-webkit-scrollbar { width: 8px; }
+.modal-body-padding::-webkit-scrollbar-track { background: transparent; }
+.modal-body-padding::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 
 .modal-title-text {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-size: 1.8rem;
+  font-weight: 900;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.modal-header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.modal-body-padding {
-  padding: 35px;
-}
-
+/* --- FORMULÁRIO --- */
 .form-flex-column {
   display: flex;
   flex-direction: column;
@@ -358,17 +365,20 @@
   text-transform: uppercase;
   margin-bottom: 8px;
   display: block;
+  letter-spacing: 0.05em;
 }
 
 .form-control {
   width: 100%;
-  padding: 14px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
+  padding: 16px 20px;
+  border: 2px solid #f1f5f9;
+  border-radius: 18px;
   font-size: 1rem;
+  font-weight: 600;
   outline: none;
   background: #f8fafc;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #1e293b;
 }
 
 .form-control:focus {
@@ -379,37 +389,60 @@
 
 .color-picker-wrapper {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
-}
-
-.hex-input {
-  width: 120px;
-  text-align: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
 }
 
 .input-color-square {
-  width: 50px;
-  height: 50px;
+  width: 55px;
+  height: 55px;
   padding: 0;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  border: 2px solid #f1f5f9;
+  border-radius: 15px;
   overflow: hidden;
   cursor: pointer;
+  transition: transform 0.2s ease;
 }
 
+/* --- FOOTER DE AÇÕES (FIXO NA BASE) --- */
 .modal-footer-icons-container {
-  padding: 0 35px 35px;
+  padding: 25px 45px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: white;
+  border-top: 1px solid #f1f5f9;
+  border-radius: 0 0 45px 45px;
+  flex-shrink: 0; /* Impede que o footer encolha */
 }
 
 .footer-right-actions {
   display: flex;
-  gap: 15px;
+  gap: 20px;
+}
+
+.btn-icon-action {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-action:hover:not(:disabled) {
+  transform: scale(1.15) translateY(-3px);
+}
+
+.icon-38 { width: 46px; height: 46px; }
+
+/* --- RESUMO DE VISUALIZAÇÃO --- */
+.fatura-resumo {
+  background: #f8fafc;
+  padding: 25px;
+  border-radius: 25px;
+  border: 1px solid #f1f5f9;
 }
 
 /* --- FLOATING ACTION BUTTON (FAB) --- */
@@ -417,44 +450,26 @@
   position: fixed;
   bottom: 40px;
   right: 40px;
-  width: 60px;
-  height: 60px;
-  border-radius: 20px;
+  width: 65px;
+  height: 65px;
+  border-radius: 22px;
   background: #4361ee;
   color: white;
   border: none;
-  box-shadow: 0 15px 30px rgba(67, 97, 238, 0.4);
+  box-shadow: 0 15px 35px rgba(67, 97, 238, 0.4);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .cat-fab:hover {
   transform: scale(1.1) rotate(90deg);
-  filter: brightness(1.1);
+  filter: brightness(1.15);
 }
-
-.btn-icon-action {
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  padding: 8px;
-  border-radius: 14px;
-  cursor: pointer;
-  display: flex;
-  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.btn-icon-action:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
-}
-
-.icon-32 { width: 32px; height: 32px; }
-.icon-38 { width: 38px; height: 38px; }
 
 /* --- ANIMAÇÕES --- */
 @keyframes fadeIn {
@@ -481,19 +496,16 @@
 
 /* --- RESPONSIVIDADE --- */
 @media (max-width: 768px) {
-  .metas-header { 
-    flex-direction: column; 
-    gap: 25px; 
-    align-items: center; 
-    text-align: center;
-  }
+  .metas-header { flex-direction: column; gap: 25px; align-items: center; text-align: center; }
   .header-controls { align-items: center; width: 100%; }
-  .grid-metas-modern { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-metas-modern { grid-template-columns: 1fr; gap: 20px; }
   .icon-grid-selector { grid-template-columns: repeat(4, 1fr); }
-  .card-value-display { font-size: 1.4rem; }
-  .grid-metas-modern { grid-template-columns: 1fr; }
-  .cat-fab { bottom: 90px; right: 20px; width: 55px; height: 55px; }
-  .icon-grid-selector { grid-template-columns: repeat(3, 1fr); }
-  .cat-title-area h1 { font-size: 1.5rem; }
-  .modal-content.modal-expanded { border-radius: 30px 30px 0 0; align-self: flex-end; margin-bottom: -20px; }
+  .card-value-display { font-size: 1.5rem; }
+  .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
+  .modal-content.modal-expanded { 
+    border-radius: 35px 35px 0 0; 
+    align-self: flex-end; 
+    margin-bottom: 0; 
+    max-height: 85vh; 
+  }
 }

@@ -46,9 +46,7 @@ interface Meta {
   cor_meta: string | null;
 }
 
-// Opções de ícones expandida - Padrão Fintech
 const ICON_OPTIONS = [
-  // Essenciais e Gastos
   { name: 'Wallet', icon: Wallet },
   { name: 'ShoppingCart', icon: ShoppingCart },
   { name: 'ShoppingBag', icon: ShoppingBag },
@@ -61,15 +59,11 @@ const ICON_OPTIONS = [
   { name: 'Zap', icon: Zap },
   { name: 'Home', icon: Home },
   { name: 'Wifi', icon: Wifi },
-  
-  // Saúde e Estilo de Vida
   { name: 'Heart', icon: Heart },
   { name: 'Stethoscope', icon: Stethoscope },
   { name: 'Dumbbell', icon: Dumbbell },
   { name: 'Baby', icon: Baby },
   { name: 'PawPrint', icon: PawPrint },
-  
-  // Lazer e Tecnologia
   { name: 'Gamepad2', icon: Gamepad2 },
   { name: 'Tv', icon: Tv },
   { name: 'Smartphone', icon: Smartphone },
@@ -79,14 +73,10 @@ const ICON_OPTIONS = [
   { name: 'Ticket', icon: Ticket },
   { name: 'Plane', icon: Plane },
   { name: 'Globe', icon: Globe },
-  
-  // Trabalho e Educação
   { name: 'GraduationCap', icon: GraduationCap },
   { name: 'Briefcase', icon: Briefcase },
   { name: 'Hammer', icon: Hammer },
   { name: 'HardHat', icon: HardHat },
-  
-  // Financeiro e Metas
   { name: 'PiggyBank', icon: PiggyBank },
   { name: 'Landmark', icon: Landmark },
   { name: 'DollarSign', icon: DollarSign },
@@ -130,14 +120,14 @@ const CategoriasMetas: React.FC = () => {
     setFeedback({ isOpen: true, type, title, message, onConfirm });
   };
 
-  const getSettingsColor = (hexcolor: string) => {
+  const getContrastColor = (hexcolor: string) => {
     if (!hexcolor) return '#ffffff';
     const hex = hexcolor.replace('#', '');
     const r = parseInt(hex.substring(0, 2), 16);
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
     const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-    return yiq >= 128 ? '#000000' : '#ffffff';
+    return yiq >= 128 ? '#1e293b' : '#ffffff';
   };
 
   const buscarDados = useCallback(async () => {
@@ -178,20 +168,21 @@ const CategoriasMetas: React.FC = () => {
   }, [buscarDados]);
 
   const cardsParaExibir = useMemo(() => {
-    const categoriasFiltradas = categorias.filter(c => c.tipo === activeTab);
-    return categoriasFiltradas.map(cat => {
-      const metaEncontrada = metasMes.find(m => m.categoria_id === cat.id);
-      return {
-        categoria_id: cat.id,
-        user_id: cat.user_id,
-        id_meta: metaEncontrada?.id || null,
-        nome: cat.nome,
-        cor: cat.cor,
-        icone: cat.icone || 'Wallet',
-        valor_meta: metaEncontrada?.valor_meta || 0,
-        existe_meta: !!metaEncontrada
-      };
-    });
+    return categorias
+      .filter(c => c.tipo === activeTab)
+      .map(cat => {
+        const metaEncontrada = metasMes.find(m => m.categoria_id === cat.id);
+        return {
+          categoria_id: cat.id,
+          user_id: cat.user_id,
+          id_meta: metaEncontrada?.id || null,
+          nome: cat.nome,
+          cor: cat.cor,
+          icone: cat.icone || 'Wallet',
+          valor_meta: metaEncontrada?.valor_meta || 0,
+          existe_meta: !!metaEncontrada
+        };
+      });
   }, [categorias, metasMes, activeTab]);
 
   const totalPlanejado = useMemo(() => {
@@ -228,8 +219,8 @@ const CategoriasMetas: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  async function handleSalvar(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSalvar(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     if (!podeEditar(selectedItem)) return;
 
     setLoading(true);
@@ -239,6 +230,7 @@ const CategoriasMetas: React.FC = () => {
 
       let currentCatId = selectedItem?.categoria_id;
 
+      // Se estiver criando ou editando configurações da categoria
       if (!currentCatId || isEditing) {
         const catPayload = { 
           nome: form.nome, 
@@ -257,6 +249,7 @@ const CategoriasMetas: React.FC = () => {
         }
       }
 
+      // Upsert na Meta
       const metaPayload: any = {
         user_id: user.id,
         categoria_id: currentCatId,
@@ -275,17 +268,17 @@ const CategoriasMetas: React.FC = () => {
 
       setIsModalOpen(false);
       await buscarDados();
-      alertar('success', 'Sucesso!', 'Seu planejamento foi atualizado.');
+      alertar('success', 'Sucesso!', 'Planejamento atualizado.');
     } catch (error: any) {
-      alertar('error', 'Ops!', 'Erro ao salvar: ' + error.message);
+      alertar('error', 'Ops!', error.message);
     } finally {
       setLoading(false);
     }
   }
 
   const handleExcluirCascata = () => {
-    if (!selectedItem?.categoria_id || !podeEditar(selectedItem)) return;
-    alertar('danger', 'Confirmar Exclusão', `Isso apagará "${selectedItem.nome}" e todos os registros vinculados. Deseja continuar?`, async () => {
+    if (!selectedItem?.categoria_id) return;
+    alertar('danger', 'Confirmar Exclusão', `Isso apagará "${selectedItem.nome}" e todas as metas associadas.`, async () => {
       setLoading(true);
       try {
         await supabase.from('metas').delete().eq('categoria_id', selectedItem.categoria_id);
@@ -294,7 +287,7 @@ const CategoriasMetas: React.FC = () => {
         setIsModalOpen(false);
         buscarDados();
       } catch (error: any) {
-        alertar('error', 'Erro', 'Não foi possível excluir: ' + error.message);
+        alertar('error', 'Erro', error.message);
       } finally {
         setLoading(false);
       }
@@ -304,14 +297,13 @@ const CategoriasMetas: React.FC = () => {
   return (
     <>
       <div className="cat-page-wrapper metas-container fade-in">
-        
         <header className="metas-header">
           <div className="cat-title-area">
             <div className="titulo-secao">
               <Target size={28} color="#4361ee" />
               <h1>Planejamento</h1>
             </div>
-            <p className="subtitulo-metas">Gerencie seu orçamento mensal</p>
+            <p className="subtitulo-metas">Orçamento mensal e objetivos</p>
           </div>
 
           <div className="header-controls">
@@ -341,63 +333,61 @@ const CategoriasMetas: React.FC = () => {
           <button className={activeTab === 'pessoal' ? 'active' : ''} onClick={() => setActiveTab('pessoal')}><Star size={18} /> Objetivos</button>
         </nav>
 
-        <div className="metas-content">
-          {loading ? (
-            <div className="cat-status"><Loader2 className="spinner" /></div>
-          ) : (
-            <div className="grid-metas-modern">
-              {cardsParaExibir.map((item) => (
-                <div 
-                  key={item.categoria_id} 
-                  className="card-financeiro-flux" 
-                  style={{ '--card-color': item.cor } as any}
-                  onClick={() => openModal(item)}
-                >
-                  <div className="card-bg-icon">
-                    {React.createElement(ICON_OPTIONS.find(i => i.name === item.icone)?.icon || Wallet)}
-                  </div>
-                  
-                  <div className="card-content-top">
-                    <div className="card-icon-small">
-                      {React.createElement(ICON_OPTIONS.find(i => i.name === item.icone)?.icon || Wallet, { size: 18 })}
-                    </div>
-                    <span className="card-label-top">{item.nome.toUpperCase()}</span>
-                  </div>
-
-                  <div className="card-main-info">
-                    <h2 className="card-value-display">
-                      {item.existe_meta 
-                        ? item.valor_meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                        : 'Definir Meta'}
-                    </h2>
-                    <p className="card-subtitle-bottom">
-                      {item.existe_meta ? 'Meta planejada para o período' : 'Clique para configurar'}
-                    </p>
-                  </div>
-                  
-                  <div className="card-edit-indicator">
-                    {podeEditar(item) ? <Edit2 size={14} /> : <Lock size={12} />}
-                  </div>
+        {loading ? (
+          <div className="cat-status"><Loader2 className="spinner" /></div>
+        ) : (
+          <div className="grid-metas-modern">
+            {cardsParaExibir.map((item) => (
+              <div 
+                key={item.categoria_id} 
+                className="card-financeiro-flux" 
+                style={{ '--card-color': item.cor } as any}
+                onClick={() => openModal(item)}
+              >
+                <div className="card-bg-icon">
+                  {React.createElement(ICON_OPTIONS.find(i => i.name === item.icone)?.icon || Wallet)}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                
+                <div className="card-content-top">
+                  <div className="card-icon-small">
+                    {React.createElement(ICON_OPTIONS.find(i => i.name === item.icone)?.icon || Wallet, { size: 18 })}
+                  </div>
+                  <span className="card-label-top">{item.nome}</span>
+                </div>
+
+                <div className="card-main-info">
+                  <h2 className="card-value-display">
+                    {item.existe_meta 
+                      ? item.valor_meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                      : 'R$ 0,00'}
+                  </h2>
+                  <p className="card-subtitle-bottom">
+                    {item.existe_meta ? 'Planejado para o mês' : 'Clique para planejar'}
+                  </p>
+                </div>
+                
+                <div className="card-edit-indicator">
+                  {podeEditar(item) ? <Edit2 size={14} /> : <Lock size={12} />}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {isModalOpen && (
           <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-            <div className="modal-content fade-in modal-expanded" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content modal-expanded fade-in" onClick={(e) => e.stopPropagation()}>
               
-              <div className="modal-details-header" style={{ background: isEditing ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : `linear-gradient(135deg, ${form.cor} 0%, #1e293b 100%)` }}>
+              <div className="modal-details-header" style={{ background: isEditing ? '#1e293b' : `linear-gradient(135deg, ${form.cor} 0%, #1e293b 100%)` }}>
                 <div className="modal-header-top">
-                  <h2 className="modal-title-text" style={{ color: !isEditing ? getSettingsColor(form.cor) : '#fff' }}>
-                    {!selectedItem ? 'Nova Categoria' : isEditing ? 'Configurações' : form.nome}
-                    {!podeEditar(selectedItem) && <Lock size={16} />}
+                  <h2 className="modal-title-text" style={{ color: !isEditing ? getContrastColor(form.cor) : '#fff' }}>
+                    {React.createElement(ICON_OPTIONS.find(i => i.name === form.icone)?.icon || Target, { size: 24 })}
+                    {!selectedItem ? 'Nova Categoria' : isEditing ? 'Configurar Categoria' : form.nome}
                   </h2>
                   <div className="modal-header-actions">
                     {selectedItem && !isEditing && podeEditar(selectedItem) && (
                       <button type="button" className="btn-icon-action" onClick={() => setIsEditing(true)}>
-                        <Settings2 size={32} color={getSettingsColor(form.cor)} />
+                        <Settings2 size={32} color={getContrastColor(form.cor)} />
                       </button>
                     )}
                     <button type="button" onClick={() => setIsModalOpen(false)} className="btn-icon-action">
@@ -408,74 +398,69 @@ const CategoriasMetas: React.FC = () => {
               </div>
 
               <div className="modal-body-padding">
-                <form id="meta-form" onSubmit={handleSalvar}>
-                  <div className="form-flex-column">
-                    <div className="form-group">
-                      <label className="form-label-custom">Nome da Categoria</label>
+                <form id="meta-form" onSubmit={handleSalvar} className="form-flex-column">
+                  <div className="form-group">
+                    <label className="form-label-custom">Nome da Categoria</label>
+                    <input 
+                      className="form-control"
+                      value={form.nome} 
+                      disabled={!isEditing} 
+                      onChange={e => setForm({...form, nome: e.target.value})} 
+                      required 
+                      placeholder="Ex: Alimentação, Lazer..."
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label-custom">Valor do Planejamento (R$)</label>
+                    <input 
+                      className="form-control"
+                      type="number" 
+                      step="0.01" 
+                      value={form.valor_meta} 
+                      disabled={!podeEditar(selectedItem)}
+                      onChange={e => setForm({...form, valor_meta: e.target.value})} 
+                      required 
+                      placeholder="0,00"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label-custom">Ícone Representativo</label>
+                    <div className="icon-grid-selector">
+                      {ICON_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.name}
+                          type="button"
+                          className={`icon-option-btn ${form.icone === opt.name ? 'selected' : ''}`}
+                          onClick={() => isEditing && setForm({...form, icone: opt.name})}
+                          style={{ '--active-color': form.cor } as any}
+                          disabled={!isEditing}
+                        >
+                          <opt.icon size={20} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label-custom">Cor Visual</label>
+                    <div className="color-picker-wrapper">
                       <input 
-                        className="form-control"
+                        type="color" 
+                        value={form.cor} 
+                        disabled={!isEditing}
+                        onChange={e => setForm({...form, cor: e.target.value})} 
+                        className="input-color-square"
+                      />
+                      <input 
                         type="text" 
-                        value={form.nome} 
-                        disabled={!isEditing} 
-                        onChange={e => setForm({...form, nome: e.target.value})} 
-                        required 
-                        placeholder="Ex: Alimentação, Lazer..."
+                        value={form.cor.toUpperCase()} 
+                        disabled={!isEditing}
+                        onChange={e => setForm({...form, cor: e.target.value})}
+                        maxLength={7}
+                        className="form-control hex-input"
                       />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label-custom">Valor da Meta (R$)</label>
-                      <input 
-                        className="form-control"
-                        type="number" 
-                        step="0.01" 
-                        value={form.valor_meta} 
-                        disabled={!podeEditar(selectedItem)}
-                        onChange={e => setForm({...form, valor_meta: e.target.value})} 
-                        required 
-                        placeholder="0,00"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label-custom">Escolha um Ícone</label>
-                      <div className="icon-grid-selector">
-                        {ICON_OPTIONS.map((opt) => (
-                          <button
-                            key={opt.name}
-                            type="button"
-                            className={`icon-option-btn ${form.icone === opt.name ? 'selected' : ''}`}
-                            onClick={() => isEditing && setForm({...form, icone: opt.name})}
-                            style={{ '--active-color': form.cor } as any}
-                            disabled={!isEditing}
-                            title={opt.name}
-                          >
-                            <opt.icon size={20} />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label-custom">Cor de Identificação</label>
-                      <div className="color-picker-wrapper">
-                        <input 
-                          type="color" 
-                          value={form.cor} 
-                          disabled={!isEditing}
-                          onChange={e => setForm({...form, cor: e.target.value})} 
-                          className="input-color-square"
-                          style={{ cursor: isEditing ? 'pointer' : 'default' }}
-                        />
-                        <input 
-                          type="text" 
-                          value={form.cor.toUpperCase()} 
-                          disabled={!isEditing}
-                          onChange={e => setForm({...form, cor: e.target.value})}
-                          maxLength={7}
-                          className="form-control hex-input"
-                        />
-                      </div>
                     </div>
                   </div>
                 </form>
@@ -514,12 +499,10 @@ const CategoriasMetas: React.FC = () => {
         />
       </div>
 
-      {/* FAB REPLICADO DO PROVENTOS - POSICIONADO FORA DO WRAPPER PRINCIPAL PARA FLUTUAR */}
       {perfil?.tipo_usuario !== 'comum' && (
         <button 
           className="cat-fab" 
           onClick={() => openModal()} 
-          title="Nova Categoria"
           style={{ background: activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee' }}
         >
           <Plus size={30} />
