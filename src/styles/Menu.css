@@ -93,14 +93,17 @@
     border-radius: 18px;
     display: flex;
     flex-direction: column;
-    min-width: 110px;
+    min-width: 120px; /* Aumentado levemente para acomodar o ícone à direita */
     border: 1px solid rgba(255, 255, 255, 0.1);
     transition: all 0.3s ease;
 }
 
-/* --- ESTADOS DE PAGAMENTO (NOVO) --- */
+/* --- ESTADOS DE PAGAMENTO (CORREÇÃO DE ALINHAMENTO E OPACIDADE) --- */
+
 .status-pago-opacidade {
-    opacity: 0.5;
+    opacity: 1 !important; 
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 .text-pago {
@@ -115,6 +118,7 @@
     border-radius: 4px;
     font-weight: 800;
     margin-left: 8px;
+    opacity: 1 !important;
 }
 
 .mini-card-label {
@@ -122,19 +126,40 @@
     font-weight: 700;
     text-transform: uppercase;
     display: flex;
-    align-items: center; /* Alinha o ícone verde com o nome */
-    gap: 4px;
+    align-items: center; 
+    justify-content: space-between; /* Empurra o ícone para a direita */
+    width: 100%;
 }
 
-/* Garante que o ícone de check ignore a opacidade do card pai para brilhar no verde */
-.mini-card.status-pago-opacidade svg {
+/* Ícone de check alinhado à direita */
+.mini-card-label svg {
+    margin-left: auto; 
     opacity: 1 !important;
+}
+
+/* Aplicamos o fade apenas no texto do label quando pago */
+.status-pago-opacidade .mini-card-label {
+    color: rgba(255, 255, 255, 0.4); 
+}
+
+/* Garante que o ícone ignore o fade do texto pai */
+.status-pago-opacidade .mini-card-label svg {
+    color: #10b981 !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.3));
+}
+
+.status-pago-opacidade .mini-card-value {
+    color: rgba(255, 255, 255, 0.5) !important;
 }
 
 .mini-card-value {
     font-size: 0.95rem;
     font-weight: 800;
+    margin-top: 4px;
 }
+
+/* --- FIM DA CORREÇÃO --- */
 
 /* Pills de Resumo */
 .pills-row {
@@ -175,7 +200,7 @@
     opacity: 0.4;
 }
 
-/* --- GRID DE AÇÕES (ORIGINAL MANTIDO) --- */
+/* --- GRID DE AÇÕES --- */
 .actions-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -183,7 +208,6 @@
     margin-bottom: 30px;
 }
 
-/* --- GRADE DE AÇÕES MINIMALISTA (NOVO - 5 COLUNAS) --- */
 .actions-grid-minimal {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -238,7 +262,6 @@
     letter-spacing: -0.5px;
 }
 
-/* Estilos Legados para QuickActionCard (Não excluir) */
 .quick-action-card {
     padding: 18px 10px;
     border-radius: 24px;
@@ -360,23 +383,13 @@
     font-weight: 600;
 }
 
-/* Scroll Interno */
 .modal-scroll-area {
     padding: 10px;
     overflow-y: auto;
     background: #ffffff;
     flex-grow: 1;
-    scrollbar-gutter: stable;
 }
 
-.modal-scroll-area::-webkit-scrollbar { width: 6px; }
-.modal-scroll-area::-webkit-scrollbar-track { background: transparent; margin: 20px; }
-.modal-scroll-area::-webkit-scrollbar-thumb {
-    background: #e2e8f0;
-    border-radius: 10px;
-}
-
-/* BOTÃO FECHAR REFATORADO */
 .btn-close-round {
     background: transparent;
     border: none;
@@ -385,15 +398,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
     width: 42px;
     height: 42px;
 }
 
 .btn-close-round:hover { transform: rotate(90deg) scale(1.1); }
-.btn-close-round img { width: 100%; height: 100%; max-width: 42px; object-fit: contain; }
+.btn-close-round img { width: 100%; height: 100%; object-fit: contain; }
 
-/* Itens da Lista */
 .history-item-card {
     margin-bottom: 15px;
     background: #fff;
@@ -442,7 +453,6 @@
 .user-spend-col {
     display: flex;
     flex-direction: column;
-    transition: opacity 0.3s ease;
 }
 
 .user-spend-name {
@@ -452,7 +462,7 @@
     text-transform: uppercase;
     display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: space-between; /* Alinha o ícone do histórico à direita também */
 }
 
 .user-spend-value {
@@ -472,9 +482,8 @@
     .menu-container { padding: 15px; }
     .total-value { font-size: 2.2rem; }
     
-    /* Ajuste fino para as 5 colunas no mobile */
     .actions-grid-minimal { 
-        grid-template-columns: repeat(4, 1fr); /* 4 colunas em telas muito pequenas para não espremer */
+        grid-template-columns: repeat(4, 1fr); 
         gap: 15px 8px; 
     }
     

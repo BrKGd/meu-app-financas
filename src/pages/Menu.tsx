@@ -297,8 +297,9 @@ const Menu: React.FC = () => {
                           const isUserMensalPago = d.pendente === 0 && d.pago > 0;
                           return (
                             <div key={nome} className="user-spend-col" style={{ opacity: isUserMensalPago ? 0.6 : 1 }}>
-                              <span className="user-spend-name">
-                                {nome} {isUserMensalPago && <CheckCircle2 size={12} color="#10b981" style={{ display: 'inline', marginLeft: 4 }} />}
+
+                              <span className="mini-card-label">
+                                {nome} {isUserMensalPago && (<CheckCircle2 size={12} color="#10b981"style={{ display: 'inline' }}/>)}
                               </span>
                               <span className="user-spend-value" style={isUserMensalPago ? { color: '#10b981' } : {}}>
                                 {formatMoney(isUserMensalPago ? d.pago : d.pendente)}
