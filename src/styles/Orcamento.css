@@ -244,8 +244,11 @@
 }
 
 .modal-header-premium .header-info {
-  padding: 40px 45px 30px;
+  padding: 20px 25px 15px;
 }
+
+.modal-footer-icons.footer-despesas { color: var(--danger); }
+.modal-footer-icons.footer-receitas { color: var(--success); }
 
 .modal-header-premium.header-despesas { background-color: var(--danger); }
 .modal-header-premium.header-receitas { background-color: var(--success); }
@@ -279,8 +282,9 @@
 .btn-close-clean img {
   width: 40px; 
   height: 40px;
-  border: 3px;
-  border-color: white;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-sizing: border-box;
 }
 
 /* Quando estiver sobre o fundo colorido, o ícone fica branco */
@@ -293,10 +297,11 @@
 .btn-close-clean:hover img {
   opacity: 1;
   transform: scale(1.1);
+  border-color: white;     /* Garante que a borda continue branca no hover */
 }
 
 .modal-body-premium {
-  padding: 20px 45px 40px;
+  padding: 10px 15px 20px;
   max-height: 450px;
   overflow-y: auto;
 }
@@ -317,7 +322,7 @@
 .fatura-item-valor { font-weight: 800; color: #334155; font-size: 1rem; }
 
 .modal-footer-icons {
-  padding: 30px 45px;
+  padding: 10px 15px;
   background: white;
   display: flex;
   justify-content: space-between;

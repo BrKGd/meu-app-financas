@@ -353,7 +353,8 @@ const Orcamento: React.FC = () => {
                <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
                   Total Visualizado
                </div>
-               <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b' }}>
+               <div className={`modal-footer-icons ${modalDetalhe.tipo === 'Receitas' ? 'footer-receitas' : 'footer-despesas'}`} 
+               style={{ fontSize: '1.2rem', fontWeight: 900}}>
                   {formatMoney(
                     modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0)
                   )}
