@@ -223,13 +223,23 @@
 .obj-goal { font-size: 0.75rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
 
 /* --- MODAIS (VERSÃO PREMIUM / DINÂMICO) --- */
-.modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
 
 .modal-content-premium {
   background: #f8fafc;
   width: 100%;
   max-width: 550px;
-  border-radius: 45px;
+  border-radius: 35px;
   position: relative;
   animation: modalPop 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -249,6 +259,9 @@
 
 .modal-footer-icons.footer-despesas { color: var(--danger); }
 .modal-footer-icons.footer-receitas { color: var(--success); }
+
+.modal-content-premium.despesas { border: var(--danger) 1px solid;} 
+.modal-content-premium.receitas { border: var(--success) 1px solid;}
 
 .modal-header-premium.header-despesas { background-color: var(--danger); }
 .modal-header-premium.header-receitas { background-color: var(--success); }

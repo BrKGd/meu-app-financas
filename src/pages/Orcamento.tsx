@@ -310,7 +310,9 @@ const Orcamento: React.FC = () => {
       {/* --- MODAL ATUALIZADO (DINÂMICO: VERMELHO/VERDE) --- */}
       {modalDetalhe.aberto && (
         <div className="modal-overlay" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
-          <div className="modal-content-premium" onClick={e => e.stopPropagation()}>
+          <div className=
+          {`modal-content-premium ${modalDetalhe.tipo === 'Receitas' ? 'receitas' : 'despesas'}`}
+          onClick={e => e.stopPropagation()}>
             
             {/* Header com classe dinâmica para cor de fundo */}
             <div className={`modal-header-premium ${modalDetalhe.tipo === 'Receitas' ? 'header-receitas' : 'header-despesas'}`}>
@@ -350,8 +352,8 @@ const Orcamento: React.FC = () => {
             </div>
 
             <div className="modal-footer-icons">
-               <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                  Total Visualizado
+               <div style={{ fontSize: '1.75rem', color: '#1e293b', fontWeight: 600 }}>
+                  Total
                </div>
                <div className={`modal-footer-icons ${modalDetalhe.tipo === 'Receitas' ? 'footer-receitas' : 'footer-despesas'}`} 
                style={{ fontSize: '1.2rem', fontWeight: 900}}>
