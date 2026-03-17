@@ -3,7 +3,8 @@ import { supabase } from '../services/supabaseClient';
 import { 
   ShoppingBag, CreditCard, LayoutDashboard, Plus, TrendingUp, 
   ChevronRight, User as UserIcon, Users, Calendar, History, 
-  PiggyBank, ArrowUpCircle, ArrowDownCircle, Target, Shield, LucideProps
+  PiggyBank, ArrowUpCircle, ArrowDownCircle, Target, Shield, LucideProps,
+  CheckCircle2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { TipoUsuario } from '../types/database'; 
@@ -28,17 +29,20 @@ interface Compra {
   cartao: string | null;
   periodo_referencia: string;
   parcela_numero: number;
+  status_pagamento?: string; 
 }
 
 interface GastoPorUsuario {
   nome: string;
   valor: number;
+  valorPago: number; // Novo: para controle interno
 }
 
 interface ItemHistorico {
   chave: string;
-  total: number;
-  porUsuario: Record<string, number>;
+  totalPendente: number;
+  totalPago: number;
+  porUsuario: Record<string, { pendente: number; pago: number }>;
 }
 
 interface PerfilEstado {
@@ -47,7 +51,7 @@ interface PerfilEstado {
 }
 
 const Menu: React.FC = () => {
-  const [resumo, setResumo] = useState({ total: 0, quantidade: 0 });
+  const [resumo, setResumo] = useState({ totalPendente: 0, quantidade: 0 });
   const [gastosPorUsuario, setGastosPorUsuario] = useState<GastoPorUsuario[]>([]);
   const [historicoMensal, setHistoricoMensal] = useState<ItemHistorico[]>([]);
   const [perfil, setPerfil] = useState<PerfilEstado>({ nome: 'Usuário', tipo: 'comum' });
@@ -93,39 +97,58 @@ const Menu: React.FC = () => {
 
       const agora = new Date();
       const mesAtualChave = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+      const mesAtualReferencia = `${mesAtualChave}-01`;
       
-      const mapaHistorico: Record<string, { total: number, porUsuario: Record<string, number> }> = {}; 
-      let contadorItensFaturadosNoMes = 0; 
+      const mapaHistorico: Record<string, ItemHistorico> = {}; 
+      let contadorItensNoMes = 0; 
       
       todasCompras?.forEach(item => {
         const valorParcela = parseFloat(String(item.valor_total)) || 0;
         const nomeResponsavel = mapaNomes[item.user_id] || 'Outros';
+        const estaPago = item.status_pagamento === 'pago';
         
         if (!item.periodo_referencia) return;
         const chaveMes = item.periodo_referencia.substring(0, 7);
 
         if (!mapaHistorico[chaveMes]) {
-          mapaHistorico[chaveMes] = { total: 0, porUsuario: {} };
+          mapaHistorico[chaveMes] = { 
+            chave: chaveMes, 
+            totalPendente: 0, 
+            totalPago: 0, 
+            porUsuario: {} 
+          };
         }
 
         const ref = mapaHistorico[chaveMes];
-        ref.total += valorParcela;
-        ref.porUsuario[nomeResponsavel] = (ref.porUsuario[nomeResponsavel] || 0) + valorParcela;
+        if (!ref.porUsuario[nomeResponsavel]) {
+          ref.porUsuario[nomeResponsavel] = { pendente: 0, pago: 0 };
+        }
 
-        if (chaveMes === mesAtualChave) {
-          contadorItensFaturadosNoMes++;
+        if (estaPago) {
+          ref.totalPago += valorParcela;
+          ref.porUsuario[nomeResponsavel].pago += valorParcela;
+        } else {
+          ref.totalPendente += valorParcela;
+          ref.porUsuario[nomeResponsavel].pendente += valorParcela;
+        }
+
+        if (item.periodo_referencia === mesAtualReferencia) {
+          contadorItensNoMes++;
         }
       });
 
-      const listaHistorico: ItemHistorico[] = Object.keys(mapaHistorico)
-        .map(chave => ({ chave, ...mapaHistorico[chave] }))
+      const listaHistorico = Object.values(mapaHistorico)
         .sort((a, b) => b.chave.localeCompare(a.chave));
 
-      const dadosMesAtual = mapaHistorico[mesAtualChave] || { total: 0, porUsuario: {} };
+      const dadosMesAtual = mapaHistorico[mesAtualChave] || { totalPendente: 0, totalPago: 0, porUsuario: {} };
 
       setHistoricoMensal(listaHistorico);
-      setGastosPorUsuario(Object.entries(dadosMesAtual.porUsuario).map(([nome, valor]) => ({ nome, valor })));
-      setResumo({ total: dadosMesAtual.total, quantidade: contadorItensFaturadosNoMes });
+      setGastosPorUsuario(Object.entries(dadosMesAtual.porUsuario).map(([nome, dados]) => ({ 
+        nome, 
+        valor: dados.pendente,
+        valorPago: dados.pago
+      })));
+      setResumo({ totalPendente: dadosMesAtual.totalPendente, quantidade: contadorItensNoMes });
 
     } catch (err) {
       console.error("Erro ao buscar dados do menu:", err);
@@ -154,23 +177,27 @@ const Menu: React.FC = () => {
         </div>
       </header>
 
-      {/* Card Principal - Clique abre histórico */}
+      {/* Card Principal */}
       <div className="main-card" onClick={() => setShowModalHistorico(true)}>
         <div className="main-card-content">
           <div className="card-label-row">
             {isGestor ? <Users size={18} /> : <UserIcon size={18} />}
-            <span>{isGestor ? 'Dívidas Globais' : 'Minha Dívida'}</span>
+            <span>{isGestor ? 'Pendências Globais' : 'Minha Pendência'}</span>
             <History size={14} style={{ marginLeft: 'auto', opacity: 0.6 }} />
           </div>
 
-          <h2 className="total-value">{formatMoney(resumo.total)}</h2>
+          <h2 className="total-value">{formatMoney(resumo.totalPendente)}</h2>
 
           {isGestor && gastosPorUsuario.length > 0 && (
             <div className="mini-cards-container">
               {gastosPorUsuario.map((g, i) => (
-                <div key={i} className="mini-card">
-                  <span className="mini-card-label">{g.nome}</span>
-                  <span className="mini-card-value">{formatMoney(g.valor)}</span>
+                <div key={i} className={`mini-card ${g.valor === 0 && g.valorPago > 0 ? 'status-pago-opacidade' : ''}`}>
+                  <span className="mini-card-label">
+                    {g.nome} {g.valor === 0 && g.valorPago > 0 && '✅'}
+                  </span>
+                  <span className="mini-card-value">
+                    {g.valor > 0 ? formatMoney(g.valor) : 'Pago'}
+                  </span>
                 </div>
               ))}
             </div>
@@ -181,12 +208,6 @@ const Menu: React.FC = () => {
               <span className="pill-label">Itens no mês:</span>
               <span style={{fontWeight: 800}}>{resumo.quantidade}</span>
             </div>
-            {perfil.tipo === 'administrador' && (
-              <div className="pill admin-pill-style">
-                <Shield size={10} style={{marginRight: 4}}/>
-                <span style={{fontSize: '0.7rem'}}>MODO ADMIN</span>
-              </div>
-            )}
           </div>
         </div>
         <div className="card-decoration" />
@@ -220,17 +241,15 @@ const Menu: React.FC = () => {
         </div>
       </Link>
 
-      {/* Modal de Histórico Mensal - Estilo Refatorado */}
+      {/* Modal de Histórico Mensal */}
       {showModalHistorico && (
         <div className="modal-overlay" onClick={() => setShowModalHistorico(false)}>
           <div className="modal-content history-modal-container fade-in" onClick={e => e.stopPropagation()}>
             <div className="history-header-bg">
                 <div className="history-header-row">
                    <div>
-                     <h2 className="history-title">Histórico Mensal</h2>
-                     <p className="history-subtitle">
-                       {isGestor ? 'Visão consolidada do grupo' : 'Meus gastos faturados'}
-                     </p>
+                     <h2 className="history-title">Histórico de Faturas</h2>
+                     <p className="history-subtitle">Valores pendentes e pagos por mês</p>
                    </div>
                    <button onClick={() => setShowModalHistorico(false)} className="btn-close-round">
                      <img src={iconFechar} alt="Fechar" />
@@ -239,40 +258,46 @@ const Menu: React.FC = () => {
             </div>
 
             <div className="modal-scroll-area">
-              {historicoMensal.length > 0 ? (
-                historicoMensal.map((mesObj, idx) => {
-                  const [ano, mes] = mesObj.chave.split('-');
-                  const dataFormatada = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(parseInt(ano), parseInt(mes) - 1));
-                  const isAtual = (new Date().getMonth() + 1) === parseInt(mes) && new Date().getFullYear() === parseInt(ano);
+              {historicoMensal.map((mesObj, idx) => {
+                const [ano, mes] = mesObj.chave.split('-');
+                const dataFormatada = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(parseInt(ano), parseInt(mes) - 1));
+                const tudoPago = mesObj.totalPendente === 0 && mesObj.totalPago > 0;
 
-                  return (
-                    <div key={idx} className={`history-item-card ${isAtual ? 'active' : ''}`}>
-                      <div className={`history-item-main ${isGestor ? 'has-divider' : ''}`}>
-                        <div className="history-item-info">
-                          <Calendar size={18} color={isAtual ? '#4361ee' : '#64748b'} />
-                          <span className="history-item-date">{dataFormatada}</span>
-                        </div>
-                        <span className={`history-item-total ${isAtual ? 'text-primary' : ''}`}>
-                          {formatMoney(mesObj.total)}
-                        </span>
+                return (
+                  <div key={idx} className={`history-item-card ${tudoPago ? 'status-pago-opacidade' : ''}`}>
+                    <div className="history-item-main">
+                      <div className="history-item-info">
+                        <Calendar size={18} color={tudoPago ? '#10b981' : '#64748b'} />
+                        <span className="history-item-date">{dataFormatada}</span>
+                        {tudoPago && <span className="badge-pago-mini">PAGO</span>}
                       </div>
-
-                      {isGestor && (
-                        <div className="history-user-grid">
-                          {Object.entries(mesObj.porUsuario).map(([nome, valor]) => (
-                            <div key={nome} className="user-spend-col">
-                              <span className="user-spend-name">{nome}</span>
-                              <span className="user-spend-value">{formatMoney(valor)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div style={{ textAlign: 'right' }}>
+                        <span className={`history-item-total ${tudoPago ? 'text-pago' : ''}`}>
+                          {formatMoney(tudoPago ? mesObj.totalPago : mesObj.totalPendente)}
+                        </span>
+                        {!tudoPago && mesObj.totalPago > 0 && (
+                          <div style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 600 }}>
+                            + {formatMoney(mesObj.totalPago)} já pagos
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  );
-                })
-              ) : (
-                <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>Nenhum histórico encontrado.</p>
-              )}
+
+                    {isGestor && (
+                      <div className="history-user-grid">
+                        {Object.entries(mesObj.porUsuario).map(([nome, d]) => (
+                          <div key={nome} className={`user-spend-col ${d.pendente === 0 ? 'text-pago' : ''}`}>
+                            <span className="user-spend-name">{nome} {d.pendente === 0 && '✓'}</span>
+                            <span className="user-spend-value">
+                              {d.pendente > 0 ? formatMoney(d.pendente) : 'Em dia'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
