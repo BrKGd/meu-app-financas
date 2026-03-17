@@ -472,6 +472,79 @@
     color: #334155;
 }
 
+/* --- ESTILOS DO GRÁFICO DE ROSCA --- */
+.chart-section {
+    background: white;
+    padding: 20px;
+    border-radius: 30px;
+    margin-bottom: 25px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+
+.chart-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 15px;
+}
+
+.chart-container-relative {
+    position: relative;
+    width: 180px;
+    height: 180px;
+}
+
+.chart-center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+}
+
+.center-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.center-value {
+    font-size: 0.95rem;
+    font-weight: 900;
+    color: #0f172a;
+}
+
+.chart-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 4px;
+}
+
+.legend-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    white-space: nowrap;
+}
+
 /* --- ANIMAÇÕES --- */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
@@ -499,4 +572,15 @@
     }
     .history-header-bg { padding: 30px 20px; border-radius: 0; }
     .btn-close-round { width: 36px; height: 36px; }
+    chart-wrapper {
+        flex-direction: column;
+        gap: 0;
+    }
+    .chart-legend {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: -10px;
+        padding-bottom: 10px;
+    }
 }

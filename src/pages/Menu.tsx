@@ -7,6 +7,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { TipoUsuario } from '../types/database'; 
 import '../styles/Menu.css';
 
@@ -30,6 +31,7 @@ interface Compra {
   periodo_referencia: string;
   parcela_numero: number;
   status_pagamento?: string; 
+  categoria_id?: string;
 }
 
 interface GastoPorUsuario {
@@ -50,10 +52,17 @@ interface PerfilEstado {
   tipo: TipoUsuario;
 }
 
+interface GastoCategoria {
+  name: string;
+  value: number;
+  color: string;
+}
+
 const Menu: React.FC = () => {
   const [resumo, setResumo] = useState({ totalPendente: 0, quantidade: 0 });
   const [gastosPorUsuario, setGastosPorUsuario] = useState<GastoPorUsuario[]>([]);
   const [historicoMensal, setHistoricoMensal] = useState<ItemHistorico[]>([]);
+  const [gastosPorCategoria, setGastosPorCategoria] = useState<GastoCategoria[]>([]);
   const [perfil, setPerfil] = useState<PerfilEstado>({ nome: 'Usuário', tipo: 'comum' });
   const [loading, setLoading] = useState<boolean>(true);
   const [showModalHistorico, setShowModalHistorico] = useState<boolean>(false);
@@ -67,10 +76,11 @@ const Menu: React.FC = () => {
       const user = authData?.user;
       if (!user) return;
 
-      const [resPerfil, resTodosPerfis, resCompras] = await Promise.all([
+      const [resPerfil, resTodosPerfis, resCompras, resCategorias] = await Promise.all([
         supabase.from('profiles').select('nome, tipo_usuario').eq('id', user.id).single(),
         supabase.from('profiles').select('id, nome'),
-        supabase.from('compras').select('*')
+        supabase.from('compras').select('*'),
+        supabase.from('categorias').select('id, nome, cor')
       ]);
 
       const perfilData = resPerfil.data as Profile | null;
@@ -90,6 +100,7 @@ const Menu: React.FC = () => {
         if (p.id && p.nome) mapaNomes[p.id] = p.nome.split(' ')[0];
       });
 
+      const categoriasData = resCategorias.data || [];
       const comprasBrutas = resCompras.data as Compra[] | null;
       const todasCompras = temAcessoGestao 
         ? comprasBrutas 
@@ -100,6 +111,7 @@ const Menu: React.FC = () => {
       const mesAtualReferencia = `${mesAtualChave}-01`;
       
       const mapaHistorico: Record<string, ItemHistorico> = {}; 
+      const mapaCategorias: Record<string, number> = {};
       
       todasCompras?.forEach(item => {
         const valorParcela = parseFloat(String(item.valor_total)) || 0;
@@ -109,6 +121,7 @@ const Menu: React.FC = () => {
         if (!item.periodo_referencia) return;
         const chaveMes = item.periodo_referencia.substring(0, 7);
 
+        // Agrupamento para o Histórico
         if (!mapaHistorico[chaveMes]) {
           mapaHistorico[chaveMes] = { 
             chave: chaveMes, 
@@ -130,20 +143,40 @@ const Menu: React.FC = () => {
           ref.totalPendente += valorParcela;
           ref.porUsuario[nomeResponsavel].pendente += valorParcela;
         }
+
+        // Agrupamento para o Gráfico (Mês Atual)
+        if (item.periodo_referencia === mesAtualReferencia) {
+          const catId = item.categoria_id || 'sem-categoria';
+          mapaCategorias[catId] = (mapaCategorias[catId] || 0) + valorParcela;
+        }
       });
+
+      // Formatação Dados Gráfico
+      const dadosGrafico = Object.entries(mapaCategorias).map(([id, valor]) => {
+        const cat = categoriasData.find(c => c.id === id);
+        return {
+          name: cat?.nome || 'Outros',
+          value: valor,
+          color: cat?.cor || '#cbd5e1'
+        };
+      }).sort((a, b) => b.value - a.value);
 
       const listaHistorico = Object.values(mapaHistorico)
         .sort((a, b) => b.chave.localeCompare(a.chave));
 
       const dadosMesAtual = mapaHistorico[mesAtualChave] || { totalPendente: 0, totalPago: 0, porUsuario: {} };
 
+      setGastosPorCategoria(dadosGrafico);
       setHistoricoMensal(listaHistorico);
       setGastosPorUsuario(Object.entries(dadosMesAtual.porUsuario).map(([nome, dados]) => ({ 
         nome, 
         valorPendente: dados.pendente,
         valorPago: dados.pago
       })));
-      setResumo({ totalPendente: dadosMesAtual.totalPendente, quantidade: todasCompras?.filter(c => c.periodo_referencia === mesAtualReferencia).length || 0 });
+      setResumo({ 
+        totalPendente: dadosMesAtual.totalPendente, 
+        quantidade: todasCompras?.filter(c => c.periodo_referencia === mesAtualReferencia).length || 0 
+      });
 
     } catch (err) {
       console.error("Erro ao buscar dados do menu:", err);
@@ -159,6 +192,7 @@ const Menu: React.FC = () => {
   if (loading) return null;
 
   const isGestor = perfil.tipo === 'proprietario' || perfil.tipo === 'administrador';
+  const totalGeralMes = gastosPorCategoria.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
     <div className="menu-container fade-in">
@@ -221,7 +255,6 @@ const Menu: React.FC = () => {
         <QuickActionIcon to="/despesas" icon={<ArrowDownCircle />} label="Fixos" color="#ef4444" />
         {perfil.tipo === 'proprietario' && <QuickActionIcon to="/cartoes" icon={<CreditCard />} label="Cartões" color="#7209b7" />}
         <QuickActionIcon to="/listagem" icon={<ShoppingBag />} label="Extrato" color="#00cc66" />
-        {/* NOVO ÍCONE DE PERFIL AQUI */}
         <QuickActionIcon 
           to="/perfil" 
           icon={perfil.tipo === 'comum' ? <UserIcon /> : <Shield />} 
@@ -230,6 +263,49 @@ const Menu: React.FC = () => {
         />
         <QuickActionIcon to="/lancamento" icon={<Plus />} label="Novo" color="#4361ee" isPrimary />
       </div>
+
+      {/* SEÇÃO DO GRÁFICO DE ROSCA */}
+      {gastosPorCategoria.length > 0 && (
+      <div className="chart-section">
+        <h3 className="section-title">Gastos por Categoria</h3>
+        <div className="chart-wrapper">
+          <div className="chart-container-relative">
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={gastosPorCategoria}
+                  innerRadius={55}
+                  outerRadius={75}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {gastosPorCategoria.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value: number) => formatMoney(value)}
+                  contentStyle={{ borderRadius: '15px', border: 'none', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="chart-center-text">
+              <span className="center-label">Total</span>
+              <span className="center-value">{formatMoney(totalGeralMes).replace('R$', '')}</span>
+            </div>
+          </div>
+          
+          <div className="chart-legend">
+            {gastosPorCategoria.slice(0, 5).map((item, idx) => (
+              <div key={idx} className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: item.color }}></span>
+                <span className="legend-label">{item.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
 
       {/* Modal de Histórico Mensal */}
       {showModalHistorico && (
