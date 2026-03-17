@@ -2,8 +2,8 @@
 
 /* --- ESTRUTURA GERAL --- */
 .menu-container {
-    padding: 20px;
-    max-width: 1200px;
+    padding: 10px;
+    max-width: 100%;
     margin: 0 auto;
     padding-bottom: 100px;
     font-family: 'Inter', sans-serif;
@@ -43,7 +43,7 @@
 .main-card {
     background: linear-gradient(135deg, #0f172a 0%, #3f37c9 100%);
     border-radius: 35px;
-    padding: 30px;
+    padding: 20px;
     color: white;
     margin-bottom: 30px;
     position: relative;
@@ -51,6 +51,7 @@
     box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.3);
     transition: transform 0.3s ease;
     cursor: pointer;
+    width: 100%;
 }
 
 .main-card:active {
