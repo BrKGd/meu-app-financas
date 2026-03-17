@@ -34,8 +34,8 @@ interface Compra {
 
 interface GastoPorUsuario {
   nome: string;
-  valor: number;
-  valorPago: number; // Novo: para controle interno
+  valorPendente: number;
+  valorPago: number;
 }
 
 interface ItemHistorico {
@@ -145,7 +145,7 @@ const Menu: React.FC = () => {
       setHistoricoMensal(listaHistorico);
       setGastosPorUsuario(Object.entries(dadosMesAtual.porUsuario).map(([nome, dados]) => ({ 
         nome, 
-        valor: dados.pendente,
+        valorPendente: dados.pendente,
         valorPago: dados.pago
       })));
       setResumo({ totalPendente: dadosMesAtual.totalPendente, quantidade: contadorItensNoMes });
@@ -190,16 +190,19 @@ const Menu: React.FC = () => {
 
           {isGestor && gastosPorUsuario.length > 0 && (
             <div className="mini-cards-container">
-              {gastosPorUsuario.map((g, i) => (
-                <div key={i} className={`mini-card ${g.valor === 0 && g.valorPago > 0 ? 'status-pago-opacidade' : ''}`}>
-                  <span className="mini-card-label">
-                    {g.nome} {g.valor === 0 && g.valorPago > 0 && '✅'}
-                  </span>
-                  <span className="mini-card-value">
-                    {g.valor > 0 ? formatMoney(g.valor) : 'Pago'}
-                  </span>
-                </div>
-              ))}
+              {gastosPorUsuario.map((g, i) => {
+                const isUserPago = g.valorPendente === 0 && g.valorPago > 0;
+                return (
+                  <div key={i} className={`mini-card ${isUserPago ? 'status-pago-opacidade' : ''}`}>
+                    <span className="mini-card-label">
+                      {g.nome} {isUserPago && <CheckCircle2 size={10} style={{ display: 'inline', marginLeft: 2 }} />}
+                    </span>
+                    <span className="mini-card-value">
+                      {isUserPago ? formatMoney(g.valorPago) : formatMoney(g.valorPendente)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -269,15 +272,19 @@ const Menu: React.FC = () => {
                       <div className="history-item-info">
                         <Calendar size={18} color={tudoPago ? '#10b981' : '#64748b'} />
                         <span className="history-item-date">{dataFormatada}</span>
-                        {tudoPago && <span className="badge-pago-mini">PAGO</span>}
+                        {tudoPago && (
+                          <div className="badge-pago-mini" style={{ backgroundColor: '#10b981', color: '#fff', fontSize: '0.6rem', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: 800 }}>
+                            PAGO
+                          </div>
+                        )}
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <span className={`history-item-total ${tudoPago ? 'text-pago' : ''}`}>
+                        <span className={`history-item-total ${tudoPago ? 'text-pago' : ''}`} style={tudoPago ? { color: '#10b981' } : {}}>
                           {formatMoney(tudoPago ? mesObj.totalPago : mesObj.totalPendente)}
                         </span>
                         {!tudoPago && mesObj.totalPago > 0 && (
                           <div style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 600 }}>
-                            + {formatMoney(mesObj.totalPago)} já pagos
+                            + {formatMoney(mesObj.totalPago)} pagos
                           </div>
                         )}
                       </div>
@@ -285,14 +292,19 @@ const Menu: React.FC = () => {
 
                     {isGestor && (
                       <div className="history-user-grid">
-                        {Object.entries(mesObj.porUsuario).map(([nome, d]) => (
-                          <div key={nome} className={`user-spend-col ${d.pendente === 0 ? 'text-pago' : ''}`}>
-                            <span className="user-spend-name">{nome} {d.pendente === 0 && '✓'}</span>
-                            <span className="user-spend-value">
-                              {d.pendente > 0 ? formatMoney(d.pendente) : 'Em dia'}
-                            </span>
-                          </div>
-                        ))}
+                        {Object.entries(mesObj.porUsuario).map(([nome, d]) => {
+                          const isUserMensalPago = d.pendente === 0 && d.pago > 0;
+                          return (
+                            <div key={nome} className="user-spend-col" style={{ opacity: isUserMensalPago ? 0.6 : 1 }}>
+                              <span className="user-spend-name">
+                                {nome} {isUserMensalPago && <CheckCircle2 size={10} style={{ display: 'inline', color: '#10b981' }} />}
+                              </span>
+                              <span className="user-spend-value" style={isUserMensalPago ? { color: '#10b981' } : {}}>
+                                {formatMoney(isUserMensalPago ? d.pago : d.pendente)}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
