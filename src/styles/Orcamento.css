@@ -17,7 +17,7 @@
   max-width: 1200px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
-  padding-bottom: 120px; /* Aumentado para não cobrir conteúdo com o FAB */
+  padding-bottom: 120px;
 }
 
 .loading-state { 
@@ -29,20 +29,74 @@
   color: var(--primary); 
 }
 
-/* --- HEADER --- */
+/* --- HEADER (Alinhamento Horizontal Estratégico) --- */
 .orcamento-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 35px;
+  width: 100%;
 }
 
-.header-info h2 {
-  font-size: 2rem;
+/* Wrapper para manter título e seletor na mesma linha */
+.header-content-wrapper {
+  display: flex;
+  justify-content: space-between; /* Título à esquerda, Seletor à direita */
+  align-items: center;           /* Alinhamento vertical centralizado */
+  width: 100%;
+}
+
+.header-content-wrapper h2 {
+  font-size: 2.5rem;
   font-weight: 950;
   color: #0f172a;
   margin: 0;
   letter-spacing: -1px;
+}
+
+/* SELETOR DE MÊS - PADRÃO PROVENTOS AJUSTADO */
+.prov-month-selector {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: white;
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  width: fit-content;
+}
+
+.prov-current-month {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: capitalize;
+  min-width: 160px;
+  justify-content: center;
+}
+
+.prov-current-month span {
+  font-size: 0.9rem;
+  letter-spacing: -0.2px;
+}
+
+.prov-nav-btn {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.prov-nav-btn:hover {
+  background: var(--primary);
+  color: white;
+  transform: translateY(-1px);
 }
 
 .badge-mes {
@@ -56,10 +110,9 @@
   font-weight: 800;
   color: #64748b;
   border: 1px solid #e2e8f0;
-  margin-top: 10px;
 }
 
-/* --- FAB (BOTÃO FLUTUANTE) - PADRÃO UNIFICADO --- */
+/* --- FAB (BOTÃO FLUTUANTE) --- */
 .btn-ajuste-premium {
   position: fixed;
   bottom: 40px;
@@ -212,6 +265,8 @@
 /* --- RESPONSIVIDADE --- */
 @media (max-width: 768px) {
   .orcamento-container { padding: 20px 10px 100px; }
+  .header-content-wrapper { flex-direction: column; align-items: flex-start; gap: 15px; }
+  .prov-month-selector { width: 100%; justify-content: space-between; }
   .summary-grid-objectives { grid-template-columns: 1fr; }
   .alocacao-grid-3-col { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .aloc-mini-card { padding: 12px 8px; }

@@ -2,7 +2,8 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   PiggyBank, AlertCircle, ArrowUpCircle, 
-  Calendar, TrendingUp, X, ArrowDownCircle, CheckCircle2, Info, Settings
+  Calendar, TrendingUp, X, ArrowDownCircle, CheckCircle2, Info, Settings,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import '../styles/Orcamento.css';
 import { useNavigate } from 'react-router-dom';
@@ -36,6 +37,10 @@ interface DadosOrcamento {
 const Orcamento: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  
+  // --- Estados de Data (Padrão Proventos) ---
+  const [dataFiltro, setDataFiltro] = useState(new Date());
+
   const [modalDetalhe, setModalDetalhe] = useState<{aberto: boolean, tipo: string, dados: any[]}>({ 
     aberto: false, tipo: '', dados: [] 
   });
@@ -57,6 +62,12 @@ const Orcamento: React.FC = () => {
 
   const formatMoney = (v: number | string) => {
     return (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  // Funções de Navegação de Data
+  const alterarMes = (delta: number) => {
+    const novaData = new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() + delta, 1);
+    setDataFiltro(novaData);
   };
 
   const calcular503020 = (receita: number, categorias: CategoriaConsolidada[]) => {
@@ -82,9 +93,8 @@ const Orcamento: React.FC = () => {
   const buscarDadosCompletos = useCallback(async () => {
     setLoading(true);
     try {
-      const agora = new Date();
-      const anoAtual = agora.getFullYear();
-      const mesAtual = agora.getMonth() + 1;
+      const anoAtual = dataFiltro.getFullYear();
+      const mesAtual = dataFiltro.getMonth() + 1;
       const primeiroDia = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
       const ultimoDia = new Date(anoAtual, mesAtual, 0).toISOString().split('T')[0];
 
@@ -146,7 +156,7 @@ const Orcamento: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dataFiltro]);
 
   useEffect(() => {
     buscarDadosCompletos();
@@ -166,11 +176,22 @@ const Orcamento: React.FC = () => {
   return (
     <div className="orcamento-container">
       <header className="orcamento-header">
-        <div className="header-info">
+        <div className="header-content-wrapper">
           <h2>Gestão Estratégica</h2>
-          <div className="badge-mes">
-            <Calendar size={14} />
-            <span>{new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date()).toUpperCase()}</span>
+          
+          <div className="prov-month-selector">
+            <button onClick={() => alterarMes(-1)} className="prov-nav-btn">
+              <ChevronLeft size={20} />
+            </button>
+            <div className="prov-current-month">
+              <Calendar size={18} style={{ color: 'var(--primary)' }} />
+              <span>
+                {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(dataFiltro)}
+              </span>
+            </div>
+            <button onClick={() => alterarMes(1)} className="prov-nav-btn">
+              <ChevronRight size={20} />
+            </button>
           </div>
         </div>
       </header>
