@@ -27,9 +27,10 @@ interface Compra {
   parcela_numero: number;
   parcelas_total: number;
   data_compra: string; 
-  cartao_id: number; // Alterado para ID
+  cartao_id: number; 
   forma_pagamento: string;
   periodo_referencia: string;
+  status_pagamento: string; // Adicionado para a nova lógica de limite
 }
 
 const Cartoes: React.FC = () => {
@@ -86,21 +87,25 @@ const Cartoes: React.FC = () => {
     }
   }
 
-  // --- Cálculos Atualizados para Novo Esquema ---
+  // --- Cálculos Atualizados para Novo Esquema e Lógica de Status ---
   
   const calcularDisponivel = (cartao: Cartao, limite: number | string) => {
     const limNum = Number(limite);
-    // Soma todas as compras no crédito deste cartão que ainda não foram pagas
-    // (Ou simplificando: todas as parcelas futuras + atual vinculadas a este ID)
+    
+    // Soma apenas compras no crédito que NÃO estejam com status 'pago'
     const totalComprometido = compras.reduce((acc, item) => {
       if (item.cartao_id !== cartao.id) return acc;
       
-      // Consideramos comprometido o que vence no mês atual ou futuro
+      // Se já estiver pago, o limite é liberado (não entra no acumulador de comprometido)
+      if (item.status_pagamento === 'pago') return acc;
+
+      // Consideramos comprometido o que vence no mês atual ou futuro e que não está pago
       if (item.periodo_referencia >= periodoAtual) {
          return acc + Number(item.valor_total);
       }
       return acc;
     }, 0);
+
     return Number((limNum - totalComprometido).toFixed(2));
   };
 
@@ -253,6 +258,7 @@ const Cartoes: React.FC = () => {
                               <div className="fatura-item-desc">{item.descricao || item.loja}</div>
                               <div className="fatura-item-sub">
                                 {item.parcelas_total > 1 ? `Parcela ${item.parcela_numero}/${item.parcelas_total}` : 'À Vista'}
+                                {item.status_pagamento === 'pago' && <span style={{ marginLeft: '8px', color: '#10b981' }}>• Pago</span>}
                               </div>
                             </div>
                             <div className="fatura-item-valor">{formatMoney(item.valor_total)}</div>
