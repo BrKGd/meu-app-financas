@@ -8,6 +8,9 @@ import {
 import '../styles/Orcamento.css';
 import { useNavigate } from 'react-router-dom';
 
+// Importação dos ícones de ação para o modal (mesmo padrão do Cartoes.tsx)
+import iconFechar from '../assets/fechar.png';
+
 // --- Interfaces para Tipagem ---
 interface CategoriaConsolidada {
   id: string;
@@ -38,7 +41,7 @@ const Orcamento: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   
-  // --- Estados de Data (Padrão Proventos) ---
+  // --- Estados de Data ---
   const [dataFiltro, setDataFiltro] = useState(new Date());
 
   const [modalDetalhe, setModalDetalhe] = useState<{aberto: boolean, tipo: string, dados: any[]}>({ 
@@ -64,7 +67,6 @@ const Orcamento: React.FC = () => {
     return (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  // Funções de Navegação de Data
   const alterarMes = (delta: number) => {
     const novaData = new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() + delta, 1);
     setDataFiltro(novaData);
@@ -96,19 +98,16 @@ const Orcamento: React.FC = () => {
       const anoAtual = dataFiltro.getFullYear();
       const mesAtual = dataFiltro.getMonth() + 1;
       const primeiroDiaMes = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
-      
-      // Datas para busca de proventos (range tradicional)
-      const primeiroDiaBusca = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
       const ultimoDiaBusca = new Date(anoAtual, mesAtual, 0).toISOString().split('T')[0];
 
       const [
         { data: metasData },
         { data: proventos },
-        { data: todasComprasMes }, // Agora buscamos tudo aqui (fixos, parcelados e únicos)
+        { data: todasComprasMes },
         { data: cats }
       ] = await Promise.all([
         (supabase.from('metas') as any).select('*').eq('mes_referencia', mesAtual).eq('ano_referencia', anoAtual),
-        (supabase.from('proventos') as any).select('*').gte('data_recebimento', primeiroDiaBusca).lte('data_recebimento', ultimoDiaBusca),
+        (supabase.from('proventos') as any).select('*').gte('data_recebimento', primeiroDiaMes).lte('data_recebimento', ultimoDiaBusca),
         (supabase.from('compras') as any).select('valor_total, categoria_id').eq('periodo_referencia', primeiroDiaMes),
         (supabase.from('categorias') as any).select('*').order('nome', { ascending: true })
       ]);
@@ -116,7 +115,6 @@ const Orcamento: React.FC = () => {
       const gastosPorCat: Record<string, number> = {};
       let totalGastoFinal = 0;
 
-      // Processa todas as compras do mês (incluindo as geradas por recorrência/parcelamento)
       todasComprasMes?.forEach((c: any) => {
         const v = parseFloat(c.valor_total) || 0;
         totalGastoFinal += v;
@@ -291,7 +289,7 @@ const Orcamento: React.FC = () => {
           <h3 className="premium-section-title"><TrendingUp size={18} /> Objetivos Ativos</h3>
           <div className="summary-grid-objectives">
             {dados.objetivosPessoais.map(meta => (
-              <div key={meta.id} className="objective-card-premium">
+              <div key={meta.id} className="objective-card-premium clickable" onClick={() => setModalDetalhe({ aberto: true, tipo: 'Objetivos', dados: [meta] })}>
                 <div className="obj-header">
                   <span className="obj-name">{meta.nome}</span>
                   <span className="obj-percent">{(meta.metaValor > 0 ? (meta.gastoReal/meta.metaValor)*100 : 0).toFixed(0)}%</span>
@@ -309,33 +307,62 @@ const Orcamento: React.FC = () => {
         </>
       )}
 
+      {/* --- MODAL ATUALIZADO (DINÂMICO: VERMELHO/VERDE) --- */}
       {modalDetalhe.aberto && (
         <div className="modal-overlay" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Detalhes de {modalDetalhe.tipo}</h3>
-              <button className="close-btn" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}><X size={20} /></button>
+          <div className="modal-content-premium" onClick={e => e.stopPropagation()}>
+            
+            {/* Header com classe dinâmica para cor de fundo */}
+            <div className={`modal-header-premium ${modalDetalhe.tipo === 'Receitas' ? 'header-receitas' : 'header-despesas'}`}>
+              <div className="header-info">
+                <h3>Detalhamento de {modalDetalhe.tipo}</h3>
+                <p>Confira os lançamentos deste mês</p>
+              </div>
+              <button className="btn-close-clean" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
+                <img src={iconFechar} alt="Fechar" />
+              </button>
             </div>
-            <div className="modal-body">
-              {modalDetalhe.tipo === 'Receitas' ? (
-                modalDetalhe.dados.map((p, i) => (
-                  <div key={p.id || i} className="detalhe-item">
-                    <span>{p.descricao}</span>
-                    <strong>{formatMoney(p.valor)}</strong>
-                  </div>
-                ))
-              ) : (
-                modalDetalhe.dados.map((c, i) => (
-                  <div key={c.id || i} className="detalhe-item">
-                    <span>{c.nome}</span>
-                    <strong>{formatMoney(c.gastoReal)}</strong>
-                  </div>
-                ))
-              )}
+
+            <div className="modal-body-premium">
+              <div className="fatura-lista">
+                {modalDetalhe.tipo === 'Receitas' ? (
+                  modalDetalhe.dados.map((p, i) => (
+                    <div key={p.id || i} className="fatura-item">
+                      <div className="fatura-item-info">
+                        <span className="fatura-item-desc">{p.descricao}</span>
+                        <span className="fatura-item-sub">Recebido em {new Date(p.data_recebimento).toLocaleDateString()}</span>
+                      </div>
+                      <span className="fatura-item-valor" style={{ color: '#10b981' }}>+ {formatMoney(p.valor)}</span>
+                    </div>
+                  ))
+                ) : (
+                  modalDetalhe.dados.map((c, i) => (
+                    <div key={c.id || i} className="fatura-item">
+                      <div className="fatura-item-info">
+                        <span className="fatura-item-desc">{c.nome}</span>
+                        <span className="fatura-item-sub">Consolidado no mês</span>
+                      </div>
+                      <span className="fatura-item-valor">{formatMoney(c.gastoReal)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer-icons">
+               <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                  Total Visualizado
+               </div>
+               <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b' }}>
+                  {formatMoney(
+                    modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0)
+                  )}
+               </div>
             </div>
           </div>
         </div>
       )}
+
       <button 
         className="btn-ajuste-premium" 
         onClick={() => navigate('/CategoriasMetas')}
