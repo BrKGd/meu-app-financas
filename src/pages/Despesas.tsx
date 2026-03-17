@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Calendar, Tag, Trash2, X, Save, 
   ShoppingCart, Loader2, Filter, CreditCard, Banknote, Landmark, ChevronLeft, ChevronRight,
-  QrCode, Receipt, AlertTriangle, User, Store, Lock, UserPlus, Repeat
+  QrCode, Receipt, AlertTriangle, User, Store, Lock, UserPlus, Repeat, CheckCircle2
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
@@ -191,7 +191,6 @@ const Despesas: React.FC = () => {
   const totalGastoFinal = useMemo(() => despesas.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0), [despesas]);
   const extrapolou = totalGastoFinal > metaTotalPlanejada && metaTotalPlanejada > 0;
   
-  // Lógica de cálculo do excedente
   const valorExcedente = totalGastoFinal - metaTotalPlanejada;
   const percentualExcedente = metaTotalPlanejada > 0 
     ? Math.round((valorExcedente / metaTotalPlanejada) * 100) 
@@ -406,7 +405,12 @@ const Despesas: React.FC = () => {
                           {item.recorrencia_id && !item.parcelado && <Repeat size={12} style={{marginLeft: '6px', color: '#6366f1'}} />}
                           {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.4, marginLeft: '6px'}} />}
                         </span>
-                        <span className="desp-value value-negative">{formatarMoeda(item.valor_projetado || 0)}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {item.status_pagamento === 'pago' && <CheckCircle2 size={16} color="#10b981" />}
+                          <span className={`desp-value ${item.status_pagamento === 'pago' ? 'value-paid' : 'value-negative'}`}>
+                            {formatarMoeda(item.valor_projetado || 0)}
+                          </span>
+                        </div>
                       </div>
                       <div className="desp-meta-line">
                         <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
@@ -426,8 +430,16 @@ const Despesas: React.FC = () => {
               <div className="edit-modal-header">
                 <div>
                   <h2 style={{margin: 0, fontWeight: 900, fontSize: '1.25rem'}}>{ temPermissaoEscrita(itemEditando) ? 'Editar Lançamento' : 'Visualizar Detalhes' }</h2>
-                  { itemEditando.recorrencia_id && <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}><Repeat size={10} color="#6366f1" /><span style={{fontSize: '0.65rem', color: '#6366f1', fontWeight: 700}}>LANÇAMENTO RECORRENTE</span></div>}
-                  { !temPermissaoEscrita(itemEditando) && <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}><Lock size={10} color="#ef4444" /><span style={{fontSize: '0.65rem', color: '#ef4444', fontWeight: 700}}>APENAS VISUALIZAÇÃO</span></div>}
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px'}}>
+                    {itemEditando.status_pagamento === 'pago' && (
+                      <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                        <CheckCircle2 size={10} color="#10b981" />
+                        <span style={{fontSize: '0.65rem', color: '#10b981', fontWeight: 700}}>PAGO</span>
+                      </div>
+                    )}
+                    { itemEditando.recorrencia_id && <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}><Repeat size={10} color="#6366f1" /><span style={{fontSize: '0.65rem', color: '#6366f1', fontWeight: 700}}>RECORRENTE</span></div>}
+                    { !temPermissaoEscrita(itemEditando) && <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}><Lock size={10} color="#ef4444" /><span style={{fontSize: '0.65rem', color: '#ef4444', fontWeight: 700}}>VISUALIZAÇÃO</span></div>}
+                  </div>
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="btn-png-action"><img src={iconFechar} alt="Fechar" style={{width: '32px'}} /></button>
               </div>
