@@ -1,4 +1,4 @@
-/* Menu.css - Versão Premium Refatorada */
+/* Menu.css - Versão Premium Refatorada & Atualizada */
 
 /* --- ESTRUTURA GERAL --- */
 .menu-container {
@@ -95,13 +95,40 @@
     flex-direction: column;
     min-width: 110px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+/* --- ESTADOS DE PAGAMENTO (NOVO) --- */
+.status-pago-opacidade {
+    opacity: 0.5;
+}
+
+.text-pago {
+    color: #10b981 !important;
+}
+
+.badge-pago-mini {
+    background: #10b981;
+    color: white;
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 800;
+    margin-left: 8px;
 }
 
 .mini-card-label {
     font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
-    opacity: 0.7;
+    display: flex;
+    align-items: center; /* Alinha o ícone verde com o nome */
+    gap: 4px;
+}
+
+/* Garante que o ícone de check ignore a opacidade do card pai para brilhar no verde */
+.mini-card.status-pago-opacidade svg {
+    opacity: 1 !important;
 }
 
 .mini-card-value {
@@ -148,12 +175,59 @@
     opacity: 0.4;
 }
 
-/* --- GRID DE AÇÕES --- */
+/* --- GRID DE AÇÕES (ORIGINAL MANTIDO) --- */
 .actions-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     margin-bottom: 30px;
+}
+
+/* --- GRADE DE AÇÕES MINIMALISTA (NOVO - 5 COLUNAS) --- */
+.actions-grid-minimal {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px 10px;
+    margin-bottom: 35px;
+    padding: 10px 0;
+}
+
+.quick-action-minimal-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.quick-action-minimal-link:active {
+    transform: scale(0.9);
+}
+
+.action-icon-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+}
+
+.action-icon-circle.primary-bg {
+    background: linear-gradient(135deg, #4361ee, #3f37c9);
+    color: white;
+    box-shadow: 0 8px 16px rgba(67, 97, 238, 0.25);
+}
+
+.action-icon-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #475569;
+    text-align: center;
+    white-space: nowrap;
+    letter-spacing: -0.2px;
 }
 
 .section-title {
@@ -164,6 +238,7 @@
     letter-spacing: -0.5px;
 }
 
+/* Estilos Legados para QuickActionCard (Não excluir) */
 .quick-action-card {
     padding: 18px 10px;
     border-radius: 24px;
@@ -178,23 +253,9 @@
     box-sizing: border-box;
 }
 
-.quick-action-card:active {
-    transform: scale(0.92);
-}
-
-.quick-action-card.primary {
-    background: #4361ee;
-    box-shadow: 0 10px 20px rgba(67, 97, 238, 0.15);
-    border: none;
-    color: white;
-}
-
-.quick-action-card.secondary {
-    background: white;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-    border: 1px solid #f1f5f9;
-    color: #1e293b;
-}
+.quick-action-card:active { transform: scale(0.92); }
+.quick-action-card.primary { background: #4361ee; color: white; box-shadow: 0 10px 20px rgba(67, 97, 238, 0.15); }
+.quick-action-card.secondary { background: white; border: 1px solid #f1f5f9; color: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
 
 .action-icon-wrapper {
     width: 48px;
@@ -315,7 +376,7 @@
     border-radius: 10px;
 }
 
-/* BOTÃO FECHAR REFATORADO (CORREÇÃO DE TAMANHO) */
+/* BOTÃO FECHAR REFATORADO */
 .btn-close-round {
     background: transparent;
     border: none;
@@ -325,20 +386,12 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    width: 42px;  /* Largura fixa do container */
-    height: 42px; /* Altura fixa do container */
+    width: 42px;
+    height: 42px;
 }
 
-.btn-close-round:hover {
-    transform: rotate(90deg) scale(1.1);
-}
-
-.btn-close-round img {
-    width: 100%;     /* Ocupa o tamanho do container */
-    height: 100%;
-    max-width: 42px; /* Limite máximo para não estourar */
-    object-fit: contain;
-}
+.btn-close-round:hover { transform: rotate(90deg) scale(1.1); }
+.btn-close-round img { width: 100%; height: 100%; max-width: 42px; object-fit: contain; }
 
 /* Itens da Lista */
 .history-item-card {
@@ -350,25 +403,13 @@
     transition: all 0.3s ease;
 }
 
-.history-item-card:hover {
-    border-color: #cbd5e1;
-    transform: translateY(-2px);
-}
-
-.history-item-card.active {
-    background: #f8fafc;
-    border: 2px solid #4361ee;
-}
+.history-item-card:hover { border-color: #cbd5e1; transform: translateY(-2px); }
 
 .history-item-main {
     display: flex;
     justify-content: space-between;
     padding: 20px;
     align-items: center;
-}
-
-.history-item-main.has-divider {
-    border-bottom: 1px dashed #e2e8f0;
 }
 
 .history-item-info {
@@ -390,10 +431,6 @@
     font-size: 1.1rem;
 }
 
-.text-primary {
-    color: #4361ee !important;
-}
-
 .history-user-grid {
     padding: 15px 20px;
     background: #f8fafc;
@@ -405,6 +442,7 @@
 .user-spend-col {
     display: flex;
     flex-direction: column;
+    transition: opacity 0.3s ease;
 }
 
 .user-spend-name {
@@ -412,6 +450,9 @@
     font-weight: 700;
     color: #94a3b8;
     text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .user-spend-value {
@@ -430,9 +471,16 @@
 @media (max-width: 480px) {
     .menu-container { padding: 15px; }
     .total-value { font-size: 2.2rem; }
-    .actions-grid { gap: 8px; }
-    .quick-action-card { padding: 15px 5px; border-radius: 20px; }
     
+    /* Ajuste fino para as 5 colunas no mobile */
+    .actions-grid-minimal { 
+        grid-template-columns: repeat(4, 1fr); /* 4 colunas em telas muito pequenas para não espremer */
+        gap: 15px 8px; 
+    }
+    
+    .action-icon-circle { width: 48px; height: 48px; }
+    .action-icon-label { font-size: 0.65rem; }
+
     .history-modal-container {
         width: 100%;
         height: 100%;

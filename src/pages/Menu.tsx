@@ -195,7 +195,7 @@ const Menu: React.FC = () => {
                 return (
                   <div key={i} className={`mini-card ${isUserPago ? 'status-pago-opacidade' : ''}`}>
                     <span className="mini-card-label">
-                      {g.nome} {isUserPago && <CheckCircle2 size={10} style={{ display: 'inline', marginLeft: 2 }} />}
+                      {g.nome} {isUserPago && <CheckCircle2 size={12} color="#10b981" style={{ display: 'inline', marginLeft: 4 }} />}
                     </span>
                     <span className="mini-card-value">
                       {isUserPago ? formatMoney(g.valorPago) : formatMoney(g.valorPendente)}
@@ -218,15 +218,16 @@ const Menu: React.FC = () => {
 
       <h3 className="section-title">Ações Rápidas</h3>
       
-      <div className="actions-grid">
-        <QuickActionLink to="/dashboard" icon={<LayoutDashboard />} label="Painel" sub="Análise" color="#4361ee" />
-        {isGestor && <QuickActionLink to="/categoriasMetas" icon={<Target />} label="Metas" sub="Planejar" color="#8b5cf6" />}
-        {isGestor && <QuickActionLink to="/orcamento" icon={<PiggyBank />} label="Orçamento" sub="Gestão" color="#ff9900" />}
-        {isGestor && <QuickActionLink to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" sub="Renda" color="#16a34a" />}
-        <QuickActionLink to="/despesas" icon={<ArrowDownCircle />} label="Gastos" sub="Fixos" color="#ef4444" />
-        {perfil.tipo === 'proprietario' && <QuickActionLink to="/cartoes" icon={<CreditCard />} label="Cartões" sub="Bancos" color="#7209b7" />}
-        <QuickActionLink to="/listagem" icon={<ShoppingBag />} label="Extrato" sub="Compras" color="#00cc66" />
-        <QuickActionLink to="/lancamento" icon={<Plus />} label="Novo" sub="Lançar" color="#fff" isPrimary />
+      {/* Grade de Ações em 5 colunas sem cards de fundo */}
+      <div className="actions-grid-minimal">
+        <QuickActionIcon to="/dashboard" icon={<LayoutDashboard />} label="Painel" color="#4361ee" />
+        {isGestor && <QuickActionIcon to="/categoriasMetas" icon={<Target />} label="Metas" color="#8b5cf6" />}
+        {isGestor && <QuickActionIcon to="/orcamento" icon={<PiggyBank />} label="Gestão" color="#ff9900" />}
+        {isGestor && <QuickActionIcon to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" color="#16a34a" />}
+        <QuickActionIcon to="/despesas" icon={<ArrowDownCircle />} label="Fixos" color="#ef4444" />
+        {perfil.tipo === 'proprietario' && <QuickActionIcon to="/cartoes" icon={<CreditCard />} label="Cartões" color="#7209b7" />}
+        <QuickActionIcon to="/listagem" icon={<ShoppingBag />} label="Extrato" color="#00cc66" />
+        <QuickActionIcon to="/lancamento" icon={<Plus />} label="Novo" color="#4361ee" isPrimary />
       </div>
 
       <Link to="/perfil" className="footer-link-reset">
@@ -297,7 +298,7 @@ const Menu: React.FC = () => {
                           return (
                             <div key={nome} className="user-spend-col" style={{ opacity: isUserMensalPago ? 0.6 : 1 }}>
                               <span className="user-spend-name">
-                                {nome} {isUserMensalPago && <CheckCircle2 size={10} style={{ display: 'inline', color: '#10b981' }} />}
+                                {nome} {isUserMensalPago && <CheckCircle2 size={12} color="#10b981" style={{ display: 'inline', marginLeft: 4 }} />}
                               </span>
                               <span className="user-spend-value" style={isUserMensalPago ? { color: '#10b981' } : {}}>
                                 {formatMoney(isUserMensalPago ? d.pago : d.pendente)}
@@ -318,30 +319,21 @@ const Menu: React.FC = () => {
   );
 };
 
-// --- COMPONENTE AUXILIAR ---
-interface QuickActionProps {
+// --- COMPONENTE DE ÍCONE MINIMALISTA ---
+interface QuickActionIconProps {
   to: string;
   icon: React.ReactNode;
   label: string;
-  sub: string;
   color: string;
   isPrimary?: boolean;
 }
 
-const QuickActionLink: React.FC<QuickActionProps> = ({ to, icon, label, sub, color, isPrimary }) => (
-  <Link to={to} style={{ textDecoration: 'none' }}>
-    <div className={`quick-action-card ${isPrimary ? 'primary' : 'secondary'}`}>
-      <div className="action-icon-wrapper" style={{ 
-        background: isPrimary ? 'rgba(255,255,255,0.2)' : `${color}15`, 
-        color: isPrimary ? '#fff' : color 
-      }}>
-        {React.isValidElement<LucideProps>(icon) ? React.cloneElement(icon, { size: 22 }) : icon}
-      </div>
-      <div className="action-label-container">
-        <span className="action-label-title">{label}</span>
-        <span className="action-label-sub">{sub}</span>
-      </div>
+const QuickActionIcon: React.FC<QuickActionIconProps> = ({ to, icon, label, color, isPrimary }) => (
+  <Link to={to} className="quick-action-minimal-link">
+    <div className={`action-icon-circle ${isPrimary ? 'primary-bg' : ''}`} style={!isPrimary ? { backgroundColor: `${color}15`, color: color } : {}}>
+      {React.isValidElement<LucideProps>(icon) ? React.cloneElement(icon, { size: 24 }) : icon}
     </div>
+    <span className="action-icon-label">{label}</span>
   </Link>
 );
 
