@@ -301,7 +301,7 @@
 }
 
 .modal-body-premium {
-  padding: 10px 15px 20px;
+  padding: 20px 25px 15px;
   max-height: 450px;
   overflow-y: auto;
 }
@@ -322,7 +322,7 @@
 .fatura-item-valor { font-weight: 800; color: #334155; font-size: 1rem; }
 
 .modal-footer-icons {
-  padding: 10px 15px;
+  padding: 20px 25px 15px;
   background: white;
   display: flex;
   justify-content: space-between;
