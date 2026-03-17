@@ -343,6 +343,7 @@
   .stats-values h3 { font-size: 1.75rem; }
   .status-badges-stack { right: 15px; bottom: 10px; }
   .btn-ajuste-premium { bottom: 90px; right: 20px; }
+  .modal-body-premium {max-height: 550px;}
 }
 
 /* --- ANIMAÇÕES --- */
