@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+// Importamos o HashRouter como Router, conforme seu padrão
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './services/supabaseClient'; 
 import { Session } from '@supabase/supabase-js';
@@ -57,13 +58,12 @@ const App: React.FC = () => {
   }
 
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="app-main">
         {!session ? (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Registro />} />
-            {/* Redireciona qualquer rota não autenticada para o login */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         ) : (
@@ -83,16 +83,12 @@ const App: React.FC = () => {
                 <Route path="/despesas" element={<Despesas />} />
                 <Route path="/cartoes" element={<Cartoes />} />
                 <Route path="/perfil" element={<Perfil />} />
-                
-                {/* Se estiver logado e tentar ir para o login, volta para o menu */}
                 <Route path="/login" element={<Navigate to="/" replace />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
           </div>
         )}
-        
-        {/* Componente que gerencia o PWA e avisa sobre novas versões para evitar cache */}
         <ReloadPrompt />
       </div>
     </Router>

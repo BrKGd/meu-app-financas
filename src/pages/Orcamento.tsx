@@ -95,37 +95,34 @@ const Orcamento: React.FC = () => {
     try {
       const anoAtual = dataFiltro.getFullYear();
       const mesAtual = dataFiltro.getMonth() + 1;
-      const primeiroDia = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
-      const ultimoDia = new Date(anoAtual, mesAtual, 0).toISOString().split('T')[0];
+      const primeiroDiaMes = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
+      
+      // Datas para busca de proventos (range tradicional)
+      const primeiroDiaBusca = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
+      const ultimoDiaBusca = new Date(anoAtual, mesAtual, 0).toISOString().split('T')[0];
 
       const [
         { data: metasData },
         { data: proventos },
-        { data: comprasNaoParceladas },
-        { data: parcelasDoMes },
+        { data: todasComprasMes }, // Agora buscamos tudo aqui (fixos, parcelados e únicos)
         { data: cats }
       ] = await Promise.all([
         (supabase.from('metas') as any).select('*').eq('mes_referencia', mesAtual).eq('ano_referencia', anoAtual),
-        (supabase.from('proventos') as any).select('*').gte('data_recebimento', primeiroDia).lte('data_recebimento', ultimoDia),
-        (supabase.from('compras') as any).select('valor_total, categoria_id').eq('parcelado', false).gte('data_vencimento', primeiroDia).lte('data_vencimento', ultimoDia),
-        (supabase.from('parcelas') as any).select('valor_parcela, compras!inner(categoria_id)').gte('data_vencimento', primeiroDia).lte('data_vencimento', ultimoDia),
+        (supabase.from('proventos') as any).select('*').gte('data_recebimento', primeiroDiaBusca).lte('data_recebimento', ultimoDiaBusca),
+        (supabase.from('compras') as any).select('valor_total, categoria_id').eq('periodo_referencia', primeiroDiaMes),
         (supabase.from('categorias') as any).select('*').order('nome', { ascending: true })
       ]);
 
       const gastosPorCat: Record<string, number> = {};
       let totalGastoFinal = 0;
 
-      comprasNaoParceladas?.forEach((c: any) => {
+      // Processa todas as compras do mês (incluindo as geradas por recorrência/parcelamento)
+      todasComprasMes?.forEach((c: any) => {
         const v = parseFloat(c.valor_total) || 0;
         totalGastoFinal += v;
-        if (c.categoria_id) gastosPorCat[c.categoria_id] = (gastosPorCat[c.categoria_id] || 0) + v;
-      });
-
-      parcelasDoMes?.forEach((p: any) => {
-        const v = parseFloat(p.valor_parcela) || 0;
-        totalGastoFinal += v;
-        const catId = p.compras?.categoria_id;
-        if (catId) gastosPorCat[catId] = (gastosPorCat[catId] || 0) + v;
+        if (c.categoria_id) {
+          gastosPorCat[c.categoria_id] = (gastosPorCat[c.categoria_id] || 0) + v;
+        }
       });
 
       const totalReceitaReal = proventos?.reduce((acc: number, cur: any) => acc + Number(cur.valor), 0) || 0;
