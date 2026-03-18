@@ -180,8 +180,10 @@
 .grid-metas-modern {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 15px;
+  gap: 5px;
   width: 100%;
+  align-items: center;
+  text-align: center;
 }
 
 .card-financeiro-flux {
@@ -227,7 +229,7 @@
 .card-content-top {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 2px;
   z-index: 2;
 }
 
@@ -566,11 +568,12 @@
 @media (max-width: 768px) {
   .metas-header { flex-direction: column; gap: 25px; align-items: center; text-align: center; }
   .header-controls { align-items: center; width: 100%; }
-  .grid-metas-modern { grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-metas-modern { grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
   .icon-grid-selector-inner { grid-template-columns: repeat(5, 1fr); }
   .card-value-display { font-size: 1.5rem; }
   .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
   .card-value-display {font-size: 1rem;}
+  .card-label-top {font-size: 0.75rem;}
   .modal-content.modal-expanded { 
     align-self: flex-end;
     max-height: 85vh; 
