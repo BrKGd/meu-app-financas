@@ -4,7 +4,8 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Plus, Calendar, Tag, Trash2, X, Save, 
   ShoppingCart, Loader2, Filter, CreditCard, Banknote, Landmark, ChevronLeft, ChevronRight,
-  QrCode, Receipt, AlertTriangle, User, Store, Lock, UserPlus, Repeat, CheckCircle2
+  QrCode, Receipt, AlertTriangle, User, Store, Lock, UserPlus, Repeat, CheckCircle2,
+  Utensils, Car, Home, Tv, HeartPulse, Briefcase, GraduationCap, Plane, Dumbbell, Coffee, Pizza
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
@@ -14,6 +15,24 @@ import iconConfirme from '../assets/confirme.png';
 import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
+
+// Mapeamento de Ícones por Nome de Categoria
+const IconeCategoria: Record<string, any> = {
+  "Alimentação": Utensils,
+  "Transporte": Car,
+  "Moradia": Home,
+  "Lazer": Tv,
+  "Saúde": HeartPulse,
+  "Trabalho": Briefcase,
+  "Educação": GraduationCap,
+  "Viagem": Plane,
+  "Academia": Dumbbell,
+  "Mercado": ShoppingCart,
+  "Restaurante": Pizza,
+  "Café": Coffee,
+  "Assinaturas": Repeat,
+  "Outros": Tag
+};
 
 interface Categoria {
   id: string;
@@ -392,33 +411,40 @@ const Despesas: React.FC = () => {
                 <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>{formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}</span>
               </div>
               <div className="desp-panel-list" style={{borderRadius: '0 0 16px 16px'}}>
-                {itens.map((item, idx) => (
-                  <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
-                    <div className="desp-icon-column">
-                      <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}><ShoppingCart size={20} /></div>
-                    </div>
-                    <div className="desp-main-content">
-                      <div className="desp-top-line">
-                        <span className="desp-desc">
-                          {item.descricao} 
-                          {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px'}}>{item.parcela_atual}/{item.parcelas_total}</span>}
-                          {item.recorrencia_id && !item.parcelado && <Repeat size={12} style={{marginLeft: '6px', color: '#6366f1'}} />}
-                          {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.4, marginLeft: '6px'}} />}
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {item.status_pagamento === 'pago' && <CheckCircle2 size={16} color="#10b981" />}
-                          <span className={`desp-value ${item.status_pagamento === 'pago' ? 'value-paid' : 'value-negative'}`}>
-                            {formatarMoeda(item.valor_projetado || 0)}
-                          </span>
+                {itens.map((item, idx) => {
+                  // Determina o ícone com base na categoria
+                  const IconComp = IconeCategoria[item.categorias?.nome || "Outros"] || Tag;
+
+                  return (
+                    <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
+                      <div className="desp-icon-column">
+                        <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}>
+                          <IconComp size={20} />
                         </div>
                       </div>
-                      <div className="desp-meta-line">
-                        <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
-                        <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
+                      <div className="desp-main-content">
+                        <div className="desp-top-line">
+                          <span className="desp-desc">
+                            {item.descricao} 
+                            {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px'}}>{item.parcela_atual}/{item.parcelas_total}</span>}
+                            {item.recorrencia_id && !item.parcelado && <Repeat size={12} style={{marginLeft: '6px', color: '#6366f1'}} />}
+                            {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.4, marginLeft: '6px'}} />}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {item.status_pagamento === 'pago' && <CheckCircle2 size={16} color="#10b981" />}
+                            <span className={`desp-value ${item.status_pagamento === 'pago' ? 'value-paid' : 'value-negative'}`}>
+                              {formatarMoeda(item.valor_projetado || 0)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="desp-meta-line">
+                          <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
+                          <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
