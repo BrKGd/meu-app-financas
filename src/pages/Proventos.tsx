@@ -246,8 +246,8 @@ const Proventos: React.FC = () => {
     <>
       <style>{`
         .prov-edit-modal {
-          width: 95%; max-width: 550px; max-height: 85vh; background: white;
-          border-radius: 28px; padding: 24px; position: relative;
+          width: 100%; max-width: 100%; max-height: 85vh; background: white;
+          border-radius: 28px; padding: 10px; position: relative;
           box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); z-index: 1001;
           overflow-y: auto; display: flex; flex-direction: column; scrollbar-gutter: stable;
         }

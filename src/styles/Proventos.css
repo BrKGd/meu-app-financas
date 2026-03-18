@@ -1,11 +1,11 @@
 /* --- LAYOUT GERAL --- */
 .proventos-premium-wrapper {
-  padding:10px;
-  max-width: 1200px;
+  padding:5px;
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 25px;
+  gap: 5px;
   animation: fadeIn 0.5s ease-out;
   box-sizing: border-box;
 }
@@ -15,7 +15,7 @@
   background: white;
   border-radius: 32px;
   border: 1px solid #f1f5f9;
-  padding: 30px;
+  padding: 20px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.02);
   box-sizing: border-box;
 }
@@ -81,7 +81,7 @@
 .prov-item-row {
   display: flex;
   align-items: center; /* Alinha ícone e conteúdo centralizados verticalmente */
-  padding: 20px 30px;
+  padding: 10px 15px;
   border-bottom: 1px solid #f8fafc;
   cursor: pointer;
   transition: all 0.2s ease;
