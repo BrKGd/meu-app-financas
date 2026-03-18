@@ -250,11 +250,11 @@
 }
 
 .card-label-top {
-  font-size: 0.75rem;
-  font-weight: 900;
-  letter-spacing: 1.2px;
+  font-size: 1rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-weight: bold;
   color: rgba(255, 255, 255, 0.95);
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 
 .card-main-info {
@@ -566,7 +566,7 @@
 @media (max-width: 768px) {
   .metas-header { flex-direction: column; gap: 25px; align-items: center; text-align: center; }
   .header-controls { align-items: center; width: 100%; }
-  .grid-metas-modern { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-metas-modern { grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
   .icon-grid-selector-inner { grid-template-columns: repeat(5, 1fr); }
   .card-value-display { font-size: 1.5rem; }
   .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
