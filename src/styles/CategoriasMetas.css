@@ -379,14 +379,15 @@
 }
 
 .modal-content.modal-expanded {
-  background: white;
+  background: none;
   width: 100%;
-  max-width: 520px;
+  max-width: 100%;
   max-height: 90vh;
-  border-radius: 45px !important;
+  border-radius: 45px!important;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overflow-y: auto; 
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   transition: all 0.3s ease;
   padding: 0;
@@ -428,6 +429,7 @@
   padding: 25px;
   overflow-y: auto; 
   flex-grow: 1;
+  background-color: white;
 }
 
 .modal-body-padding::-webkit-scrollbar { width: 8px; }
@@ -576,6 +578,5 @@
   .card-label-top {font-size: 0.75rem;}
   .modal-content.modal-expanded { 
     align-self: flex-end;
-    max-height: 85vh; 
   }
 }
