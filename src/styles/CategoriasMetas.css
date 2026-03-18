@@ -372,7 +372,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 0px 10px 30px 10px;
+  padding: 0px 10px 60px 10px;
 }
 
 .modal-content.modal-expanded {
@@ -570,8 +570,7 @@
   .card-value-display { font-size: 1.5rem; }
   .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
   .modal-content.modal-expanded { 
-    align-self: flex-end; 
-    border-radius: 45px 45px 0 0 !important;
+    align-self: flex-end;
     max-height: 85vh; 
   }
 }

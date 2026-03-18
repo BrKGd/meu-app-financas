@@ -41,7 +41,7 @@ interface Meta {
   cor_meta: string | null;
 }
 
-// --- Definição das Categorias Lucide (Traduzidas) ---
+// --- Definição das Categorias Lucide ---
 const ICON_CATEGORIES = [
   {
     label: 'Finanças e Comércio',
@@ -99,14 +99,12 @@ const CategoriasMetas: React.FC = () => {
     onConfirm?: () => void;
   }>({ isOpen: false, type: 'success', title: '', message: '' });
 
-  // --- Helper de Renderização Seguro ---
-  const RenderIcon = useCallback(({ name, size = 24, className = '', style = {} }: { name: string, size?: number, className?: string, style?: React.CSSProperties }) => {
+  const RenderIcon = useCallback(({ name, size = 24, className = '' }: { name: string, size?: number, className?: string }) => {
     const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
-    // Garante que o componente existe e é renderizável
     if (typeof IconComponent !== 'function' && typeof IconComponent !== 'object') {
-      return <LucideIcons.HelpCircle size={size} className={className} style={style} />;
+      return <LucideIcons.HelpCircle size={size} className={className} />;
     }
-    return <IconComponent size={size} className={className} style={style} />;
+    return <IconComponent size={size} className={className} />;
   }, []);
 
   const alertar = (type: ModalType, title: string, message: string, onConfirm?: () => void) => {
@@ -269,7 +267,7 @@ const CategoriasMetas: React.FC = () => {
         <header className="metas-header">
           <div className="cat-title-area">
             <div className="titulo-secao">
-              <LucideIcons.Flag className="w-7 h-7" style={{ color: '#4361ee' }} />
+              <LucideIcons.Flag className="w-7 h-7" />
               <h1>Planejamento</h1>
             </div>
             <p className="subtitulo-metas">Orçamento mensal e objetivos</p>
@@ -277,16 +275,16 @@ const CategoriasMetas: React.FC = () => {
 
           <div className="header-controls">
             <div className="seletor-periodo">
-              <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}><LucideIcons.ChevronLeft className="w-5 h-5"/></button>
+              <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}><LucideIcons.ChevronLeft /></button>
               <span className="periodo-display">
                 {new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(ano, mes - 1))} {ano}
               </span>
-              <button onClick={() => setMes(m => m === 12 ? 1 : m + 1)}><LucideIcons.ChevronRight className="w-5 h-5"/></button>
+              <button onClick={() => setMes(m => m === 12 ? 1 : m + 1)}><LucideIcons.ChevronRight /></button>
             </div>
 
             <div className="badge-planejado-modern">
                 <div className={`badge-icon-wrapper ${activeTab === 'despesa' ? 'bg-red' : 'bg-green'}`}>
-                  {activeTab === 'despesa' ? <LucideIcons.TrendingDown className="w-4 h-4 text-red-500" /> : <LucideIcons.Wallet className="w-4 h-4 text-green-500" />}
+                  {activeTab === 'despesa' ? <LucideIcons.TrendingDown /> : <LucideIcons.Wallet />}
                 </div>
                 <span className="badge-text">
                   Total {activeTab === 'despesa' ? 'Planejado' : 'Esperado'}: 
@@ -297,19 +295,24 @@ const CategoriasMetas: React.FC = () => {
         </header>
 
         <nav className="metas-tabs">
-          <button className={activeTab === 'despesa' ? 'active' : ''} onClick={() => setActiveTab('despesa')}><LucideIcons.TrendingDown className="w-5 h-5" /> Gastos</button>
-          <button className={activeTab === 'provento' ? 'active' : ''} onClick={() => setActiveTab('provento')}><LucideIcons.DollarSign className="w-5 h-5" /> Receitas</button>
-          <button className={activeTab === 'pessoal' ? 'active' : ''} onClick={() => setActiveTab('pessoal')}><LucideIcons.Star className="w-5 h-5" /> Objetivos</button>
+          <button className={activeTab === 'despesa' ? 'active' : ''} onClick={() => setActiveTab('despesa')}><LucideIcons.TrendingDown /> Gastos</button>
+          <button className={activeTab === 'provento' ? 'active' : ''} onClick={() => setActiveTab('provento')}><LucideIcons.DollarSign /> Receitas</button>
+          <button className={activeTab === 'pessoal' ? 'active' : ''} onClick={() => setActiveTab('pessoal')}><LucideIcons.Star /> Objetivos</button>
         </nav>
 
         {loading ? (
-          <div className="cat-status"><div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div></div>
+          <div className="cat-status"><div className="spinner-loader"></div></div>
         ) : (
           <div className="grid-metas-modern">
             {cardsParaExibir.map((item) => (
-              <div key={item.categoria_id} className="card-financeiro-flux" style={{ '--card-color': item.cor } as any} onClick={() => openModal(item)}>
+              <div 
+                key={item.categoria_id} 
+                className="card-financeiro-flux" 
+                style={{ '--card-color': item.cor } as React.CSSProperties} 
+                onClick={() => openModal(item)}
+              >
                 <div className="card-bg-icon">
-                  <RenderIcon name={item.icone} size={80} />
+                  <RenderIcon name={item.icone} size={160} />
                 </div>
                 <div className="card-content-top">
                   <div className="card-icon-small">
@@ -324,7 +327,7 @@ const CategoriasMetas: React.FC = () => {
                   <p className="card-subtitle-bottom">{item.existe_meta ? 'Planejado' : 'Não planejado'}</p>
                 </div>
                 <div className="card-edit-indicator">
-                  {podeEditar(item) ? <LucideIcons.Pencil className="w-4 h-4" /> : <LucideIcons.Lock className="w-3 h-3" />}
+                  {podeEditar(item) ? <LucideIcons.Pencil /> : <LucideIcons.Lock />}
                 </div>
               </div>
             ))}
@@ -335,19 +338,25 @@ const CategoriasMetas: React.FC = () => {
           <div className="modal-overlay" onClick={handleCancelarEdicao}>
             <div className="modal-content modal-expanded fade-in" onClick={(e) => e.stopPropagation()}>
               
-              <div className="modal-details-header" style={{ background: isEditing ? '#1e293b' : `linear-gradient(135deg, ${form.cor} 0%, #1e293b 100%)` }}>
+              <div 
+                className="modal-details-header" 
+                style={{ 
+                    background: isEditing ? '#1e293b' : `linear-gradient(135deg, ${form.cor} 0%, #1e293b 100%)`,
+                    color: !isEditing ? getContrastColor(form.cor) : '#ffffff'
+                }}
+              >
                 <div className="modal-header-top">
-                  <div className="modal-title-text" style={{ color: !isEditing ? getContrastColor(form.cor) : '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div className="modal-title-text">
                     <RenderIcon name={form.icone} size={28} />
-                    <h2 style={{ fontSize: '1.25rem', margin: 0 }}>
+                    <h2>
                       {!selectedItem ? 'Nova Categoria' : isEditing ? 'Configurar Categoria' : form.nome}
                     </h2>
                   </div>
 
-                  <div className="modal-header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center', zIndex: 99 }}>
+                  <div className="modal-header-actions">
                     {selectedItem && !isEditing && podeEditar(selectedItem) && (
                       <button type="button" className="btn-icon-action" onClick={() => setIsEditing(true)}>
-                        <LucideIcons.Settings2 size={32} style={{ color: getContrastColor(form.cor) }} />
+                        <LucideIcons.Settings2 size={32} />
                       </button>
                     )}
                     <button type="button" onClick={() => setIsModalOpen(false)} className="btn-icon-action">
@@ -368,14 +377,13 @@ const CategoriasMetas: React.FC = () => {
                     <input className="form-control" type="number" step="0.01" value={form.valor_meta} disabled={!isEditing} onChange={e => setForm({...form, valor_meta: e.target.value})} required />
                   </div>
 
-                  {/* --- SELETOR DE ÍCONES AGRUPADO --- */}
                   <div className="form-group">
                     <label className="form-label-custom">Ícone</label>
-                    <div className="icon-picker-container" style={{ maxHeight: '300px', overflowY: 'auto', background: '#f8fafc', borderRadius: '12px', padding: '15px' }}>
+                    <div className="icon-picker-container">
                       {ICON_CATEGORIES.map((cat) => (
-                        <div key={cat.label} className="icon-cat-section" style={{ marginBottom: '5px' }}>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#1e293b' }}>{cat.label}</h4>
-                          <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: '#64748b' }}>{cat.description}</p>
+                        <div key={cat.label} className="icon-cat-section">
+                          <h4>{cat.label}</h4>
+                          <p>{cat.description}</p>
                           <div className="icon-grid-selector-inner">
                             {cat.icons.map((iconName) => (
                               <button
@@ -383,16 +391,10 @@ const CategoriasMetas: React.FC = () => {
                                 type="button"
                                 className={`icon-option-btn ${form.icone === iconName ? 'selected' : ''}`}
                                 onClick={() => isEditing && setForm({...form, icone: iconName})}
-                                style={{ 
-                                  padding: '5px', 
-                                  borderRadius: '10px', 
-                                  border: form.icone === iconName ? `2px solid ${form.cor}` : '1px solid #e2e8f0',
-                                  background: form.icone === iconName ? `${form.cor}15` : 'white',
-                                  cursor: isEditing ? 'pointer' : 'default'
-                                }}
                                 disabled={!isEditing}
+                                style={{ '--active-color': form.cor } as React.CSSProperties}
                               >
-                                <RenderIcon name={iconName} size={20} style={{ color: form.icone === iconName ? form.cor : '#64748b' }} />
+                                <RenderIcon name={iconName} size={24} />
                               </button>
                             ))}
                           </div>
@@ -445,8 +447,12 @@ const CategoriasMetas: React.FC = () => {
       </div>
 
       {perfil?.tipo_usuario !== 'comum' && (
-        <button className="cat-fab" onClick={() => openModal()} style={{ background: activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee' }}>
-          <LucideIcons.Plus size={32} color="white" />
+        <button 
+          className="cat-fab" 
+          onClick={() => openModal()} 
+          style={{ background: activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee' }}
+        >
+          <LucideIcons.Plus size={32} />
         </button>
       )}
     </>
