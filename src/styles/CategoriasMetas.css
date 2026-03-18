@@ -336,9 +336,7 @@
 
 .icon-grid-selector-inner {
   display: grid;
-  /* Aumentando para 6 colunas os ícones ficam menores e mais profissionais */
   grid-template-columns: repeat(6, 1fr); 
-  /* Reduzir o gap ajuda a aproximar os itens se eles ficarem muito longe */
   gap: 8px; 
   max-height: 220px;
   overflow-y: auto;
@@ -349,16 +347,15 @@
 
 .icon-option-btn {
   aspect-ratio: 1;
-  border: 1.5px solid #f1f5f9; /* Borda mais suave conforme a imagem */
+  border: 1.5px solid #f1f5f9;
   background: white;
-  border-radius: 14px; /* Cantos um pouco mais arredondados */
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
   color: #64748b;
-  /* MEXA AQUI: Menos padding = quadrado menor */
   padding: 8px; 
 }
 
@@ -382,25 +379,25 @@
   background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(8px);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: center;     /* Centraliza verticalmente */
+  justify-content: center;    /* Centraliza horizontalmente */
   z-index: 1000;
-  padding: 0px 10px 60px 10px;
+  padding: 20px;           /* Padding uniforme para evitar colar nas bordas */
 }
 
 .modal-content.modal-expanded {
-  background: none;
+  background: none;       /* Mudado de none para white para visibilidade do fundo */
   width: 100%;
-  max-width: 100%;
+  max-width: 500px;        /* Largura máxima controlada para ficar centralizado e elegante */
   max-height: 90vh;
-  border-radius: 45px!important;
+  border-radius: 35px!important;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  overflow-y: auto; 
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   transition: all 0.3s ease;
   padding: 0;
+  position: relative;
 }
 
 .modal-details-header {
@@ -470,11 +467,25 @@
   outline: none;
   background: #f8fafc;
   transition: 0.3s;
+  color: #1e293b;
 }
 
 .form-control:focus {
   border-color: #4361ee;
   background: white;
+}
+
+/* Estilo para campos somente leitura (ReadOnly) */
+.form-control[readonly] {
+  background-color: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+}
+
+.form-control[readonly]:focus {
+  border-color: #e2e8f0;
+  box-shadow: none;
 }
 
 .color-picker-wrapper {
@@ -561,18 +572,24 @@
 .fade-in { animation: fadeIn 0.4s ease-out; }
 
 /* --- RESPONSIVIDADE --- */
-/* --- RESPONSIVIDADE --- */
 @media (max-width: 768px) {
   .metas-header { flex-direction: column; gap: 25px; align-items: center; text-align: center; }
   .header-controls { align-items: center; width: 100%; }
-  .grid-metas-modern { grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+  .grid-metas-modern { grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .icon-grid-selector-inner { grid-template-columns: repeat(6, 1fr); }
-  .card-value-display { font-size: 1.5rem; }
   .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
-  .card-value-display {font-size: 1rem;}
-  .card-label-top {font-size: 0.75rem;}
-  .modal-content.modal-expanded { 
-    align-self: flex-end;
+  .card-value-display { font-size: 1rem; }
+  .card-label-top { font-size: 0.75rem; }
+  
+  /* Centralização mantida no mobile conforme solicitado */
+  .modal-overlay {
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+  }
+  .modal-content.modal-expanded {
+    width: 95%;
+    max-height: 85vh;
   }
 }
 
