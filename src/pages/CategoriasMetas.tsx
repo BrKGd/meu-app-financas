@@ -8,7 +8,7 @@ import * as LucideIcons from 'lucide-react';
 import ModalFeedback, { ModalType } from '../components/ModalFeedback';
 import '../styles/CategoriasMetas.css';
 
-// Assets PNG (Verifique se os caminhos estão corretos no seu projeto)
+// Assets PNG
 import iconConfirme from '../assets/confirme.png';
 import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
@@ -26,7 +26,7 @@ interface Categoria {
   nome: string;
   tipo: string;
   cor: string;
-  icone?: string;
+  icone: string; // Removido o opcional para evitar undefined no RenderIcon
 }
 
 interface Meta {
@@ -41,38 +41,54 @@ interface Meta {
   cor_meta: string | null;
 }
 
-// --- Extração Dinâmica Segura de Ícones ---
-const ALL_LUCIDE_ICONS = Object.keys(LucideIcons).filter((key) => {
+// Interface para o formulário
+interface FormState {
+  nome: string;
+  cor: string;
+  icone: string;
+  valor_meta: string | number;
+}
+
+// --- Mapeamento de Categorias de Ícones ---
+const ICON_CATEGORIES: Record<string, string[]> = {
+  "Finanças": ["Wallet", "PiggyBank", "DollarSign", "CreditCard", "Banknote", "Coins", "Receipt", "ChartBar", "TrendingUp", "TrendingDown", "Landmark", "Calculator"],
+  "Transporte": ["Car", "Bus", "Bike", "Plane", "Train", "Fuel", "MapPin", "Navigation", "Truck"],
+  "Casa": ["Home", "Lightbulb", "Tv", "Wifi", "Zap", "Droplets", "Utensils", "Refrigerator", "Bed", "Bath"],
+  "Saúde": ["Heart", "Stethoscope", "Activity", "Pill", "Baby", "Dumbbell", "FirstAidKit"],
+  "Lazer": ["Gamepad2", "Music", "Camera", "Coffee", "Beer", "Popcorn", "Ticket", "Umbrella", "Mountain"],
+  "Shopping": ["ShoppingBag", "ShoppingCart", "Tag", "Gift", "Package", "Shirt"],
+  "Trabalho": ["Briefcase", "Laptop", "HardDrive", "Mail", "Phone", "FileText", "Languages", "User"]
+};
+
+// Extração Dinâmica Segura
+const ALL_LUCIDE_KEYS: string[] = Object.keys(LucideIcons).filter((key) => {
   const item = (LucideIcons as any)[key];
-  // Filtra apenas o que começa com letra maiúscula e é um componente válido
-  const isIcon = /^[A-Z]/.test(key) && (typeof item === 'function' || typeof item === 'object');
-  // Remove utilitários internos que não são ícones
-  const isInternal = ['createLucideIcon', 'LucideProps', 'Icon', 'LucideIcon'].includes(key);
-  return isIcon && !isInternal;
+  return /^[A-Z]/.test(key) && 
+         (typeof item === 'function' || typeof item === 'object') && 
+         !['createLucideIcon', 'LucideProps', 'Icon', 'LucideIcon'].includes(key);
 }).sort();
 
 const CategoriasMetas: React.FC = () => {
-  // Estados de Dados
   const [loading, setLoading] = useState<boolean>(true);
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [metasMes, setMetasMes] = useState<Meta[]>([]);
   const [activeTab, setActiveTab] = useState<'despesa' | 'provento' | 'pessoal'>('despesa');
   
-  // Estados de Filtro/Período
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [iconCategory, setIconCategory] = useState<string>("Finanças");
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
   const [ano, setAno] = useState<number>(new Date().getFullYear());
 
-  // Estados do Modal
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false); 
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [form, setForm] = useState({ 
+  
+  const [form, setForm] = useState<FormState>({ 
     nome: '', 
     cor: '#4361ee', 
     icone: 'Wallet',
-    valor_meta: '' as string | number
+    valor_meta: ''
   });
 
   const [feedback, setFeedback] = useState<{
@@ -83,13 +99,10 @@ const CategoriasMetas: React.FC = () => {
     onConfirm?: () => void;
   }>({ isOpen: false, type: 'success', title: '', message: '' });
 
-  // --- Helpers ---
-  
-  // Renderizador Dinâmico de Ícone com Fallback
-  const RenderIcon = useCallback(({ name, size = 24, className = '' }: { name: string, size?: number, className?: string }) => {
-    const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
-    // Verifica se o componente é válido antes de renderizar
-    if (typeof IconComponent !== 'function' && typeof IconComponent !== 'object') {
+  // --- Renderizador de Ícone (Tipado para evitar o erro TS7006) ---
+  const RenderIcon = useCallback(({ name, size = 24, className = '' }: { name: string; size?: number; className?: string }) => {
+    const IconComponent = (LucideIcons as any)[name];
+    if (!IconComponent || (typeof IconComponent !== 'function' && typeof IconComponent !== 'object')) {
         return <LucideIcons.HelpCircle size={size} className={className} />;
     }
     return <IconComponent size={size} className={className} />;
@@ -109,7 +122,6 @@ const CategoriasMetas: React.FC = () => {
     return yiq >= 128 ? '#1e293b' : '#ffffff';
   };
 
-  // --- Busca de Dados ---
   const buscarDados = useCallback(async () => {
     setLoading(true);
     try {
@@ -135,7 +147,13 @@ const CategoriasMetas: React.FC = () => {
 
   useEffect(() => { buscarDados(); }, [buscarDados]);
 
-  // --- Lógica de Negócio ---
+  const filteredIcons = useMemo(() => {
+    if (searchTerm) {
+      return ALL_LUCIDE_KEYS.filter(icon => icon.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 60);
+    }
+    return ICON_CATEGORIES[iconCategory] || [];
+  }, [searchTerm, iconCategory]);
+
   const cardsParaExibir = useMemo(() => {
     return categorias
       .filter(c => c.tipo === activeTab)
@@ -160,20 +178,12 @@ const CategoriasMetas: React.FC = () => {
       .reduce((acc, curr) => acc + (Number(curr.valor_meta) || 0), 0);
   }, [metasMes, activeTab]);
 
-  // Filtro de ícones para o Picker (Limitado a 80 por performance)
-  const filteredIcons = useMemo(() => {
-    const search = searchTerm.toLowerCase();
-    const result = ALL_LUCIDE_ICONS.filter(icon => icon.toLowerCase().includes(search));
-    return result.slice(0, 80); 
-  }, [searchTerm]);
-
   const podeEditar = (item: any) => {
     if (!perfil) return false;
     if (perfil.tipo_usuario === 'proprietario') return true;
     return perfil.tipo_usuario === 'administrador' && (!item || item.user_id === perfil.id);
   };
 
-  // --- Ações do Modal ---
   const openModal = (item: any = null) => {
     setSearchTerm('');
     if (item) {
@@ -217,7 +227,6 @@ const CategoriasMetas: React.FC = () => {
 
       let currentCatId = selectedItem?.categoria_id;
 
-      // 1. Salvar Categoria se for nova ou se estivermos editando os campos da categoria
       if (!currentCatId || isEditing) {
         const catPayload = { nome: form.nome, tipo: activeTab, cor: form.cor, icone: form.icone, user_id: user.id };
         if (currentCatId) {
@@ -229,7 +238,6 @@ const CategoriasMetas: React.FC = () => {
         }
       }
 
-      // 2. Salvar Meta
       const valorNum = typeof form.valor_meta === 'string' ? parseFloat(form.valor_meta.replace(',', '.')) : form.valor_meta;
       const { error: metaErr } = await (supabase.from('metas') as any).upsert({
         id: selectedItem?.id_meta || undefined,
@@ -257,7 +265,7 @@ const CategoriasMetas: React.FC = () => {
 
   const handleExcluirCascata = () => {
     if (!selectedItem?.categoria_id) return;
-    alertar('danger', 'Confirmar Exclusão', `Isso excluirá a categoria "${selectedItem.nome}" e todas as metas associadas a ela neste mês. Confirmar?`, async () => {
+    alertar('danger', 'Confirmar Exclusão', `Isso excluirá a categoria "${selectedItem.nome}" e todas as metas associadas. Confirmar?`, async () => {
       setLoading(true);
       try {
         await supabase.from('metas').delete().eq('categoria_id', selectedItem.categoria_id);
@@ -352,7 +360,6 @@ const CategoriasMetas: React.FC = () => {
           </div>
         )}
 
-        {/* --- MODAL DE EDIÇÃO / CRIAÇÃO --- */}
         {isModalOpen && (
           <div className="modal-overlay" onClick={handleCancelarEdicao}>
             <div className="modal-content modal-expanded fade-in" onClick={(e) => e.stopPropagation()}>
@@ -388,47 +395,40 @@ const CategoriasMetas: React.FC = () => {
               <div className="modal-body-padding">
                 <form id="meta-form" onSubmit={handleSalvar} className="form-flex-column">
                   <div className="form-group">
-                    <label className="form-label-custom">Nome da Categoria</label>
-                    <input className="form-control" value={form.nome} disabled={!isEditing} onChange={e => setForm({...form, nome: e.target.value})} required placeholder="Ex: Alimentação" />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label className="form-label-custom">Valor do Planejamento (R$)</label>
-                    <input className="form-control" type="number" step="0.01" value={form.valor_meta} disabled={!isEditing} onChange={e => setForm({...form, valor_meta: e.target.value})} required placeholder="0,00" />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label-custom">Seletor de Ícone</label>
-                    {isEditing && (
-                      <div className="search-icon-wrapper">
-                        <LucideIcons.Search size={16} className="search-icon-input" />
-                        <input 
-                          className="form-control search-icon-field" 
-                          placeholder="Pesquisar ícone..." 
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                    )}
-
-                    <div className="icon-picker-container">
-                      <div className="icon-grid-selector-inner">
-                        {filteredIcons.map((iconName) => (
-                          <button
-                            key={iconName}
-                            type="button"
-                            className={`icon-option-btn ${form.icone === iconName ? 'selected' : ''}`}
-                            onClick={() => isEditing && setForm({...form, icone: iconName})}
-                            disabled={!isEditing}
-                            style={{ '--active-color': form.cor } as React.CSSProperties}
-                            title={iconName}
-                          >
-                            <RenderIcon name={iconName} size={22} />
-                          </button>
-                        ))}
-                      </div>
+                    <label className="form-label-custom">Nome e Valor do Planejamento</label>
+                    <div className="form-row-duo">
+                      <input className="form-control" value={form.nome} disabled={!isEditing} onChange={e => setForm({...form, nome: e.target.value})} required placeholder="Ex: Alimentação" />
+                      <input className="form-control" type="number" step="0.01" value={form.valor_meta} disabled={!isEditing} onChange={e => setForm({...form, valor_meta: e.target.value})} required placeholder="0,00" />
                     </div>
                   </div>
+
+                  {isEditing && (
+                    <div className="icon-picker-section">
+                       <label className="form-label-custom">Escolha um Ícone</label>
+                       <div className="search-icon-wrapper">
+                         <LucideIcons.Search size={16} />
+                         <input placeholder="Buscar ícone..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                       </div>
+
+                       {!searchTerm && (
+                         <div className="category-chips">
+                           {Object.keys(ICON_CATEGORIES).map((cat: string) => (
+                             <button key={cat} type="button" className={`chip ${iconCategory === cat ? 'active' : ''}`} onClick={() => setIconCategory(cat)}>
+                               {cat}
+                             </button>
+                           ))}
+                         </div>
+                       )}
+
+                       <div className="icon-grid-selector-inner">
+                         {filteredIcons.map((name: string) => (
+                           <button key={name} type="button" className={`icon-option-btn ${form.icone === name ? 'selected' : ''}`} onClick={() => setForm({...form, icone: name})}>
+                             <RenderIcon name={name} size={35} />
+                           </button>
+                         ))}
+                       </div>
+                    </div>
+                  )}
 
                   <div className="form-group">
                     <label className="form-label-custom">Cor da Identidade</label>
@@ -458,7 +458,6 @@ const CategoriasMetas: React.FC = () => {
                   )}
                 </div>
               </div>
-
             </div>
           </div>
         )}
@@ -473,7 +472,6 @@ const CategoriasMetas: React.FC = () => {
         />
       </div>
 
-      {/* FAB - Botão de Adicionar */}
       {perfil?.tipo_usuario !== 'comum' && (
         <button 
           className="cat-fab" 
