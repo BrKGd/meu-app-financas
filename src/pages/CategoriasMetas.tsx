@@ -41,34 +41,11 @@ interface Meta {
   cor_meta: string | null;
 }
 
-// --- Definição das Categorias Lucide ---
-const ICON_CATEGORIES = [
-  {
-    label: 'Finanças e Comércio',
-    description: 'Ícones para dinheiro, moedas, cartões e transações.',
-    icons: ['Wallet', 'PiggyBank', 'CreditCard', 'Coins', 'Banknote', 'CircleDollarSign', 'Landmark', 'Receipt', 'ShoppingCart', 'BadgeDollarSign']
-  },
-  {
-    label: 'Gráficos e Análise',
-    description: 'Visualização de dados, tendências e crescimento.',
-    icons: ['TrendingUp', 'TrendingDown', 'BarChart3', 'PieChart', 'LineChart', 'Activity', 'ArrowUpRight', 'ArrowDownLeft', 'Target', 'Percent']
-  },
-  {
-    label: 'Estilo de Vida',
-    description: 'Saúde, alimentação, lazer e transporte.',
-    icons: ['Utensils', 'Coffee', 'Car', 'Home', 'Plane', 'Dumbbell', 'Heart', 'Tv', 'Gamepad2', 'ShoppingBag', 'Briefcase', 'GraduationCap', 'Stethoscope']
-  },
-  {
-    label: 'Interface e Ação',
-    description: 'Ícones comuns para navegação e estados do sistema.',
-    icons: ['Star', 'Bell', 'Settings', 'ShieldCheck', 'Calendar', 'Clock', 'Search', 'Filter', 'Plus', 'Pencil', 'Trash2', 'Flag', 'Info']
-  },
-  {
-    label: 'Tecnologia',
-    description: 'Dispositivos, rede e comunicação.',
-    icons: ['Smartphone', 'Laptop', 'Wifi', 'Mail', 'MessageCircle', 'HardDrive', 'Cpu', 'Zap']
-  }
-];
+// Extração dinâmica de todos os nomes de ícones válidos
+const ALL_LUCIDE_ICONS = Object.keys(LucideIcons).filter(key => {
+  const item = (LucideIcons as any)[key];
+  return (typeof item === 'function' || typeof item === 'object') && key !== 'createLucideIcon';
+});
 
 const CategoriasMetas: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -76,6 +53,7 @@ const CategoriasMetas: React.FC = () => {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [metasMes, setMetasMes] = useState<Meta[]>([]);
   const [activeTab, setActiveTab] = useState<'despesa' | 'provento' | 'pessoal'>('despesa');
+  const [searchTerm, setSearchTerm] = useState(''); // Estado para busca de ícones
   
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
   const [ano, setAno] = useState<number>(new Date().getFullYear());
@@ -99,11 +77,16 @@ const CategoriasMetas: React.FC = () => {
     onConfirm?: () => void;
   }>({ isOpen: false, type: 'success', title: '', message: '' });
 
+  // Ícones filtrados pela busca
+  const filteredIcons = useMemo(() => {
+    if (!searchTerm) return ALL_LUCIDE_ICONS.slice(0, 100); // Mostra 100 iniciais se vazio
+    return ALL_LUCIDE_ICONS.filter(icon => 
+      icon.toLowerCase().includes(searchTerm.toLowerCase())
+    ).slice(0, 100); // Limitamos a 100 por performance
+  }, [searchTerm]);
+
   const RenderIcon = useCallback(({ name, size = 24, className = '' }: { name: string, size?: number, className?: string }) => {
     const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
-    if (typeof IconComponent !== 'function' && typeof IconComponent !== 'object') {
-      return <LucideIcons.HelpCircle size={size} className={className} />;
-    }
     return <IconComponent size={size} className={className} />;
   }, []);
 
@@ -174,6 +157,7 @@ const CategoriasMetas: React.FC = () => {
   };
 
   const openModal = (item: any = null) => {
+    setSearchTerm(''); // Limpa busca ao abrir
     if (item) {
       setSelectedItem(item);
       setForm({
@@ -379,27 +363,36 @@ const CategoriasMetas: React.FC = () => {
 
                   <div className="form-group">
                     <label className="form-label-custom">Ícone</label>
+                    
+                    {/* Campo de Busca de Ícone */}
+                    {isEditing && (
+                      <input 
+                        className="form-control" 
+                        placeholder="Buscar ícone..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ marginBottom: '10px', fontSize: '0.85rem', padding: '10px' }}
+                      />
+                    )}
+
                     <div className="icon-picker-container">
-                      {ICON_CATEGORIES.map((cat) => (
-                        <div key={cat.label} className="icon-cat-section">
-                          <h4>{cat.label}</h4>
-                          <p>{cat.description}</p>
-                          <div className="icon-grid-selector-inner">
-                            {cat.icons.map((iconName) => (
-                              <button
-                                key={iconName}
-                                type="button"
-                                className={`icon-option-btn ${form.icone === iconName ? 'selected' : ''}`}
-                                onClick={() => isEditing && setForm({...form, icone: iconName})}
-                                disabled={!isEditing}
-                                style={{ '--active-color': form.cor } as React.CSSProperties}
-                              >
-                                <RenderIcon name={iconName} size={24} />
-                              </button>
-                            ))}
-                          </div>
+                      <div className="icon-cat-section">
+                        <div className="icon-grid-selector-inner">
+                          {filteredIcons.map((iconName) => (
+                            <button
+                              key={iconName}
+                              type="button"
+                              className={`icon-option-btn ${form.icone === iconName ? 'selected' : ''}`}
+                              onClick={() => isEditing && setForm({...form, icone: iconName})}
+                              disabled={!isEditing}
+                              style={{ '--active-color': form.cor } as React.CSSProperties}
+                              title={iconName}
+                            >
+                              <RenderIcon name={iconName} size={24} />
+                            </button>
+                          ))}
                         </div>
-                      ))}
+                      </div>
                     </div>
                   </div>
 

@@ -422,7 +422,7 @@
 }
 
 .modal-body-padding {
-  padding: 25px 35px;
+  padding: 25px;
   overflow-y: auto; 
   flex-grow: 1;
 }
