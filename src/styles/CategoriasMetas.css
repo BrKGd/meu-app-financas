@@ -179,8 +179,8 @@
 /* --- GRID E CARDS (FLUX FINTECH DESIGN) --- */
 .grid-metas-modern {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
   width: 100%;
 }
 
@@ -188,12 +188,12 @@
   position: relative;
   background: linear-gradient(135deg, var(--card-color) 0%, rgba(0, 0, 0, 0.25) 150%);
   border-radius: 32px;
-  padding: 24px;
+  padding: 15px 0 0 15px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   cursor: pointer;
-  min-height: 180px;
+  min-height: 100px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -263,12 +263,13 @@
 }
 
 .card-value-display {
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   font-weight: 900;
   color: white;
   margin: 0;
   text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+  text-align: center;
+  }
 
 .card-subtitle-bottom {
   font-size: 0.8rem;
@@ -569,6 +570,7 @@
   .icon-grid-selector-inner { grid-template-columns: repeat(5, 1fr); }
   .card-value-display { font-size: 1.5rem; }
   .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
+  .card-value-display {font-size: 1rem;}
   .modal-content.modal-expanded { 
     align-self: flex-end;
     max-height: 85vh; 

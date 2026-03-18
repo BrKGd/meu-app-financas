@@ -8,7 +8,7 @@ import * as LucideIcons from 'lucide-react';
 import ModalFeedback, { ModalType } from '../components/ModalFeedback';
 import '../styles/CategoriasMetas.css';
 
-// Assets PNG
+// Assets PNG (Verifique se os caminhos estão corretos no seu projeto)
 import iconConfirme from '../assets/confirme.png';
 import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
@@ -41,27 +41,33 @@ interface Meta {
   cor_meta: string | null;
 }
 
-// Extração dinâmica de todos os nomes de ícones válidos
-const ALL_LUCIDE_ICONS = Object.keys(LucideIcons).filter(key => {
+// --- Extração Dinâmica Segura de Ícones ---
+const ALL_LUCIDE_ICONS = Object.keys(LucideIcons).filter((key) => {
   const item = (LucideIcons as any)[key];
-  return (typeof item === 'function' || typeof item === 'object') && key !== 'createLucideIcon';
-});
+  // Filtra apenas o que começa com letra maiúscula e é um componente válido
+  const isIcon = /^[A-Z]/.test(key) && (typeof item === 'function' || typeof item === 'object');
+  // Remove utilitários internos que não são ícones
+  const isInternal = ['createLucideIcon', 'LucideProps', 'Icon', 'LucideIcon'].includes(key);
+  return isIcon && !isInternal;
+}).sort();
 
 const CategoriasMetas: React.FC = () => {
+  // Estados de Dados
   const [loading, setLoading] = useState<boolean>(true);
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [metasMes, setMetasMes] = useState<Meta[]>([]);
   const [activeTab, setActiveTab] = useState<'despesa' | 'provento' | 'pessoal'>('despesa');
-  const [searchTerm, setSearchTerm] = useState(''); // Estado para busca de ícones
   
+  // Estados de Filtro/Período
+  const [searchTerm, setSearchTerm] = useState('');
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
   const [ano, setAno] = useState<number>(new Date().getFullYear());
 
+  // Estados do Modal
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false); 
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  
   const [form, setForm] = useState({ 
     nome: '', 
     cor: '#4361ee', 
@@ -77,16 +83,15 @@ const CategoriasMetas: React.FC = () => {
     onConfirm?: () => void;
   }>({ isOpen: false, type: 'success', title: '', message: '' });
 
-  // Ícones filtrados pela busca
-  const filteredIcons = useMemo(() => {
-    if (!searchTerm) return ALL_LUCIDE_ICONS.slice(0, 100); // Mostra 100 iniciais se vazio
-    return ALL_LUCIDE_ICONS.filter(icon => 
-      icon.toLowerCase().includes(searchTerm.toLowerCase())
-    ).slice(0, 100); // Limitamos a 100 por performance
-  }, [searchTerm]);
-
+  // --- Helpers ---
+  
+  // Renderizador Dinâmico de Ícone com Fallback
   const RenderIcon = useCallback(({ name, size = 24, className = '' }: { name: string, size?: number, className?: string }) => {
     const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
+    // Verifica se o componente é válido antes de renderizar
+    if (typeof IconComponent !== 'function' && typeof IconComponent !== 'object') {
+        return <LucideIcons.HelpCircle size={size} className={className} />;
+    }
     return <IconComponent size={size} className={className} />;
   }, []);
 
@@ -104,21 +109,25 @@ const CategoriasMetas: React.FC = () => {
     return yiq >= 128 ? '#1e293b' : '#ffffff';
   };
 
+  // --- Busca de Dados ---
   const buscarDados = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
       const { data: profile } = await supabase.from('profiles').select('id, tipo_usuario').eq('id', user.id).single();
       setPerfil(profile);
+
       const [resCats, resMetas] = await Promise.all([
         supabase.from('categorias').select('*').order('nome'),
         supabase.from('metas').select('*').eq('mes_referencia', mes).eq('ano_referencia', ano)
       ]);
+
       setCategorias((resCats.data as Categoria[]) || []);
       setMetasMes((resMetas.data || []).map((m: any) => ({ ...m, valor_meta: parseFloat(m.valor_meta) || 0 })));
     } catch (error: any) {
-      console.error("Erro:", error.message);
+      console.error("Erro ao buscar dados:", error.message);
     } finally {
       setLoading(false);
     }
@@ -126,6 +135,7 @@ const CategoriasMetas: React.FC = () => {
 
   useEffect(() => { buscarDados(); }, [buscarDados]);
 
+  // --- Lógica de Negócio ---
   const cardsParaExibir = useMemo(() => {
     return categorias
       .filter(c => c.tipo === activeTab)
@@ -150,14 +160,22 @@ const CategoriasMetas: React.FC = () => {
       .reduce((acc, curr) => acc + (Number(curr.valor_meta) || 0), 0);
   }, [metasMes, activeTab]);
 
+  // Filtro de ícones para o Picker (Limitado a 80 por performance)
+  const filteredIcons = useMemo(() => {
+    const search = searchTerm.toLowerCase();
+    const result = ALL_LUCIDE_ICONS.filter(icon => icon.toLowerCase().includes(search));
+    return result.slice(0, 80); 
+  }, [searchTerm]);
+
   const podeEditar = (item: any) => {
     if (!perfil) return false;
     if (perfil.tipo_usuario === 'proprietario') return true;
     return perfil.tipo_usuario === 'administrador' && (!item || item.user_id === perfil.id);
   };
 
+  // --- Ações do Modal ---
   const openModal = (item: any = null) => {
-    setSearchTerm(''); // Limpa busca ao abrir
+    setSearchTerm('');
     if (item) {
       setSelectedItem(item);
       setForm({
@@ -196,18 +214,24 @@ const CategoriasMetas: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
       let currentCatId = selectedItem?.categoria_id;
+
+      // 1. Salvar Categoria se for nova ou se estivermos editando os campos da categoria
       if (!currentCatId || isEditing) {
         const catPayload = { nome: form.nome, tipo: activeTab, cor: form.cor, icone: form.icone, user_id: user.id };
         if (currentCatId) {
           await supabase.from('categorias').update(catPayload).eq('id', currentCatId);
         } else {
-          const { data: newCat } = await (supabase.from('categorias') as any).insert(catPayload).select().single();
+          const { data: newCat, error: catErr } = await (supabase.from('categorias') as any).insert(catPayload).select().single();
+          if (catErr) throw catErr;
           currentCatId = newCat.id;
         }
       }
+
+      // 2. Salvar Meta
       const valorNum = typeof form.valor_meta === 'string' ? parseFloat(form.valor_meta.replace(',', '.')) : form.valor_meta;
-      await (supabase.from('metas') as any).upsert({
+      const { error: metaErr } = await (supabase.from('metas') as any).upsert({
         id: selectedItem?.id_meta || undefined,
         user_id: user.id,
         categoria_id: currentCatId,
@@ -218,11 +242,14 @@ const CategoriasMetas: React.FC = () => {
         nome_meta: form.nome,
         cor_meta: form.cor
       });
+
+      if (metaErr) throw metaErr;
+
       setIsModalOpen(false);
       buscarDados();
-      alertar('success', 'Sucesso!', 'Dados salvos com sucesso.');
+      alertar('success', 'Sucesso!', 'Alterações salvas corretamente.');
     } catch (error: any) {
-      alertar('error', 'Erro', error.message);
+      alertar('error', 'Erro ao salvar', error.message);
     } finally {
       setLoading(false);
     }
@@ -230,7 +257,7 @@ const CategoriasMetas: React.FC = () => {
 
   const handleExcluirCascata = () => {
     if (!selectedItem?.categoria_id) return;
-    alertar('danger', 'Confirmar Exclusão', `Deseja excluir "${selectedItem.nome}"?`, async () => {
+    alertar('danger', 'Confirmar Exclusão', `Isso excluirá a categoria "${selectedItem.nome}" e todas as metas associadas a ela neste mês. Confirmar?`, async () => {
       setLoading(true);
       try {
         await supabase.from('metas').delete().eq('categoria_id', selectedItem.categoria_id);
@@ -238,7 +265,7 @@ const CategoriasMetas: React.FC = () => {
         setIsModalOpen(false);
         buscarDados();
       } catch (error: any) {
-        alertar('error', 'Erro', error.message);
+        alertar('error', 'Erro ao excluir', error.message);
       } finally {
         setLoading(false);
       }
@@ -254,7 +281,7 @@ const CategoriasMetas: React.FC = () => {
               <LucideIcons.Flag className="w-7 h-7" />
               <h1>Planejamento</h1>
             </div>
-            <p className="subtitulo-metas">Orçamento mensal e objetivos</p>
+            <p className="subtitulo-metas">Gerencie suas categorias e orçamentos</p>
           </div>
 
           <div className="header-controls">
@@ -279,45 +306,53 @@ const CategoriasMetas: React.FC = () => {
         </header>
 
         <nav className="metas-tabs">
-          <button className={activeTab === 'despesa' ? 'active' : ''} onClick={() => setActiveTab('despesa')}><LucideIcons.TrendingDown /> Gastos</button>
-          <button className={activeTab === 'provento' ? 'active' : ''} onClick={() => setActiveTab('provento')}><LucideIcons.DollarSign /> Receitas</button>
-          <button className={activeTab === 'pessoal' ? 'active' : ''} onClick={() => setActiveTab('pessoal')}><LucideIcons.Star /> Objetivos</button>
+          <button className={activeTab === 'despesa' ? 'active' : ''} onClick={() => setActiveTab('despesa')}>
+            <LucideIcons.TrendingDown size={18} /> Gastos
+          </button>
+          <button className={activeTab === 'provento' ? 'active' : ''} onClick={() => setActiveTab('provento')}>
+            <LucideIcons.DollarSign size={18} /> Receitas
+          </button>
+          <button className={activeTab === 'pessoal' ? 'active' : ''} onClick={() => setActiveTab('pessoal')}>
+            <LucideIcons.Star size={18} /> Objetivos
+          </button>
         </nav>
 
         {loading ? (
           <div className="cat-status"><div className="spinner-loader"></div></div>
         ) : (
           <div className="grid-metas-modern">
-            {cardsParaExibir.map((item) => (
-              <div 
-                key={item.categoria_id} 
-                className="card-financeiro-flux" 
-                style={{ '--card-color': item.cor } as React.CSSProperties} 
-                onClick={() => openModal(item)}
-              >
-                <div className="card-bg-icon">
-                  <RenderIcon name={item.icone} size={160} />
-                </div>
-                <div className="card-content-top">
-                  <div className="card-icon-small">
-                    <RenderIcon name={item.icone} size={20} />
+            {cardsParaExibir.length > 0 ? (
+              cardsParaExibir.map((item) => (
+                <div 
+                  key={item.categoria_id} 
+                  className="card-financeiro-flux" 
+                  style={{ '--card-color': item.cor } as React.CSSProperties} 
+                  onClick={() => openModal(item)}
+                >
+                  <div className="card-bg-icon">
+                    <RenderIcon name={item.icone} size={160} />
                   </div>
-                  <span className="card-label-top">{item.nome}</span>
+                  <div className="card-content-top">
+                    <div className="card-icon-small">
+                      <RenderIcon name={item.icone} size={20} />
+                    </div>
+                    <span className="card-label-top">{item.nome}</span>
+                  </div>
+                  <div className="card-main-info">
+                    <h2 className="card-value-display">
+                      {item.valor_meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </h2>
+                    <p className="card-subtitle-bottom">{item.existe_meta ? 'Meta Ativa' : 'Sem Meta'}</p>
+                  </div>
                 </div>
-                <div className="card-main-info">
-                  <h2 className="card-value-display">
-                    {item.valor_meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </h2>
-                  <p className="card-subtitle-bottom">{item.existe_meta ? 'Planejado' : 'Não planejado'}</p>
-                </div>
-                <div className="card-edit-indicator">
-                  {podeEditar(item) ? <LucideIcons.Pencil /> : <LucideIcons.Lock />}
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+                <div className="empty-state">Nenhuma categoria encontrada para esta aba.</div>
+            )}
           </div>
         )}
 
+        {/* --- MODAL DE EDIÇÃO / CRIAÇÃO --- */}
         {isModalOpen && (
           <div className="modal-overlay" onClick={handleCancelarEdicao}>
             <div className="modal-content modal-expanded fade-in" onClick={(e) => e.stopPropagation()}>
@@ -340,7 +375,7 @@ const CategoriasMetas: React.FC = () => {
                   <div className="modal-header-actions">
                     {selectedItem && !isEditing && podeEditar(selectedItem) && (
                       <button type="button" className="btn-icon-action" onClick={() => setIsEditing(true)}>
-                        <LucideIcons.Settings2 size={32} />
+                        <LucideIcons.Settings2 size={32} color="#fff" />
                       </button>
                     )}
                     <button type="button" onClick={() => setIsModalOpen(false)} className="btn-icon-action">
@@ -353,51 +388,50 @@ const CategoriasMetas: React.FC = () => {
               <div className="modal-body-padding">
                 <form id="meta-form" onSubmit={handleSalvar} className="form-flex-column">
                   <div className="form-group">
-                    <label className="form-label-custom">Nome</label>
-                    <input className="form-control" value={form.nome} disabled={!isEditing} onChange={e => setForm({...form, nome: e.target.value})} required />
+                    <label className="form-label-custom">Nome da Categoria</label>
+                    <input className="form-control" value={form.nome} disabled={!isEditing} onChange={e => setForm({...form, nome: e.target.value})} required placeholder="Ex: Alimentação" />
                   </div>
+                  
                   <div className="form-group">
                     <label className="form-label-custom">Valor do Planejamento (R$)</label>
-                    <input className="form-control" type="number" step="0.01" value={form.valor_meta} disabled={!isEditing} onChange={e => setForm({...form, valor_meta: e.target.value})} required />
+                    <input className="form-control" type="number" step="0.01" value={form.valor_meta} disabled={!isEditing} onChange={e => setForm({...form, valor_meta: e.target.value})} required placeholder="0,00" />
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label-custom">Ícone</label>
-                    
-                    {/* Campo de Busca de Ícone */}
+                    <label className="form-label-custom">Seletor de Ícone</label>
                     {isEditing && (
-                      <input 
-                        className="form-control" 
-                        placeholder="Buscar ícone..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ marginBottom: '10px', fontSize: '0.85rem', padding: '10px' }}
-                      />
+                      <div className="search-icon-wrapper">
+                        <LucideIcons.Search size={16} className="search-icon-input" />
+                        <input 
+                          className="form-control search-icon-field" 
+                          placeholder="Pesquisar ícone..." 
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
                     )}
 
                     <div className="icon-picker-container">
-                      <div className="icon-cat-section">
-                        <div className="icon-grid-selector-inner">
-                          {filteredIcons.map((iconName) => (
-                            <button
-                              key={iconName}
-                              type="button"
-                              className={`icon-option-btn ${form.icone === iconName ? 'selected' : ''}`}
-                              onClick={() => isEditing && setForm({...form, icone: iconName})}
-                              disabled={!isEditing}
-                              style={{ '--active-color': form.cor } as React.CSSProperties}
-                              title={iconName}
-                            >
-                              <RenderIcon name={iconName} size={24} />
-                            </button>
-                          ))}
-                        </div>
+                      <div className="icon-grid-selector-inner">
+                        {filteredIcons.map((iconName) => (
+                          <button
+                            key={iconName}
+                            type="button"
+                            className={`icon-option-btn ${form.icone === iconName ? 'selected' : ''}`}
+                            onClick={() => isEditing && setForm({...form, icone: iconName})}
+                            disabled={!isEditing}
+                            style={{ '--active-color': form.cor } as React.CSSProperties}
+                            title={iconName}
+                          >
+                            <RenderIcon name={iconName} size={22} />
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label-custom">Cor</label>
+                    <label className="form-label-custom">Cor da Identidade</label>
                     <div className="color-picker-wrapper">
                       <input type="color" className="input-color-square" value={form.cor} disabled={!isEditing} onChange={e => setForm({...form, cor: e.target.value})} />
                       <input type="text" className="form-control hex-input" value={form.cor.toUpperCase()} disabled={!isEditing} onChange={e => setForm({...form, cor: e.target.value})} maxLength={7} />
@@ -439,13 +473,14 @@ const CategoriasMetas: React.FC = () => {
         />
       </div>
 
+      {/* FAB - Botão de Adicionar */}
       {perfil?.tipo_usuario !== 'comum' && (
         <button 
           className="cat-fab" 
           onClick={() => openModal()} 
           style={{ background: activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee' }}
         >
-          <LucideIcons.Plus size={32} />
+          <LucideIcons.Plus size={32} color="#fff" />
         </button>
       )}
     </>
