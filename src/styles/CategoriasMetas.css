@@ -382,15 +382,15 @@
   align-items: center;     /* Centraliza verticalmente */
   justify-content: center;    /* Centraliza horizontalmente */
   z-index: 1000;
-  padding: 20px;           /* Padding uniforme para evitar colar nas bordas */
+  padding: 10px;           /* Padding uniforme para evitar colar nas bordas */
 }
 
 .modal-content.modal-expanded {
   background: none;       /* Mudado de none para white para visibilidade do fundo */
   width: 100%;
-  max-width: 500px;        /* Largura máxima controlada para ficar centralizado e elegante */
+  max-width: 100%;        /* Largura máxima controlada para ficar centralizado e elegante */
   max-height: 90vh;
-  border-radius: 35px!important;
+  border-radius: 25px!important;
   display: flex;
   flex-direction: column;
   overflow: hidden;
