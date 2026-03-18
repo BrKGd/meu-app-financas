@@ -1,7 +1,7 @@
 /* --- LAYOUT GERAL --- */
 .desp-premium-wrapper {
-  padding: 20px 20px; /* Aumentei o respiro lateral */
-  max-width: 100%;   /* De 1200px para 1600px */
+  padding: 5px; 
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -197,7 +197,7 @@
 }
 
 .edit-modal-container {
-  width: 95%;
+  width: 100%;
   max-width: 550px;
   background: white;
   border-radius: 32px;
@@ -219,7 +219,7 @@
 }
 
 .edit-modal-body {
-  padding: 28px;
+  padding: 10px;
   overflow-y: auto;
   flex: 1;
   scrollbar-width: thin;
@@ -371,7 +371,7 @@
 /* --- RESPONSIVIDADE --- */
 @media (max-width: 768px) {
   .desp-top-layout { grid-template-columns: 1fr; }
-  .desp-premium-wrapper { padding: 20px 15px; }
+  .desp-premium-wrapper { padding: 5px; }
   .desp-fab { bottom: 90px; right: 20px; }
   .desp-item-row { padding: 15px 20px; }
   .desp-icon-column { margin-right: 15px; }
