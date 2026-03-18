@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
+// Importação dinâmica de todos os ícones do Lucide
+import * as LucideIcons from 'lucide-react';
 import { 
-  Plus, Calendar, Tag, Trash2, X, Save, 
-  ShoppingCart, Loader2, Filter, CreditCard, Banknote, Landmark, ChevronLeft, ChevronRight,
-  QrCode, Receipt, AlertTriangle, User, Store, Lock, UserPlus, Repeat, CheckCircle2,
-  Utensils, Car, Home, Tv, HeartPulse, Briefcase, GraduationCap, Plane, Dumbbell, Coffee, Pizza
+  Plus, Calendar, Tag, Loader2, Filter, ChevronLeft, ChevronRight,
+  ShoppingCart, Store, Lock, Repeat, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
@@ -16,28 +16,11 @@ import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
 
-// Mapeamento de Ícones por Nome de Categoria
-const IconeCategoria: Record<string, any> = {
-  "Alimentação": Utensils,
-  "Transporte": Car,
-  "Moradia": Home,
-  "Lazer": Tv,
-  "Saúde": HeartPulse,
-  "Trabalho": Briefcase,
-  "Educação": GraduationCap,
-  "Viagem": Plane,
-  "Academia": Dumbbell,
-  "Mercado": ShoppingCart,
-  "Restaurante": Pizza,
-  "Café": Coffee,
-  "Assinaturas": Repeat,
-  "Outros": Tag
-};
-
 interface Categoria {
   id: string;
   nome: string;
   cor: string;
+  icone: string;
 }
 
 interface Responsavel {
@@ -71,6 +54,7 @@ interface Compra {
   categorias?: {
     nome: string;
     cor: string;
+    icone: string;
   } | null;
   profiles?: {
     nome: string;
@@ -112,6 +96,16 @@ const Despesas: React.FC = () => {
 
   const alertar = (type: 'success' | 'error' | 'danger', title: string, message: string, onConfirm?: () => void) => {
     setFeedback({ isOpen: true, type, title, message, onConfirm });
+  };
+
+  /**
+   * Helper para renderizar o ícone baseado na string do banco
+   */
+  const renderIcon = (iconName: string | undefined, size = 20) => {
+    if (!iconName) return <ShoppingCart size={size} />;
+    // @ts-ignore
+    const IconComponent = LucideIcons[iconName];
+    return IconComponent ? <IconComponent size={size} /> : <ShoppingCart size={size} />;
   };
 
   const formatarMoeda = (valor: number) => {
@@ -162,7 +156,7 @@ const Despesas: React.FC = () => {
       if (tipoFinal === 'comum') setFiltroResponsavel(user.id);
 
       const [catRes, profRes, cartRes, metasRes] = await Promise.all([
-        supabase.from('categorias').select('*').eq('tipo', 'despesa').order('nome'),
+        supabase.from('categorias').select('*').order('nome'),
         supabase.from('profiles').select('id, nome').order('nome'),
         supabase.from('cartoes').select('*').order('nome'),
         supabase.from('metas').select('valor_meta, tipo_meta').eq('mes_referencia', mesAlvoNum).eq('ano_referencia', anoAlvoNum)
@@ -180,7 +174,7 @@ const Despesas: React.FC = () => {
 
       let query = supabase.from('compras').select(`
         *, 
-        categorias (nome, cor), 
+        categorias (nome, cor, icone), 
         profiles!fk_compras_profiles (nome),
         recorrencias (valor)
       `).eq('periodo_referencia', periodoAlvoStr);
@@ -233,7 +227,6 @@ const Despesas: React.FC = () => {
 
   const handleAbrirModal = (item: Compra) => {
     const valorParaEdicao = item.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-    
     const valorPai = item.recorrencias?.valor || item.valor_total;
     const valorPaiExibicao = valorPai.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
@@ -394,7 +387,7 @@ const Despesas: React.FC = () => {
                 <option value="">Todas as Categorias</option>
                 {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
               </select>
-              <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} disabled={!temPermissaoGeral()} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <select value={filtroResponsavel} onChange={(e) => setFiltveResponsavel(e.target.value)} disabled={!temPermissaoGeral()} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <option value="">Todos Responsáveis</option>
                 {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
               </select>
@@ -411,40 +404,36 @@ const Despesas: React.FC = () => {
                 <span style={{fontSize: '0.85rem', fontWeight: 800, color: '#ef4444'}}>{formatarMoeda(itens.reduce((acc, curr) => acc + (curr.valor_projetado || 0), 0))}</span>
               </div>
               <div className="desp-panel-list" style={{borderRadius: '0 0 16px 16px'}}>
-                {itens.map((item, idx) => {
-                  // Determina o ícone com base na categoria
-                  const IconComp = IconeCategoria[item.categorias?.nome || "Outros"] || Tag;
-
-                  return (
-                    <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
-                      <div className="desp-icon-column">
-                        <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}>
-                          <IconComp size={20} />
-                        </div>
-                      </div>
-                      <div className="desp-main-content">
-                        <div className="desp-top-line">
-                          <span className="desp-desc">
-                            {item.descricao} 
-                            {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px'}}>{item.parcela_atual}/{item.parcelas_total}</span>}
-                            {item.recorrencia_id && !item.parcelado && <Repeat size={12} style={{marginLeft: '6px', color: '#6366f1'}} />}
-                            {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.4, marginLeft: '6px'}} />}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {item.status_pagamento === 'pago' && <CheckCircle2 size={16} color="#10b981" />}
-                            <span className={`desp-value ${item.status_pagamento === 'pago' ? 'value-paid' : 'value-negative'}`}>
-                              {formatarMoeda(item.valor_projetado || 0)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="desp-meta-line">
-                          <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
-                          <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
-                        </div>
+                {itens.map((item, idx) => (
+                  <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
+                    <div className="desp-icon-column">
+                      {/* ÍCONE DINÂMICO BASEADO NA TABELA CATEGORIAS */}
+                      <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}>
+                        {renderIcon(item.categorias?.icone)}
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="desp-main-content">
+                      <div className="desp-top-line">
+                        <span className="desp-desc">
+                          {item.descricao} 
+                          {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px'}}>{item.parcela_atual}/{item.parcelas_total}</span>}
+                          {item.recorrencia_id && !item.parcelado && <Repeat size={12} style={{marginLeft: '6px', color: '#6366f1'}} />}
+                          {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.4, marginLeft: '6px'}} />}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {item.status_pagamento === 'pago' && <CheckCircle2 size={16} color="#10b981" />}
+                          <span className={`desp-value ${item.status_pagamento === 'pago' ? 'value-paid' : 'value-negative'}`}>
+                            {formatarMoeda(item.valor_projetado || 0)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="desp-meta-line">
+                        <span className="meta-tag"><Calendar size={12} /> {item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
+                        <span className="meta-tag"><Tag size={12} /> {item.categorias?.nome || 'S/ Categoria'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
