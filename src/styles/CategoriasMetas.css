@@ -315,7 +315,7 @@
   width: 100%;
   max-width: 520px;
   max-height: 100%;
-  border-radius: 45px;
+  border-radius: 45px 45px 45px 45px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -511,7 +511,6 @@
   .card-value-display { font-size: 1.5rem; }
   .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
   .modal-content.modal-expanded { 
-    border-radius: 35px 35px 0 0; 
     align-self: flex-end; 
     margin-bottom: 0; 
     max-height: 85vh; 

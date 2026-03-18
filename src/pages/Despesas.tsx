@@ -383,14 +383,14 @@ const Despesas: React.FC = () => {
           </div>
           {showFilters && (
             <div className="advanced-filters-row" style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-              <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <option value="">Todas as Categorias</option>
-                {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
-              </select>
-              <select value={filtroResponsavel} onChange={(e) => setFiltveResponsavel(e.target.value)} disabled={!temPermissaoGeral()} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <option value="">Todos Responsáveis</option>
-                {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-              </select>
+            <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <option value="">Todas as Categorias</option>
+              {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+            </select>
+            <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} disabled={!temPermissaoGeral()} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <option value="">Todos Responsáveis</option>
+              {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+            </select>
             </div>
           )}
         </div>
