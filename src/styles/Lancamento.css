@@ -1,14 +1,14 @@
 /* src/styles/Lancamento.css */
 
 .lancamento-container {
-  max-width: 800px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 10px;
-  padding-bottom: 50px;
+  padding-bottom: 0px;
 }
 
 .lancamento-header {
-  margin-bottom: 30px;
+  margin-bottom: 0px;
 }
 
 .lancamento-header h2 {
@@ -27,7 +27,7 @@
 
 .lancamento-card {
   background: #fff;
-  padding: 30px;
+  padding: 0px;
   border-radius: 24px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03);
   border: 1px solid #f1f5f9;
@@ -37,8 +37,8 @@
 .form-grid-desc-cat {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: 15px;
-  margin-bottom: 20px;
+  gap: 5px;
+  margin-bottom: 10px;
 }
 
 /* Grid superior (Data, Loja, Responsável) */
@@ -60,9 +60,7 @@
   flex-wrap: wrap;
   gap: 15px;
   align-items: flex-end;
-  /* Removido o background cinza */
   background: transparent; 
-  /* Removido o preenchimento e bordas para não parecer um bloco separado */
   padding: 10px 0; 
   border: none;
   margin-top: 10px;
@@ -207,9 +205,9 @@
 }
 
 /* Mobile */
-@media (max-width: 600px) {
-  .lancamento-container { padding: 15px; }
-  .lancamento-card { padding: 20px; }
+@media (max-width: 768px) {
+  .lancamento-container { padding: 0px; }
+  .lancamento-card { padding: 0px; }
   
   .form-grid-desc-cat {
     grid-template-columns: 1fr;
