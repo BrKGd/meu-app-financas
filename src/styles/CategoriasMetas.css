@@ -307,17 +307,17 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 0px;
+  padding: 0px 10px 30px 10px;
 }
 
 .modal-content.modal-expanded {
   background: white;
   width: 100%;
   max-width: 520px;
-  max-height: 85vh; /* Limita a altura a 85% da tela */
+  max-height: 100%;
   border-radius: 45px;
   display: flex;
-  flex-direction: column; /* Essencial para fixar topo e base */
+  flex-direction: column;
   overflow: hidden;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   transition: all 0.3s ease;
@@ -325,30 +325,38 @@
 }
 
 .modal-details-header {
-  padding: 40px;
+  padding: 10px;
   color: white;
-  flex-shrink: 0; /* Impede que o header encolha */
+  flex-shrink: 0;
 }
-
-/* ÁREA DE SCROLL (ONDE FICA O FORMULÁRIO) */
-.modal-body-padding {
-  padding: 35px;
-  overflow-y: auto; /* Ativa o scroll interno */
-  flex-grow: 1; /* Ocupa o espaço disponível entre header e footer */
-}
-
-/* Custom Scrollbar para o corpo do Modal */
-.modal-body-padding::-webkit-scrollbar { width: 8px; }
-.modal-body-padding::-webkit-scrollbar-track { background: transparent; }
-.modal-body-padding::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 
 .modal-title-text {
   margin: 0;
-  font-size: 1.8rem;
+  font-size: 1.8rem; 
   font-weight: 900;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
+}
+
+.modal-header-actions {
+  display: flex;
+  gap: 15px;
+  align-items: flex-end;
+}
+
+.modal-body-padding {
+  padding: 15px;
+  overflow-y: auto; 
+  flex-grow: 1;
+}
+
+.modal-body-padding::-webkit-scrollbar { width: 10px; }
+.modal-body-padding::-webkit-scrollbar-track { background: transparent; }
+.modal-body-padding::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+.modal-header-top{
+  border-radius: 45px 45px 0 0;
 }
 
 /* --- FORMULÁRIO --- */
@@ -413,7 +421,7 @@
   background: white;
   border-top: 1px solid #f1f5f9;
   border-radius: 0 0 45px 45px;
-  flex-shrink: 0; /* Impede que o footer encolha */
+  flex-shrink: 0;
 }
 
 .footer-right-actions {
