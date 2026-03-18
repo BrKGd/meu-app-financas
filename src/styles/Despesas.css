@@ -207,6 +207,7 @@
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   max-height: 90vh;
   animation: modalIn 0.3s ease-out;
+  padding: 10px;
 }
 
 .edit-modal-header {
