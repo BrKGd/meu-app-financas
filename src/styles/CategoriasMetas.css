@@ -1,8 +1,8 @@
 /* --- LAYOUT E CONTAINER --- */
 .cat-page-wrapper.metas-container {
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 15px;
+  padding: 5px;
   position: relative;
   min-height: 100vh;
   animation: fadeIn 0.4s ease-out;
@@ -565,7 +565,7 @@
 @media (max-width: 768px) {
   .metas-header { flex-direction: column; gap: 25px; align-items: center; text-align: center; }
   .header-controls { align-items: center; width: 100%; }
-  .grid-metas-modern { grid-template-columns: 1fr; gap: 15px; }
+  .grid-metas-modern { grid-template-columns: 1fr 1fr; gap: 10px; }
   .icon-grid-selector-inner { grid-template-columns: repeat(5, 1fr); }
   .card-value-display { font-size: 1.5rem; }
   .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
