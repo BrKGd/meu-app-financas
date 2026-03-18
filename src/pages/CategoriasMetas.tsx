@@ -26,7 +26,7 @@ interface Categoria {
   nome: string;
   tipo: string;
   cor: string;
-  icone: string; // Removido o opcional para evitar undefined no RenderIcon
+  icone: string;
 }
 
 interface Meta {
@@ -41,7 +41,6 @@ interface Meta {
   cor_meta: string | null;
 }
 
-// Interface para o formulário
 interface FormState {
   nome: string;
   cor: string;
@@ -49,18 +48,21 @@ interface FormState {
   valor_meta: string | number;
 }
 
-// --- Mapeamento de Categorias de Ícones ---
+// --- Mapeamento de Categorias de Ícones (Alinhado ao Lucide.dev) ---
 const ICON_CATEGORIES: Record<string, string[]> = {
-  "Finanças": ["Wallet", "PiggyBank", "DollarSign", "CreditCard", "Banknote", "Coins", "Receipt", "ChartBar", "TrendingUp", "TrendingDown", "Landmark", "Calculator"],
-  "Transporte": ["Car", "Bus", "Bike", "Plane", "Train", "Fuel", "MapPin", "Navigation", "Truck"],
-  "Casa": ["Home", "Lightbulb", "Tv", "Wifi", "Zap", "Droplets", "Utensils", "Refrigerator", "Bed", "Bath"],
-  "Saúde": ["Heart", "Stethoscope", "Activity", "Pill", "Baby", "Dumbbell", "FirstAidKit"],
-  "Lazer": ["Gamepad2", "Music", "Camera", "Coffee", "Beer", "Popcorn", "Ticket", "Umbrella", "Mountain"],
-  "Shopping": ["ShoppingBag", "ShoppingCart", "Tag", "Gift", "Package", "Shirt"],
-  "Trabalho": ["Briefcase", "Laptop", "HardDrive", "Mail", "Phone", "FileText", "Languages", "User"]
+  "Finanças": ["Wallet", "PiggyBank", "DollarSign", "CreditCard", "Banknote", "Coins", "Receipt", "ChartBar", "TrendingUp", "TrendingDown", "Landmark", "Calculator", "HandCoins", "CircleDollarSign", "Percent"],
+  "Transporte": ["Car", "Bus", "Bike", "Plane", "Train", "Fuel", "MapPin", "Navigation", "Truck", "Ship", "TramFront"],
+  "Casa": ["Home", "Lightbulb", "Tv", "Wifi", "Zap", "Droplets", "Utensils", "Refrigerator", "Bed", "Bath", "WashingMachine", "Microwave", "Fan", "Sofa"],
+  "Saúde": ["Heart", "Stethoscope", "Activity", "Pill", "Baby", "Dumbbell", "FirstAidKit", "Brain", "Syringe", "Thermometer"],
+  "Lazer": ["Gamepad2", "Music", "Camera", "Coffee", "Beer", "Popcorn", "Ticket", "Umbrella", "Mountain", "Tent", "Wine", "Dices", "Trophy"],
+  "Shopping": ["ShoppingBag", "ShoppingCart", "Tag", "Gift", "Package", "Shirt", "Store", "Watch"],
+  "Trabalho": ["Briefcase", "Laptop", "HardDrive", "Mail", "Phone", "FileText", "Languages", "User", "Printer", "Database", "ShieldCheck", "BookOpen"],
+  "Comunicação": ["MessageSquare", "Send", "AtSign", "Share2", "Bell", "Video", "Mic", "Languages"],
+  "Tempo": ["Clock", "Calendar", "History", "Hourglass", "AlarmClock", "Watch", "Sun", "Moon", "Cloud"],
+  "Natureza": ["Leaf", "TreePine", "Flower2", "Sprout", "Wind", "Flame", "Bird", "PawPrint"]
 };
 
-// Extração Dinâmica Segura
+// Extração Dinâmica Segura de todos os ícones disponíveis
 const ALL_LUCIDE_KEYS: string[] = Object.keys(LucideIcons).filter((key) => {
   const item = (LucideIcons as any)[key];
   return /^[A-Z]/.test(key) && 
@@ -99,7 +101,6 @@ const CategoriasMetas: React.FC = () => {
     onConfirm?: () => void;
   }>({ isOpen: false, type: 'success', title: '', message: '' });
 
-  // --- Renderizador de Ícone (Tipado para evitar o erro TS7006) ---
   const RenderIcon = useCallback(({ name, size = 24, className = '' }: { name: string; size?: number; className?: string }) => {
     const IconComponent = (LucideIcons as any)[name];
     if (!IconComponent || (typeof IconComponent !== 'function' && typeof IconComponent !== 'object')) {
@@ -148,8 +149,10 @@ const CategoriasMetas: React.FC = () => {
   useEffect(() => { buscarDados(); }, [buscarDados]);
 
   const filteredIcons = useMemo(() => {
-    if (searchTerm) {
-      return ALL_LUCIDE_KEYS.filter(icon => icon.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 60);
+    if (searchTerm.trim()) {
+      return ALL_LUCIDE_KEYS.filter(icon => 
+        icon.toLowerCase().includes(searchTerm.toLowerCase())
+      ).slice(0, 100); 
     }
     return ICON_CATEGORIES[iconCategory] || [];
   }, [searchTerm, iconCategory]);
@@ -407,7 +410,7 @@ const CategoriasMetas: React.FC = () => {
                        <label className="form-label-custom">Escolha um Ícone</label>
                        <div className="search-icon-wrapper">
                          <LucideIcons.Search size={16} />
-                         <input placeholder="Buscar ícone..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                         <input placeholder="Buscar em todos os ícones..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                        </div>
 
                        {!searchTerm && (
@@ -420,12 +423,17 @@ const CategoriasMetas: React.FC = () => {
                          </div>
                        )}
 
+                       <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '5px', fontWeight: 'bold' }}>
+                          {searchTerm ? `Resultados da busca` : `Ícones em ${iconCategory}`}
+                       </div>
+
                        <div className="icon-grid-selector-inner">
                          {filteredIcons.map((name: string) => (
-                           <button key={name} type="button" className={`icon-option-btn ${form.icone === name ? 'selected' : ''}`} onClick={() => setForm({...form, icone: name})}>
-                             <RenderIcon name={name} size={35} />
+                           <button key={name} type="button" title={name} className={`icon-option-btn ${form.icone === name ? 'selected' : ''}`} onClick={() => setForm({...form, icone: name})}>
+                             <RenderIcon name={name} size={30} />
                            </button>
                          ))}
+                         {filteredIcons.length === 0 && <div className="empty-state">Nenhum ícone encontrado.</div>}
                        </div>
                     </div>
                   )}
