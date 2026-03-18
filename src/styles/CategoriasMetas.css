@@ -401,7 +401,7 @@
 }
 
 .modal-details-header {
-  padding: 25px 30px;
+  padding: 25px 25px;
   color: white;
   flex-shrink: 0;
 }
@@ -410,19 +410,37 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 40px;
 }
 
 .modal-title-text {
   font-size: 1.3rem; 
   font-weight: 900;
   display: flex;
-  align-items: center;
+  align-items: center; /* Alinhamento vertical do ícone com o texto */
   gap: 12px;
+}
+
+.modal-title-text h2 {
+  margin: 0;              /* REMOVE o desalinhamento padrão */
+  line-height: 1;         /* evita “empurrar” pra baixo */
+  display: flex;
+  align-items: center;
 }
 
 .modal-header-actions {
   display: flex;
+  align-items: center; /* Centraliza o conteúdo da direita */
   gap: 12px;
+}
+
+/* Caso o botão de fechar seja o círculo vermelho da imagem */
+.modal-header-actions button,
+.modal-header-actions img,
+.modal-header-actions svg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-body-padding {
@@ -585,7 +603,7 @@
   .card-icon-small { width: 30px; height: 30px; border-radius: 10px;}
   .card-icon-small svg { width: 16px; height: 16px;}
   .card-subtitle-bottom { font-size: 0.7rem; margin-top: 2px;  }
-  .modal-overlay { align-items: center; justify-content: center; padding: 10px; }
+  .modal-overlay { align-items: center; justify-content: center; padding: 0px; }
   .modal-content.modal-expanded {width: 95%; max-height: 85vh;}
 }
 

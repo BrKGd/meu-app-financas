@@ -305,7 +305,7 @@ const Cartoes: React.FC = () => {
 
 // --- Subcomponente de Campos ---
 const FormFields = ({ form, setForm }: any) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+  <div className= "modal-form" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
     <div className="form-group">
       <label>Instituição Financeira</label>
       <input className="form-control" placeholder="Ex: Nubank, Inter..." required value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} />

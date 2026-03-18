@@ -198,7 +198,7 @@
 
 .edit-modal-container {
   width: 100%;
-  max-width: 550px;
+  max-width: 100%;
   background: white;
   border-radius: 32px;
   overflow: hidden;
