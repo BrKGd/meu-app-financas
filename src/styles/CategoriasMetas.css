@@ -581,7 +581,7 @@
   .card-value-display { font-size: 1rem; }
   .card-label-top { font-size: 0.75rem; }
   .card-bg-icon svg {width: 100px;height: 100px; }
-  .card-financeiro-flux { min-height: 100px; padding: 12px; border-radius: 16px;}
+  .card-financeiro-flux { min-height: 100px; padding:  10px 5px 0 10px; border-radius: 16px;}
   .card-icon-small { width: 30px; height: 30px; border-radius: 10px;}
   .card-icon-small svg { width: 16px; height: 16px;}
   .card-subtitle-bottom { font-size: 0.7rem; margin-top: 2px;  }
