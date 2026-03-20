@@ -120,7 +120,6 @@ const Lancamento: React.FC = () => {
     }
   }
 
-  // --- LÓGICA DO BADGE DE FECHAMENTO COM ÍCONES LUCIDE ---
   const getBadgeInfo = () => {
     const cartaoSelecionado = cartoes.find(c => c.nome === form.cartao);
     if (!cartaoSelecionado || !form.data_compra || form.forma_pagamento !== 'Crédito') return null;
@@ -212,10 +211,22 @@ const Lancamento: React.FC = () => {
       setModal({ isOpen: true, type: 'error', title: 'Erro ao Salvar', message: error.message });
     } else {
       setModal({ isOpen: true, type: 'success', title: 'Sucesso!', message: 'Lançamento registrado com sucesso.' });
+      
       setForm({
-        ...form,
-        descricao: '', valor_total: '', loja: '', pedido: '', nota_fiscal: '',
-        num_parcelas: 1, tipo_lancamento: 'unico'
+        descricao: '',
+        valor_total: '',
+        loja: '',
+        pedido: '',
+        nota_fiscal: '',
+        user_id: perfilLogado?.tipo_usuario !== 'proprietario' ? (perfilLogado?.id || '') : '',
+        forma_pagamento: 'Crédito',
+        categoria_id: '',
+        num_parcelas: 1,
+        cartao: '',
+        data_compra: new Date().toISOString().split('T')[0],
+        tipo_lancamento: 'unico',
+        intervalo_frequencia: 'mensal',
+        data_limite: ''
       });
     }
     setLoading(false);
@@ -234,11 +245,10 @@ const Lancamento: React.FC = () => {
       <div className="card lancamento-card">
         <form onSubmit={handleSubmit}>
           
-          {/* LINHA 1: TIPO E RECORRÊNCIA */}
           <div className="form-row-top">
             <div className="input-group">
               <label className="input-label"><Clock size={14} /> Tipo de Lançamento</label>
-              <select className="form-control" value={form.tipo_lancamento} onChange={e => setForm({...form, tipo_lancamento: e.target.value})} disabled={form.num_parcelas > 1}>
+              <select className="form-control" value={form.tipo_lancamento} onChange={e => setForm({...form, tipo_lancamento: e.target.value})} disabled={form.num_parcelas > 1 && form.tipo_lancamento === 'parcelado'}>
                 <option value="unico">Pagamento Único</option>
                 <option value="parcelado">Parcelado</option>
                 <option value="fixo">Fixo / Mensalidade</option>
@@ -265,7 +275,6 @@ const Lancamento: React.FC = () => {
             )}
           </div>
 
-          {/* LINHA 2: DATAS E RESPONSÁVEL */}
           <div className="form-row-top section-gap">
             <div className="input-group">
               <label className="input-label"><Calendar size={14} /> {form.tipo_lancamento === 'unico' ? 'Data do Gasto' : 'Início da Cobrança'}</label>
@@ -284,7 +293,6 @@ const Lancamento: React.FC = () => {
             </div>
           </div>
 
-          {/* LINHA 3: DESCRIÇÃO E CATEGORIA */}
           <div className="form-row-top section-gap">
             <div className="input-group">
               <label className="input-label">Descrição da Compra</label>
@@ -309,7 +317,6 @@ const Lancamento: React.FC = () => {
             )}
           </div>
 
-          {/* LINHA 4: DETALHAMENTO DE CRÉDITO */}
           {isCredito && (
             <div className="form-row-top animate-in section-gap">
               <div className="input-group">
@@ -333,14 +340,18 @@ const Lancamento: React.FC = () => {
                 </select>
               </div>
 
-              <div className="input-group">
-                <label className="input-label">N° de Parcelas</label>
-                <input type="number" min="1" className="form-control text-bold-center" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
-              </div>
+              {/* LÓGICA DE VISIBILIDADE: Só aparece N° de Parcelas se o tipo for 'parcelado' */}
+              {form.tipo_lancamento === 'parcelado' ? (
+                <div className="input-group animate-in">
+                  <label className="input-label">N° de Parcelas</label>
+                  <input type="number" min="1" className="form-control text-bold-center" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
+                </div>
+              ) : (
+                <div className="input-group hidden-tablet"></div>
+              )}
             </div>
           )}
 
-          {/* LINHA 5: DOCUMENTAÇÃO E VALORES */}
           <div className="form-row-top section-gap">
             <div className="input-group">
               <label className="input-label"><Hash size={14} /> N° do Pedido</label>

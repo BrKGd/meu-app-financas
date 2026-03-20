@@ -1,16 +1,15 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-// Importação dinâmica de todos os ícones do Lucide
 import * as LucideIcons from 'lucide-react';
 import { 
   Plus, Calendar, Tag, Loader2, Filter, ChevronLeft, ChevronRight,
-  ShoppingCart, Store, Lock, Repeat, CheckCircle2, AlertTriangle
+  ShoppingCart, Store, Lock, Repeat, CheckCircle2, AlertTriangle, Hash
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Despesas.css';
 
-// --- Assets (Ícones PNG) ---
+// --- Assets ---
 import iconConfirme from '../assets/confirme.png';
 import iconExcluir from '../assets/excluir.png';
 import iconCancelar from '../assets/cancelar.png';
@@ -38,7 +37,8 @@ interface Compra {
   data_compra: string;
   categoria_id: string;
   forma_pagamento: string;
-  cartao: string | null;
+  cartao_id?: string; 
+  cartao?: string | null;
   parcelas_total?: number; 
   parcela_numero?: number; 
   tipo_lancamento?: string;
@@ -48,19 +48,17 @@ interface Compra {
   pedido?: string;
   valor_projetado?: number;
   nomeCriador?: string; 
-  parcelado?: boolean;      
-  parcela_atual?: number;   
   status_pagamento?: string;
+  intervalo_frequencia?: string;
   categorias?: {
     nome: string;
     cor: string;
     icone: string;
   } | null;
-  profiles?: {
-    nome: string;
-  } | null;
   recorrencias?: {
     valor: number;
+    parcelas_total: number;
+    cartao_id?: string;
   } | null;
 }
 
@@ -98,9 +96,6 @@ const Despesas: React.FC = () => {
     setFeedback({ isOpen: true, type, title, message, onConfirm });
   };
 
-  /**
-   * Helper para renderizar o ícone baseado na string do banco
-   */
   const renderIcon = (iconName: string | undefined, size = 20) => {
     if (!iconName) return <ShoppingCart size={size} />;
     // @ts-ignore
@@ -123,10 +118,6 @@ const Despesas: React.FC = () => {
   const temPermissaoGeral = useCallback(() => {
     return isProprietario || perfilUsuario?.tipo_usuario === 'administrador';
   }, [isProprietario, perfilUsuario]);
-
-  const podeExcluir = (item: Compra) => {
-    return temPermissaoEscrita(item);
-  };
 
   const mudarMes = (direcao: number) => {
     const novaData = new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() + direcao, 1);
@@ -176,7 +167,7 @@ const Despesas: React.FC = () => {
         *, 
         categorias (nome, cor, icone), 
         profiles!fk_compras_profiles (nome),
-        recorrencias (valor)
+        recorrencias (valor, cartao_id, parcelas_total)
       `).eq('periodo_referencia', periodoAlvoStr);
 
       if (tipoFinal === 'comum') query = query.eq('user_id', user.id);
@@ -188,8 +179,8 @@ const Despesas: React.FC = () => {
         ...item,
         valor_projetado: Number(item.valor_total),
         nomeCriador: mapaNomes[item.usuario_criacao] || 'Sistema',
-        parcelado: item.tipo_lancamento === 'parcelado',
-        parcela_atual: item.parcela_numero
+        cartao_id: item.recorrencias?.cartao_id || item.cartao_id,
+        parcelas_total: item.recorrencias?.parcelas_total || item.parcelas_total
       })) || []);
     } catch (error: any) {
       console.error("Erro técnico:", error.message);
@@ -249,63 +240,70 @@ const Despesas: React.FC = () => {
     
     setLoading(true);
     try {
-      const valorParcelaLimpo = typeof itemEditando.valor_exibicao === 'string' 
+      const valorParaSalvar = typeof itemEditando.valor_exibicao === 'string' 
         ? Number(itemEditando.valor_exibicao.replace(/\D/g, '')) / 100 
         : itemEditando.valor_total;
-  
-      if (itemEditando.recorrencia_id) {
-        const valorPaiLimpo = typeof itemEditando.valor_pai_exibicao === 'string' 
-          ? Number(itemEditando.valor_pai_exibicao.replace(/\D/g, '')) / 100 
-          : itemEditando.recorrencias?.valor;
-  
-        const { error: errorRec } = await supabase.from('recorrencias').update({
-          valor: valorPaiLimpo,
-          descricao: itemEditando.descricao,
-          loja: itemEditando.loja,
-          categoria_id: itemEditando.categoria_id,
-          forma_pagamento: itemEditando.forma_pagamento,
-          user_id: itemEditando.user_id
-        }).eq('id', itemEditando.recorrencia_id);
-  
+
+      const valorContrato = typeof itemEditando.valor_pai_exibicao === 'string'
+        ? Number(itemEditando.valor_pai_exibicao.replace(/\D/g, '')) / 100
+        : valorParaSalvar;
+
+      if (itemEditando.recorrencia_id && itemEditando.tipo_lancamento !== 'unico') {
+        const { error: errorRec } = await supabase
+          .from('recorrencias')
+          .update({
+            descricao: itemEditando.descricao,
+            loja: itemEditando.loja,
+            valor: valorContrato,
+            categoria_id: itemEditando.categoria_id,
+            forma_pagamento: itemEditando.forma_pagamento,
+            cartao_id: itemEditando.cartao_id,
+            nota_fiscal: itemEditando.nota_fiscal,
+            pedido: itemEditando.pedido,
+            intervalo_frequencia: itemEditando.intervalo_frequencia,
+            parcelas_total: Number(itemEditando.parcelas_total), // Editável agora
+            user_id: itemEditando.user_id
+          })
+          .eq('id', itemEditando.recorrencia_id);
+
         if (errorRec) throw errorRec;
+      } else {
+        const { error: errorCompra } = await supabase
+          .from('compras')
+          .update({
+            descricao: itemEditando.descricao,
+            loja: itemEditando.loja,
+            valor_total: valorParaSalvar,
+            categoria_id: itemEditando.categoria_id,
+            forma_pagamento: itemEditando.forma_pagamento,
+            cartao_id: itemEditando.cartao_id,
+            data_compra: itemEditando.data_compra,
+            user_id: itemEditando.user_id,
+            nota_fiscal: itemEditando.nota_fiscal,
+            pedido: itemEditando.pedido,
+            status_pagamento: itemEditando.status_pagamento
+          })
+          .eq('id', itemEditando.id);
+
+        if (errorCompra) throw errorCompra;
       }
-  
-      const dadosUpdate: any = {
-        descricao: itemEditando.descricao, 
-        loja: itemEditando.loja, 
-        categoria_id: itemEditando.categoria_id, 
-        forma_pagamento: itemEditando.forma_pagamento,
-        cartao: itemEditando.forma_pagamento === 'Crédito' ? itemEditando.cartao : null,
-        data_compra: itemEditando.data_compra, 
-        nota_fiscal: itemEditando.nota_fiscal, 
-        pedido: itemEditando.pedido
-      };
-  
-      if (!itemEditando.recorrencia_id || itemEditando.status_pagamento === 'pago') {
-        dadosUpdate.valor_total = valorParcelaLimpo;
-      }
-  
-      const { error } = await (supabase.from('compras') as any)
-        .update(dadosUpdate)
-        .eq('id', itemEditando.id);
-  
-      if (error) throw error;
-      
+
       setIsModalOpen(false);
       buscarDados();
-      alertar('success', 'Atualizado', 'Registro atualizado e parcelas pendentes sincronizadas!');
-    } catch (error: any) { 
-      alertar('error', 'Erro ao Salvar', 'Não foi possível salvar as alterações.'); 
+      alertar('success', 'Sucesso', 'Dados sincronizados com o sistema.');
+    } catch (error: any) {
+      console.error(error);
+      alertar('error', 'Erro ao Salvar', error.message || 'Erro ao processar atualização.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleExcluir = () => {
-    if (!itemEditando?.id || !podeExcluir(itemEditando)) return;
+    if (!itemEditando?.id || !temPermissaoEscrita(itemEditando)) return;
     
     if (itemEditando.recorrencia_id) {
-      alertar('danger', 'Excluir Recorrência', 'Este item faz parte de uma série. Deseja excluir apenas este registro ou TODA a série de parcelas pendentes?', async () => {
+      alertar('danger', 'Excluir Recorrência', 'Este item faz parte de uma série. Deseja excluir apenas este registro ou TODA a série pendente?', async () => {
         setLoading(true);
         try {
           const { error } = await supabase.rpc('excluir_lancamento_recorrente', { 
@@ -317,14 +315,14 @@ const Despesas: React.FC = () => {
           setFeedback(prev => ({ ...prev, isOpen: false }));
           buscarDados();
         } catch (err: any) {
-          alertar('error', 'Erro ao excluir série', err.message);
+          alertar('error', 'Erro ao excluir', 'Não foi possível remover a série.');
         } finally {
           setLoading(false);
         }
       });
     } else {
       alertar('danger', 'Confirmar Exclusão', 'Deseja realmente apagar este registro?', async () => {
-        const { error } = await (supabase.from('compras') as any).delete().eq('id', itemEditando.id);
+        const { error } = await supabase.from('compras').delete().eq('id', itemEditando.id);
         if (!error) {
           setIsModalOpen(false);
           setFeedback(prev => ({ ...prev, isOpen: false }));
@@ -383,14 +381,14 @@ const Despesas: React.FC = () => {
           </div>
           {showFilters && (
             <div className="advanced-filters-row" style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-            <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <option value="">Todas as Categorias</option>
-              {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
-            </select>
-            <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} disabled={!temPermissaoGeral()} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <option value="">Todos Responsáveis</option>
-              {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-            </select>
+              <select value={filtroCategoriaId} onChange={(e) => setFiltroCategoriaId(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <option value="">Todas as Categorias</option>
+                {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+              </select>
+              <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} disabled={!temPermissaoGeral()} style={{ flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <option value="">Todos Responsáveis</option>
+                {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+              </select>
             </div>
           )}
         </div>
@@ -407,7 +405,6 @@ const Despesas: React.FC = () => {
                 {itens.map((item, idx) => (
                   <div key={`${item.id}-${idx}`} className="desp-item-row" onClick={() => handleAbrirModal(item)}>
                     <div className="desp-icon-column">
-                      {/* ÍCONE DINÂMICO BASEADO NA TABELA CATEGORIAS */}
                       <div className="desp-icon-box" style={{ backgroundColor: `${item.categorias?.cor}15`, color: item.categorias?.cor || '#ef4444' }}>
                         {renderIcon(item.categorias?.icone)}
                       </div>
@@ -416,8 +413,8 @@ const Despesas: React.FC = () => {
                       <div className="desp-top-line">
                         <span className="desp-desc">
                           {item.descricao} 
-                          {item.parcelado && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px'}}>{item.parcela_atual}/{item.parcelas_total}</span>}
-                          {item.recorrencia_id && !item.parcelado && <Repeat size={12} style={{marginLeft: '6px', color: '#6366f1'}} />}
+                          {item.tipo_lancamento === 'parcelado' && item.parcelas_total && <span style={{fontSize: '0.7rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px'}}>{item.parcela_numero}/{item.parcelas_total}</span>}
+                          {item.recorrencia_id && item.tipo_lancamento !== 'parcelado' && <Repeat size={12} style={{marginLeft: '6px', color: '#6366f1'}} />}
                           {!temPermissaoEscrita(item) && <Lock size={12} style={{opacity: 0.4, marginLeft: '6px'}} />}
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -463,31 +460,43 @@ const Despesas: React.FC = () => {
                   <div className="form-group"><label>Descrição</label><input type="text" value={itemEditando.descricao || ''} onChange={e => handleChangeEdit('descricao', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} required /></div>
                   
                   {itemEditando.recorrencia_id && (
-                    <div className="form-group" style={{background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1px dashed #6366f1', marginBottom: '10px'}}>
-                      <label style={{color: '#6366f1', fontWeight: 800}}>{itemEditando.parcelado ? 'Ajustar Valor Total (Contrato)' : 'Valor Base da Recorrência'}</label>
-                      <input 
-                        type="text" 
-                        style={{color: '#6366f1', fontWeight: 900, fontSize: '1.1rem', borderBottom: '2px solid #6366f1'}}
-                        value={itemEditando.valor_pai_exibicao || ''} 
-                        onChange={e => { 
-                          let val = e.target.value.replace(/\D/g, ""); 
-                          val = (Number(val) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }); 
-                          handleChangeEdit('valor_pai_exibicao', val); 
-                        }} 
-                        disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'} 
-                        required 
-                      />
-                      <small style={{fontSize: '0.6rem', color: '#64748b'}}>
-                        {itemEditando.status_pagamento === 'pago' 
-                          ? 'Não é possível alterar o contrato de um item já pago.' 
-                          : 'Ao alterar aqui, as DEMAIS parcelas serão atualizadas proporcionalmente.'}
-                      </small>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '10px' }}>
+                       <div className="form-group" style={{background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1px dashed #6366f1', marginBottom: '10px'}}>
+                        <label style={{color: '#6366f1', fontWeight: 800}}>{itemEditando.tipo_lancamento === 'parcelado' ? 'Valor Total Contrato' : 'Valor Base Mês'}</label>
+                        <input 
+                          type="text" 
+                          style={{color: '#6366f1', fontWeight: 900, fontSize: '1.1rem', borderBottom: '2px solid #6366f1', background: 'transparent'}}
+                          value={itemEditando.valor_pai_exibicao || ''} 
+                          onChange={e => { 
+                            let val = e.target.value.replace(/\D/g, ""); 
+                            val = (Number(val) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }); 
+                            handleChangeEdit('valor_pai_exibicao', val); 
+                          }} 
+                          disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'} 
+                          required 
+                        />
+                      </div>
+
+                      <div className="form-group" style={{background: '#f0f4ff', padding: '10px', borderRadius: '12px', border: '1px solid #6366f1', marginBottom: '10px'}}>
+                        <label style={{color: '#6366f1', fontWeight: 800}}>Total de Meses</label>
+                        <div style={{position: 'relative', display: 'flex', alignItems: 'center'}}>
+                          <Hash size={16} style={{position: 'absolute', left: '10px', color: '#6366f1'}} />
+                          <input 
+                            type="number" 
+                            style={{paddingLeft: '32px', color: '#6366f1', fontWeight: 900, fontSize: '1.1rem', background: 'transparent', borderBottom: '2px solid #6366f1'}}
+                            value={itemEditando.parcelas_total || 0} 
+                            onChange={e => handleChangeEdit('parcelas_total', e.target.value)} 
+                            disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'} 
+                            required 
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
 
                   <div className="form-row-2">
                     <div className="form-group">
-                      <label>Valor {itemEditando.parcelado ? 'da Parcela Atual' : 'Deste Registro'}</label>
+                      <label>Valor {itemEditando.tipo_lancamento === 'parcelado' ? 'da Parcela Atual' : 'Deste Registro'}</label>
                       <input 
                         type="text" 
                         value={itemEditando.valor_exibicao || ''} 
@@ -499,13 +508,6 @@ const Despesas: React.FC = () => {
                         disabled={!temPermissaoEscrita(itemEditando) || (itemEditando.recorrencia_id && itemEditando.status_pagamento !== 'pago')} 
                         required 
                       />
-                      {itemEditando.recorrencia_id && (
-                        <small style={{fontSize: '0.6rem', color: '#ef4444', fontWeight: 700}}>
-                          {itemEditando.status_pagamento === 'pago' 
-                            ? 'Parcela quitada: valor bloqueado.' 
-                            : 'Para pendentes, altere o valor total acima para recalcular.'}
-                        </small>
-                      )}
                     </div>
                     <div className="form-group"><label>Data</label><input type="date" value={itemEditando.data_compra || ''} onChange={e => handleChangeEdit('data_compra', e.target.value)} disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'} required /></div>
                   </div>
@@ -513,13 +515,34 @@ const Despesas: React.FC = () => {
                   <div className="form-group"><label>Loja</label><div style={{position: 'relative'}}><Store size={18} style={{position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8'}} /><input style={{paddingLeft: '44px'}} type="text" value={itemEditando.loja || ''} onChange={e => handleChangeEdit('loja', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} /></div></div>
                   <div className="form-row-2">
                     <div className="form-group"><label>Categoria</label><select value={itemEditando.categoria_id} onChange={e => handleChangeEdit('categoria_id', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)}>{categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}</select></div>
-                    <div className="form-group"><label>Responsável</label><select value={itemEditando.user_id} onChange={e => handleChangeEdit('user_id', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)}>{responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}</select></div>
+                    <div className="form-group"><label>Responsável</label><select value={itemEditando.user_id} onChange={e => handleChangeEdit('user_id', e.target.value)} disabled={!temPermissaoEscrita(itemEditando) || !temPermissaoGeral()}>{responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}</select></div>
                   </div>
                   <div className="form-row-2">
                     <div className="form-group"><label>Pagamento</label><select value={itemEditando.forma_pagamento} onChange={e => handleChangeEdit('forma_pagamento', e.target.value)} disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'}>{formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
-                    {itemEditando.forma_pagamento === 'Crédito' && <div className="form-group"><label>Cartão</label><select value={itemEditando.cartao || ''} onChange={e => handleChangeEdit('cartao', e.target.value)} disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'}><option value="">Selecione</option>{cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}</select></div>}
+                    {itemEditando.forma_pagamento === 'Crédito' && (
+                      <div className="form-group">
+                        <label>Cartão</label>
+                        <select 
+                          value={itemEditando.cartao_id || ''} 
+                          onChange={e => handleChangeEdit('cartao_id', e.target.value)} 
+                          disabled={!temPermissaoEscrita(itemEditando) || itemEditando.status_pagamento === 'pago'}
+                        >
+                          <option value="">Selecione</option>
+                          {cartoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                        </select>
+                      </div>
+                    )}
                   </div>
-                  {itemEditando.parcelado && <div className="form-group"><label>Parcelas Totais</label><input type="number" value={itemEditando.parcelas_total || 1} disabled={true} /> <small style={{fontSize: '0.65rem', color: '#64748b'}}>Edite a recorrência para mudar o parcelamento</small></div>}
+                  
+                  {itemEditando.tipo_lancamento === 'parcelado' && itemEditando.parcelas_total > 0 && (
+                    <div className="form-group">
+                      <label>Informações da Parcela</label>
+                      <div style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 700}}>
+                        Parcela {itemEditando.parcela_numero} de {itemEditando.parcelas_total}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="form-row-2">
                     <div className="form-group"><label>Nota Fiscal</label><input type="text" value={itemEditando.nota_fiscal || ''} onChange={e => handleChangeEdit('nota_fiscal', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} /></div>
                     <div className="form-group"><label>Pedido</label><input type="text" value={itemEditando.pedido || ''} onChange={e => handleChangeEdit('pedido', e.target.value)} disabled={!temPermissaoEscrita(itemEditando)} /></div>
