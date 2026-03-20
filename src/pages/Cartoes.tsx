@@ -10,6 +10,11 @@ import iconCancelar from '../assets/cancelar.png';
 import iconFechar from '../assets/fechar.png';
 
 // --- Interfaces ---
+interface Perfil {
+  id: string;
+  nome: string; // Ajustado para bater com seu JSON
+}
+
 interface Cartao {
   id: number;
   nome: string;
@@ -17,6 +22,8 @@ interface Cartao {
   dia_fechamento: number;
   dia_vencimento: number;
   cor: string;
+  id_responsavel: string;
+  usuario_criacao?: string;
 }
 
 interface Compra {
@@ -30,26 +37,31 @@ interface Compra {
   cartao_id: number; 
   forma_pagamento: string;
   periodo_referencia: string;
-  status_pagamento: string; // Adicionado para a nova lógica de limite
+  status_pagamento: string;
 }
 
 const Cartoes: React.FC = () => {
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
+  const [usuarios, setUsuarios] = useState<Perfil[]>([]);
   const [showModalCadastro, setShowModalCadastro] = useState<boolean>(false);
   const [selectedCartao, setSelectedCartao] = useState<Cartao | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   
   const [formCartao, setFormCartao] = useState({
-    nome: '', limite: '', dia_fechamento: '', dia_vencimento: '', cor: '#4361ee'
+    nome: '', 
+    limite: '', 
+    dia_fechamento: '', 
+    dia_vencimento: '', 
+    cor: '#4361ee',
+    id_responsavel: ''
   });
 
   const mesAtual = new Date().getMonth() + 1;
   const anoAtual = new Date().getFullYear();
   const periodoAtual = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`;
 
-  // --- FUNÇÃO EXCLUSIVA PARA O SETTINGS2 ---
   const getSettingsColor = (hexcolor: string) => {
     if (!hexcolor) return '#ffffff';
     const hex = hexcolor.replace('#', '');
@@ -64,12 +76,18 @@ const Cartoes: React.FC = () => {
     setShowModalCadastro(false);
     setSelectedCartao(null);
     setIsEditing(false);
-    setFormCartao({ nome: '', limite: '', dia_fechamento: '', dia_vencimento: '', cor: '#4361ee' });
+    setFormCartao({ nome: '', limite: '', dia_fechamento: '', dia_vencimento: '', cor: '#4361ee', id_responsavel: '' });
   }, []);
 
   useEffect(() => {
     fetchDados();
+    fetchUsuarios();
   }, []);
+
+  async function fetchUsuarios() {
+    const { data } = await supabase.from('profiles').select('id, nome').order('nome');
+    if (data) setUsuarios(data);
+  }
 
   async function fetchDados() {
     setLoading(true);
@@ -87,25 +105,16 @@ const Cartoes: React.FC = () => {
     }
   }
 
-  // --- Cálculos Atualizados para Novo Esquema e Lógica de Status ---
-  
   const calcularDisponivel = (cartao: Cartao, limite: number | string) => {
     const limNum = Number(limite);
-    
-    // Soma apenas compras no crédito que NÃO estejam com status 'pago'
     const totalComprometido = compras.reduce((acc, item) => {
       if (item.cartao_id !== cartao.id) return acc;
-      
-      // Se já estiver pago, o limite é liberado (não entra no acumulador de comprometido)
       if (item.status_pagamento === 'pago') return acc;
-
-      // Consideramos comprometido o que vence no mês atual ou futuro e que não está pago
       if (item.periodo_referencia >= periodoAtual) {
          return acc + Number(item.valor_total);
       }
       return acc;
     }, 0);
-
     return Number((limNum - totalComprometido).toFixed(2));
   };
 
@@ -119,21 +128,25 @@ const Cartoes: React.FC = () => {
     return Number(total.toFixed(2));
   };
 
-  // --- Ações ---
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const payload = { 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const payload: any = { 
       nome: formCartao.nome,
       limite: parseFloat(formCartao.limite) || 0,
       dia_fechamento: parseInt(formCartao.dia_fechamento) || 1,
       dia_vencimento: parseInt(formCartao.dia_vencimento) || 1,
-      cor: formCartao.cor
+      cor: formCartao.cor,
+      id_responsavel: formCartao.id_responsavel || user.id,
     };
 
     try {
       if (isEditing && selectedCartao) {
         await supabase.from('cartoes').update(payload).eq('id', selectedCartao.id);
       } else {
+        payload.usuario_criacao = user.id;
         await supabase.from('cartoes').insert([payload]);
       }
       fetchDados();
@@ -171,6 +184,7 @@ const Cartoes: React.FC = () => {
         {cartoes.map(cartao => {
           const disponivel = calcularDisponivel(cartao, cartao.limite);
           const perc = Math.max(0, (disponivel / Number(cartao.limite)) * 100);
+          const responsavelObj = usuarios.find(u => u.id === cartao.id_responsavel);
 
           return (
             <div key={cartao.id} className="card-cartao" 
@@ -179,7 +193,9 @@ const Cartoes: React.FC = () => {
               
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <div>
-                   <span className="card-label">Crédito Gold</span>
+                   <span className="card-label">
+                     {responsavelObj ? responsavelObj.nome : 'Crédito'}
+                   </span>
                    <div className="card-bank-name">{cartao.nome}</div>
                 </div>
                 <CreditCard size={35} opacity={0.4} strokeWidth={1.5} />
@@ -220,7 +236,8 @@ const Cartoes: React.FC = () => {
                               limite: selectedCartao!.limite.toString(),
                               dia_fechamento: selectedCartao!.dia_fechamento.toString(),
                               dia_vencimento: selectedCartao!.dia_vencimento.toString(),
-                              cor: selectedCartao!.cor
+                              cor: selectedCartao!.cor,
+                              id_responsavel: selectedCartao!.id_responsavel
                           }); 
                       }} className="btn-icon-action">
                         <Settings2 
@@ -244,7 +261,7 @@ const Cartoes: React.FC = () => {
             <div style={{ padding: '35px' }}>
               {isEditing || showModalCadastro ? (
                 <form id="card-form" onSubmit={handleSave}>
-                  <FormFields form={formCartao} setForm={setFormCartao} />
+                  <FormFields form={formCartao} setForm={setFormCartao} usuarios={usuarios} />
                 </form>
               ) : (
                 <>
@@ -303,17 +320,33 @@ const Cartoes: React.FC = () => {
   );
 };
 
-// --- Subcomponente de Campos ---
-const FormFields = ({ form, setForm }: any) => (
+const FormFields = ({ form, setForm, usuarios }: any) => (
   <div className= "modal-form" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <div className="form-group">
+      <label>Responsável</label>
+      <select 
+        className="form-control" 
+        value={form.id_responsavel} 
+        onChange={e => setForm({...form, id_responsavel: e.target.value})}
+        required
+      >
+        <option value="">Selecione quem usará este cartão</option>
+        {usuarios.map((u: any) => (
+          <option key={u.id} value={u.id}>{u.nome}</option>
+        ))}
+      </select>
+    </div>
+
     <div className="form-group">
       <label>Instituição Financeira</label>
       <input className="form-control" placeholder="Ex: Nubank, Inter..." required value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} />
     </div>
+
     <div className="form-group">
       <label>Limite de Crédito</label>
       <input className="form-control" type="number" step="0.01" required value={form.limite} onChange={e => setForm({...form, limite: e.target.value})} />
     </div>
+
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
       <div className="form-group">
          <label>Dia Fechamento</label>
@@ -324,6 +357,7 @@ const FormFields = ({ form, setForm }: any) => (
          <input className="form-control" type="number" min="1" max="31" value={form.dia_vencimento} onChange={e => setForm({...form, dia_vencimento: e.target.value})} />
       </div>
     </div>
+
     <div className="form-group">
       <label>Cor de Identificação</label>
       <input type="color" className="form-control" value={form.cor} onChange={e => setForm({...form, cor: e.target.value})} style={{ height: '50px', padding: '5px' }} />
