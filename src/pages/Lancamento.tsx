@@ -237,7 +237,7 @@ const Lancamento: React.FC = () => {
           {/* LINHA 1: TIPO E RECORRÊNCIA */}
           <div className="form-row-top">
             <div className="input-group">
-              <label className="input-label"><Clock size={14} /> Fluxo do Lançamento</label>
+              <label className="input-label"><Clock size={14} /> Tipo de Lançamento</label>
               <select className="form-control" value={form.tipo_lancamento} onChange={e => setForm({...form, tipo_lancamento: e.target.value})} disabled={form.num_parcelas > 1}>
                 <option value="unico">Pagamento Único</option>
                 <option value="parcelado">Parcelado</option>
@@ -253,7 +253,7 @@ const Lancamento: React.FC = () => {
                   </select>
                 </div>
                 <div className="input-group animate-in">
-                  <label className="input-label"><Target size={14} /> Qtd. Meses</label>
+                  <label className="input-label"><Target size={14} /> Quantidade de Meses</label>
                   <input type="number" min="1" className="form-control" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
                 </div>
               </>
@@ -272,11 +272,11 @@ const Lancamento: React.FC = () => {
               <input type="date" className="form-control" value={form.data_compra} required onChange={e => setForm({...form, data_compra: e.target.value})} />
             </div>
             <div className="input-group">
-              <label className="input-label"><ShoppingBag size={14} /> Estabelecimento</label>
+              <label className="input-label"><ShoppingBag size={14} /> Loja</label>
               <input placeholder="Ex: Mercado Livre, Amazon..." className="form-control" value={form.loja} onChange={e => setForm({...form, loja: e.target.value})} />
             </div>
             <div className="input-group">
-              <label className="input-label"><User size={14} /> Solicitante / Dono</label>
+              <label className="input-label"><User size={14} /> Responsável</label>
               <select className="form-control" required value={form.user_id} disabled={perfilLogado?.tipo_usuario !== 'proprietario'} onChange={e => setForm({...form, user_id: e.target.value})}>
                 <option value="">Selecione o responsável...</option>
                 {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
@@ -287,11 +287,11 @@ const Lancamento: React.FC = () => {
           {/* LINHA 3: DESCRIÇÃO E CATEGORIA */}
           <div className="form-row-top section-gap">
             <div className="input-group">
-              <label className="input-label">Descrição do Item</label>
+              <label className="input-label">Descrição da Compra</label>
               <input placeholder="Ex: Lâmpadas para a sala" className="form-control" required value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} />
             </div>
             <div className="input-group">
-              <label className="input-label"><Tag size={14} /> Classificação</label>
+              <label className="input-label"><Tag size={14} /> Categoria</label>
               <select className="form-control select-categoria" required value={form.categoria_id} onChange={e => setForm({...form, categoria_id: e.target.value})}>
                 <option value="">Selecione a categoria...</option>
                 {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
@@ -299,7 +299,7 @@ const Lancamento: React.FC = () => {
             </div>
             {!isCredito ? (
               <div className="input-group animate-in">
-                <label className="input-label"><Wallet size={14} /> Meio de Pagamento</label>
+                <label className="input-label"><Wallet size={14} /> Forma de Pagamento</label>
                 <select className="form-control" value={form.forma_pagamento} onChange={e => setForm({...form, forma_pagamento: e.target.value})}>
                   {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
@@ -313,7 +313,7 @@ const Lancamento: React.FC = () => {
           {isCredito && (
             <div className="form-row-top animate-in section-gap">
               <div className="input-group">
-                <label className="input-label"><Wallet size={14} /> Meio de Pagamento</label>
+                <label className="input-label"><Wallet size={14} /> Forma de Pagamento</label>
                 <select className="form-control" value={form.forma_pagamento} onChange={e => setForm({...form, forma_pagamento: e.target.value})}>
                   {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
@@ -334,7 +334,7 @@ const Lancamento: React.FC = () => {
               </div>
 
               <div className="input-group">
-                <label className="input-label">Número de Parcelas</label>
+                <label className="input-label">N° de Parcelas</label>
                 <input type="number" min="1" className="form-control text-bold-center" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
               </div>
             </div>
@@ -343,15 +343,15 @@ const Lancamento: React.FC = () => {
           {/* LINHA 5: DOCUMENTAÇÃO E VALORES */}
           <div className="form-row-top section-gap">
             <div className="input-group">
-              <label className="input-label"><Hash size={14} /> Cód. Pedido</label>
+              <label className="input-label"><Hash size={14} /> N° do Pedido</label>
               <input placeholder="Opcional" className="form-control" value={form.pedido} onChange={e => setForm({...form, pedido: e.target.value})} />
             </div>
             <div className="input-group">
-              <label className="input-label"><Receipt size={14} /> Chave Nota Fiscal</label>
+              <label className="input-label"><Receipt size={14} /> Nota Fiscal</label>
               <input placeholder="000.000.000" className="form-control" value={form.nota_fiscal} onChange={e => setForm({...form, nota_fiscal: formatarNF(e.target.value)})} onBlur={e => setForm({...form, nota_fiscal: completarNF(e.target.value)})} />
             </div>
             <div className="input-group">
-              <label className="input-label">{form.tipo_lancamento === 'fixo' ? 'Mensalidade' : 'Montante Total'}</label>
+              <label className="input-label">{form.tipo_lancamento === 'fixo' ? 'Mensalidade' : 'Valor Total'}</label>
               <div className="input-with-prefix">
                 <span className="prefix-icon">R$</span>
                 <input type="number" step="0.01" className="form-control" required value={form.valor_total} onChange={e => setForm({...form, valor_total: e.target.value})} />
