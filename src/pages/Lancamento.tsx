@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Save, Calendar, ShoppingBag, Hash, Receipt, CreditCard, 
-  User, Wallet, Tag, RefreshCcw, Clock, Target,TriangleAlert, CircleCheck
+  User, Wallet, Tag, RefreshCcw, Clock, Target, TriangleAlert, CircleCheck
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Lancamento.css';
@@ -31,7 +31,6 @@ interface PerfilLogado {
 }
 
 const Lancamento: React.FC = () => {
-
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [usuarios, setUsuarios] = useState<Perfil[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -121,10 +120,10 @@ const Lancamento: React.FC = () => {
     }
   }
 
-  // --- LÓGICA DO BADGE DE FECHAMENTO ---
+  // --- LÓGICA DO BADGE DE FECHAMENTO COM ÍCONES LUCIDE ---
   const getBadgeInfo = () => {
     const cartaoSelecionado = cartoes.find(c => c.nome === form.cartao);
-    if (!cartaoSelecionado || !form.data_compra) return null;
+    if (!cartaoSelecionado || !form.data_compra || form.forma_pagamento !== 'Crédito') return null;
 
     const diaCompra = new Date(form.data_compra + 'T00:00:00').getDate();
     const fechado = diaCompra > cartaoSelecionado.dia_fechamento;
@@ -132,11 +131,9 @@ const Lancamento: React.FC = () => {
     return {
       text: fechado ? "Próxima Fatura" : "Fatura Atual",
       status: fechado ? "proxima" : "atual",
-      // Retornamos o componente aqui
       icon: fechado ? <CircleCheck size={12} /> : <TriangleAlert size={12} />
     };
   };
-
 
   const formatarNF = (valor: string) => {
     const apenasNumeros = valor.replace(/\D/g, '').slice(0, 9);
@@ -177,48 +174,48 @@ const Lancamento: React.FC = () => {
     };
 
     if (isRecorrente) {
-        payload.valor = valorTotalNum;
-        payload.data_inicio = form.data_compra;
-        payload.parcelas_total = Number(form.num_parcelas);
-        payload.intervalo_frequencia = form.intervalo_frequencia;
-        payload.tipo_despesa = form.tipo_lancamento === 'fixo' ? 'Gastos Fixos' : (isCredito ? 'Compra no Crédito' : 'Gastos Variáveis');
-        payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
-        payload.dia_vencimento = isCredito && cartaoObjeto ? cartaoObjeto.dia_vencimento : new Date(form.data_compra + 'T00:00:00').getDate();
+      payload.valor = valorTotalNum;
+      payload.data_inicio = form.data_compra;
+      payload.parcelas_total = Number(form.num_parcelas);
+      payload.intervalo_frequencia = form.intervalo_frequencia;
+      payload.tipo_despesa = form.tipo_lancamento === 'fixo' ? 'Gastos Fixos' : (isCredito ? 'Compra no Crédito' : 'Gastos Variáveis');
+      payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
+      payload.dia_vencimento = isCredito && cartaoObjeto ? cartaoObjeto.dia_vencimento : new Date(form.data_compra + 'T00:00:00').getDate();
+    } else {
+      payload.valor_total = valorTotalNum;
+      payload.data_compra = form.data_compra;
+      payload.status_pagamento = 'pendente';
+      payload.parcelado = false;
+      payload.parcelas_total = 1;
+      payload.parcela_numero = 1;
+      payload.usuario_criacao = perfilLogado?.id;
+      payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
+      payload.tipo_despesa = isCredito ? 'Compra no Crédito' : 'Gastos Variáveis';
+
+      if (isCredito && cartaoObjeto) {
+        const dataCompraObj = new Date(form.data_compra + 'T00:00:00');
+        const diaCompra = dataCompraObj.getDate();
+        let dataVenc = new Date(dataCompraObj);
+        if (diaCompra > cartaoObjeto.dia_fechamento) dataVenc.setMonth(dataVenc.getMonth() + 1);
+        dataVenc.setDate(cartaoObjeto.dia_vencimento);
+        payload.data_vencimento = dataVenc.toISOString().split('T')[0];
+        payload.periodo_referencia = dataVenc.toISOString().slice(0, 7) + "-01";
       } else {
-        payload.valor_total = valorTotalNum;
-        payload.data_compra = form.data_compra;
-        payload.status_pagamento = 'pendente';
-        payload.parcelado = false;
-        payload.parcelas_total = 1;
-        payload.parcela_numero = 1;
-        payload.usuario_criacao = perfilLogado?.id;
-        payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
-        payload.tipo_despesa = isCredito ? 'Compra no Crédito' : 'Gastos Variáveis';
-  
-        if (isCredito && cartaoObjeto) {
-          const dataCompraObj = new Date(form.data_compra + 'T00:00:00');
-          const diaCompra = dataCompraObj.getDate();
-          let dataVenc = new Date(dataCompraObj);
-          if (diaCompra > cartaoObjeto.dia_fechamento) dataVenc.setMonth(dataVenc.getMonth() + 1);
-          dataVenc.setDate(cartaoObjeto.dia_vencimento);
-          payload.data_vencimento = dataVenc.toISOString().split('T')[0];
-          payload.periodo_referencia = dataVenc.toISOString().slice(0, 7) + "-01";
-        } else {
-          payload.data_vencimento = form.data_compra;
-          payload.periodo_referencia = form.data_compra.slice(0, 7) + "-01";
-        }
+        payload.data_vencimento = form.data_compra;
+        payload.periodo_referencia = form.data_compra.slice(0, 7) + "-01";
       }
+    }
 
     const { error } = await supabase.from(tabelaAlvo).insert([payload]);
 
     if (error) {
-      setModal({ isOpen: true, type: 'error', title: 'Erro no Backend', message: error.message });
+      setModal({ isOpen: true, type: 'error', title: 'Erro ao Salvar', message: error.message });
     } else {
       setModal({ isOpen: true, type: 'success', title: 'Sucesso!', message: 'Lançamento registrado com sucesso.' });
       setForm({
         ...form,
         descricao: '', valor_total: '', loja: '', pedido: '', nota_fiscal: '',
-        num_parcelas: 1, data_limite: '', tipo_lancamento: 'unico'
+        num_parcelas: 1, tipo_lancamento: 'unico'
       });
     }
     setLoading(false);
@@ -231,76 +228,78 @@ const Lancamento: React.FC = () => {
     <div className="lancamento-container fade-in">
       <header className="lancamento-header">
         <h2>Novo Lançamento</h2>
-        <p>Registre um gasto para a unidade</p>
+        <p>Registre um gasto de forma rápida e organizada</p>
       </header>
 
       <div className="card lancamento-card">
         <form onSubmit={handleSubmit}>
           
-          {/* LINHA 1: CONFIGURAÇÃO DE TIPO E RECORRÊNCIA */}
+          {/* LINHA 1: TIPO E RECORRÊNCIA */}
           <div className="form-row-top">
             <div className="input-group">
-              <label className="input-label"><Clock size={14} /> Tipo de Lançamento</label>
+              <label className="input-label"><Clock size={14} /> Fluxo do Lançamento</label>
               <select className="form-control" value={form.tipo_lancamento} onChange={e => setForm({...form, tipo_lancamento: e.target.value})} disabled={form.num_parcelas > 1}>
                 <option value="unico">Pagamento Único</option>
                 <option value="parcelado">Parcelado</option>
-                <option value="fixo">Fixo / Recorrente</option>
+                <option value="fixo">Fixo / Mensalidade</option>
               </select>
             </div>
             {form.tipo_lancamento === 'fixo' ? (
               <>
                 <div className="input-group animate-in">
-                  <label className="input-label"><RefreshCcw size={14} /> Frequência</label>
+                  <label className="input-label"><RefreshCcw size={14} /> Periodicidade</label>
                   <select className="form-control" value={form.intervalo_frequencia} onChange={e => setForm({...form, intervalo_frequencia: e.target.value})}>
                     {frequenciasAceitas.map(freq => <option key={freq.value} value={freq.value}>{freq.label}</option>)}
                   </select>
                 </div>
                 <div className="input-group animate-in">
-                  <label className="input-label"><Target size={14} /> Meses</label>
+                  <label className="input-label"><Target size={14} /> Qtd. Meses</label>
                   <input type="number" min="1" className="form-control" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
                 </div>
               </>
             ) : (
-              <><div className="input-group hidden-tablet"></div><div className="input-group hidden-tablet"></div></>
+              <>
+                <div className="input-group hidden-tablet"></div>
+                <div className="input-group hidden-tablet"></div>
+              </>
             )}
           </div>
 
-          {/* LINHA 2: IDENTIFICAÇÃO BÁSICA */}
+          {/* LINHA 2: DATAS E RESPONSÁVEL */}
           <div className="form-row-top section-gap">
             <div className="input-group">
-              <label className="input-label"><Calendar size={14} /> {form.tipo_lancamento === 'unico' ? 'Data da Compra' : 'Data de Início'}</label>
+              <label className="input-label"><Calendar size={14} /> {form.tipo_lancamento === 'unico' ? 'Data do Gasto' : 'Início da Cobrança'}</label>
               <input type="date" className="form-control" value={form.data_compra} required onChange={e => setForm({...form, data_compra: e.target.value})} />
             </div>
             <div className="input-group">
-              <label className="input-label"><ShoppingBag size={14} /> Loja</label>
-              <input placeholder="Ex: Amazon" className="form-control" value={form.loja} onChange={e => setForm({...form, loja: e.target.value})} />
+              <label className="input-label"><ShoppingBag size={14} /> Estabelecimento</label>
+              <input placeholder="Ex: Mercado Livre, Amazon..." className="form-control" value={form.loja} onChange={e => setForm({...form, loja: e.target.value})} />
             </div>
             <div className="input-group">
-              <label className="input-label"><User size={14} /> Responsável</label>
+              <label className="input-label"><User size={14} /> Solicitante / Dono</label>
               <select className="form-control" required value={form.user_id} disabled={perfilLogado?.tipo_usuario !== 'proprietario'} onChange={e => setForm({...form, user_id: e.target.value})}>
-                <option value="">Quem comprou?</option>
+                <option value="">Selecione o responsável...</option>
                 {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
             </div>
           </div>
 
-          {/* LINHA 3: DESCRIÇÃO, CATEGORIA E PAGAMENTO DINÂMICO */}
+          {/* LINHA 3: DESCRIÇÃO E CATEGORIA */}
           <div className="form-row-top section-gap">
             <div className="input-group">
-              <label className="input-label">Descrição</label>
-              <input placeholder="O que foi comprado?" className="form-control" required value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} />
+              <label className="input-label">Descrição do Item</label>
+              <input placeholder="Ex: Lâmpadas para a sala" className="form-control" required value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} />
             </div>
             <div className="input-group">
-              <label className="input-label"><Tag size={14} /> Categoria</label>
+              <label className="input-label"><Tag size={14} /> Classificação</label>
               <select className="form-control select-categoria" required value={form.categoria_id} onChange={e => setForm({...form, categoria_id: e.target.value})}>
-                <option value="">Selecione...</option>
+                <option value="">Selecione a categoria...</option>
                 {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
               </select>
             </div>
-            {/* Se não for crédito, a forma de pagamento aparece aqui no grid de 3 */}
             {!isCredito ? (
               <div className="input-group animate-in">
-                <label className="input-label"><Wallet size={14} /> Pagamento</label>
+                <label className="input-label"><Wallet size={14} /> Meio de Pagamento</label>
                 <select className="form-control" value={form.forma_pagamento} onChange={e => setForm({...form, forma_pagamento: e.target.value})}>
                   {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
@@ -310,50 +309,49 @@ const Lancamento: React.FC = () => {
             )}
           </div>
 
-          {/* LINHA 4: DETALHES DO CRÉDITO (APENAS SE FOR CRÉDITO) */}
+          {/* LINHA 4: DETALHAMENTO DE CRÉDITO */}
           {isCredito && (
             <div className="form-row-top animate-in section-gap">
               <div className="input-group">
-                <label className="input-label"><Wallet size={14} /> Pagamento</label>
+                <label className="input-label"><Wallet size={14} /> Meio de Pagamento</label>
                 <select className="form-control" value={form.forma_pagamento} onChange={e => setForm({...form, forma_pagamento: e.target.value})}>
                   {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
               </div>
               
               <div className="input-group group-relative">
-                {/* BADGE FLUTUANTE ESTILO FOTO */}
                 {badge && (
                   <div className={`badge-fatura badge-${badge.status}`}>
                     {badge.icon}
                     {badge.text}
                   </div>
                 )}
-                <label className="input-label"><CreditCard size={14} /> Cartão</label>
+                <label className="input-label"><CreditCard size={14} /> Escolha o Cartão</label>
                 <select className="form-control" required={isCredito} value={form.cartao} onChange={e => setForm({...form, cartao: e.target.value})}>
-                  <option value="">Qual?</option>
+                  <option value="">Selecione o cartão...</option>
                   {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                 </select>
               </div>
 
               <div className="input-group">
-                <label className="input-label">Parcelas</label>
+                <label className="input-label">Número de Parcelas</label>
                 <input type="number" min="1" className="form-control text-bold-center" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
               </div>
             </div>
           )}
 
-          {/* LINHA 5: FINANCEIRO FINAL */}
+          {/* LINHA 5: DOCUMENTAÇÃO E VALORES */}
           <div className="form-row-top section-gap">
             <div className="input-group">
-              <label className="input-label"><Hash size={14} /> Pedido</label>
+              <label className="input-label"><Hash size={14} /> Cód. Pedido</label>
               <input placeholder="Opcional" className="form-control" value={form.pedido} onChange={e => setForm({...form, pedido: e.target.value})} />
             </div>
             <div className="input-group">
-              <label className="input-label"><Receipt size={14} /> Nota Fiscal</label>
+              <label className="input-label"><Receipt size={14} /> Chave Nota Fiscal</label>
               <input placeholder="000.000.000" className="form-control" value={form.nota_fiscal} onChange={e => setForm({...form, nota_fiscal: formatarNF(e.target.value)})} onBlur={e => setForm({...form, nota_fiscal: completarNF(e.target.value)})} />
             </div>
             <div className="input-group">
-              <label className="input-label">{form.tipo_lancamento === 'fixo' ? 'Valor por Mês' : 'Valor Total'}</label>
+              <label className="input-label">{form.tipo_lancamento === 'fixo' ? 'Mensalidade' : 'Montante Total'}</label>
               <div className="input-with-prefix">
                 <span className="prefix-icon">R$</span>
                 <input type="number" step="0.01" className="form-control" required value={form.valor_total} onChange={e => setForm({...form, valor_total: e.target.value})} />
@@ -362,12 +360,18 @@ const Lancamento: React.FC = () => {
           </div>
 
           <button type="submit" className="btn-submit btn-gap-top" disabled={loading}>
-            {loading ? 'Salvando...' : <><Save size={20} className="icon-margin" /> Confirmar Lançamento</>}
+            {loading ? 'Processando...' : <><Save size={20} className="icon-margin" /> Finalizar Lançamento</>}
           </button>
         </form>
       </div>
 
-      <ModalFeedback isOpen={modal.isOpen} type={modal.type} title={modal.title} message={modal.message} onClose={() => setModal({ ...modal, isOpen: false })} />
+      <ModalFeedback 
+        isOpen={modal.isOpen} 
+        type={modal.type} 
+        title={modal.title} 
+        message={modal.message} 
+        onClose={() => setModal({ ...modal, isOpen: false })} 
+      />
     </div>
   );
 };
