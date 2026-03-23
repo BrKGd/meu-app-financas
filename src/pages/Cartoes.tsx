@@ -409,7 +409,7 @@ const FormFields = ({ form, setForm, usuarios, perfilLogado }: any) => {
 
       <div className="form-group">
         <label>Cor de Identificação (Hexadecimal)</label>
-        <div style={{ display: 'grid', gap: '10px', alignItems: 'center', gridTemplateColumns: '1.4fr 0.66fr'}}>
+        <div className ="seletor-cor" style={{ display: 'flex', gap: '10px', alignItems: 'center'}}>
           <input 
             type="color" 
             className="color-picker-input" 
