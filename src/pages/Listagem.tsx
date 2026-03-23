@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
   Tag, ShoppingBag, Landmark, Lock, UserPlus,
-  CheckCircle2, Clock, RefreshCw, Repeat, Layers, CalendarDays, Save
+  CheckCircle2, Clock, RefreshCw, Repeat, Layers, CalendarDays
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
@@ -96,20 +96,16 @@ const Listagem: React.FC = () => {
 
   const currentUserId = perfilLogado?.id;
 
-  // --- NOVA LÓGICA DE PERMISSÃO ATUALIZADA ---
+  // --- LÓGICA DE PERMISSÃO RESTRITA ---
   const temPermissaoEscrita = useCallback((item: ItemCompra | null) => {
     if (!item || !currentUserId || !perfilLogado) return false;
 
-    // 1. Proprietário tem poder total
+    // 1. Proprietário: Permissão Total
     if (perfilLogado.tipo_usuario === 'proprietario') return true;
 
-    // 2. Outros usuários (ADM ou Comum) podem editar se:
-    // - Eles criaram o registro (usuario_criacao)
-    // - OU eles são o responsável pelo gasto (user_id)
-    const eOCriador = item.usuario_criacao === currentUserId;
-    const eOResponsavel = item.user_id === currentUserId;
-
-    return eOCriador || eOResponsavel;
+    // 2. Administrador ou Comum: Apenas se ele mesmo criou o registro
+    // Não basta ser o responsável (user_id), precisa ser o autor (usuario_criacao)
+    return item.usuario_criacao === currentUserId;
   }, [perfilLogado, currentUserId]);
 
   const formatarMoedaVisual = (valor: number) => {
@@ -143,8 +139,7 @@ const Listagem: React.FC = () => {
       .eq('periodo_referencia', primeiroDia)
       .order('data_compra', { ascending: false });
     
-    // AJUSTE: Apenas o usuário comum fica restrito ao seu próprio ID na visualização
-    // Administradores e Proprietários veem a lista completa para poderem gerenciar o que criaram
+    // Filtro de visualização: Comum vê só os seus. ADM e Proprietário veem tudo.
     if (perfil.tipo_usuario === 'comum') {
       query = query.eq('user_id', perfil.id);
     }
@@ -226,7 +221,7 @@ const Listagem: React.FC = () => {
     if (!itemParaEditar) return;
 
     if (!temPermissaoEscrita(itemParaEditar)) {
-      setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Você não tem permissão para editar este registro.' });
+      setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Apenas o autor deste lançamento ou o proprietário podem editar.' });
       return;
     }
 
@@ -258,11 +253,6 @@ const Listagem: React.FC = () => {
   };
 
   const confirmDelete = (item: ItemCompra) => {
-    if (!temPermissaoEscrita(item)) {
-        setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Você não tem permissão para excluir este registro.' });
-        return;
-    }
-
     setModal({
       isOpen: true,
       type: 'danger',
@@ -433,7 +423,7 @@ const Listagem: React.FC = () => {
                   <div className="form-group">
                     <label><Layers size={12}/> Período Referência</label>
                     <input type="date" className="form-control" disabled={true} value={itemParaEditar.periodo_referencia || ''} />
-                    <small style={{fontSize: '0.6rem', color: '#94a3b8'}}>Gerado automaticamente pelo sistema</small>
+                    <small style={{fontSize: '0.6rem', color: '#94a3b8'}}>Gerado automaticamente</small>
                   </div>
                   
                   <div className="form-group">
@@ -524,7 +514,7 @@ const Listagem: React.FC = () => {
                         </select>
                       </div>
                       <div className="form-group">
-                        <label>Total de Parcelas</label>
+                        <label>Parcelas</label>
                         <input type="number" min="1" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.parcelas_total} onChange={e => setItemParaEditar({...itemParaEditar, parcelas_total: Number(e.target.value)})} />
                       </div>
                     </>
@@ -533,38 +523,30 @@ const Listagem: React.FC = () => {
               </form>
             </div>
 
-            {/* RODAPÉ DO MODAL COM REGRAS DE VISIBILIDADE */}
+            {/* BOTÕES DE AÇÃO COM VALIDAÇÃO DE AUTOR */}
             {temPermissaoEscrita(itemParaEditar) ? (
-              <>
-                <div style={{ padding: '0 25px', textAlign: 'center' }}>
-                    {perfilLogado?.tipo_usuario !== 'proprietario' && (
-                        <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: 600 }}>
-                           {itemParaEditar.usuario_criacao === currentUserId ? "✨ Você criou este lançamento" : "👤 Você é o responsável"}
-                        </span>
-                    )}
-                </div>
-                <div className="modal-footer-icons">
-                  <button type="button" className="btn-icon-action btn-delete" title='Excluir' onClick={() => confirmDelete(itemParaEditar)}>
-                    <img src={iconExcluir} alt="Excluir" />
-                  </button>
+              <div className="modal-footer-icons">
+                <button type="button" className="btn-icon-action btn-delete" title='Excluir' onClick={() => confirmDelete(itemParaEditar)}>
+                  <img src={iconExcluir} alt="Excluir" />
+                </button>
 
-                  <div className="footer-right-actions">
-                    <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
-                      <img src={iconCancelar} alt="Cancelar" />
-                    </button>
-                    <button type="submit" form="edit-form" className="btn-icon-action" title='Salvar'>
-                      <img src={iconConfirme} alt="Salvar" />
-                    </button>
-                  </div>
+                <div className="footer-right-actions">
+                  <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
+                    <img src={iconCancelar} alt="Cancelar" />
+                  </button>
+                  <button type="submit" form="edit-form" className="btn-icon-action" title='Salvar'>
+                    <img src={iconConfirme} alt="Salvar" />
+                  </button>
                 </div>
-              </>
+              </div>
             ) : (
                 <div className="modal-footer-icons" style={{justifyContent: 'center', backgroundColor: '#f8fafc', padding: '15px', borderTop: '1px solid #e2e8f0'}}>
                     <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px'}}>
                         <div style={{display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600}}>
-                            <Lock size={14} style={{marginRight: '8px'}} /> Apenas visualização
+                            <Lock size={14} style={{marginRight: '8px'}} /> Somente Visualização
                         </div>
-                        <span style={{fontSize: '0.7rem', color: '#94a3b8'}}>Registro inserido por: {itemParaEditar.nomeCriador}</span>
+                        <span style={{fontSize: '0.7rem', color: '#94a3b8'}}>Inserido por: {itemParaEditar.nomeCriador}</span>
+                        <span style={{fontSize: '0.6rem', color: '#cbd5e1'}}>Apenas o autor pode alterar este registro.</span>
                     </div>
                 </div>
             )}
