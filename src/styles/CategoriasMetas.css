@@ -12,8 +12,8 @@
 .metas-header {
   display: flex;
   flex-direction: column; /* Organiza em linhas: 1. Titulo/Mes 2. Badge */
-  gap: 15px;
-  margin-bottom: 40px;
+  gap: 5px;
+  margin-bottom: 20px;
   padding: 10px 5px;
 }
 
@@ -69,12 +69,13 @@
 .seletor-periodo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0px;
   background: white;
-  padding: 10px 18px;
+  padding: 5px 9px;
   border-radius: 100px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   border: 1px solid #f1f5f9;
+  height: 30px;
 }
 
 .periodo-display {
@@ -89,8 +90,8 @@
   background: #f1f5f9;
   border: none;
   border-radius: 10px;
-  width: 32px;
-  height: 32px;
+  width: auto;
+  height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -100,8 +101,8 @@
 }
 
 .seletor-periodo button svg {
-  width: 18px;
-  height: 18px;
+  width: auto;
+  height: auto;
   stroke-width: 2.5;
 }
 
@@ -116,10 +117,11 @@
   align-items: center;
   gap: 10px;
   background: white;
-  padding: 8px 16px;
+  padding: 5px 9px;
   border-radius: 100px;
   border: 1px solid #f1f5f9;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  height: 35px;
 }
 
 .badge-icon-wrapper {
@@ -600,7 +602,6 @@
 
 .fade-in { animation: fadeIn 0.4s ease-out; }
 
-/* --- RESPONSIVIDADE --- */
 @media (max-width: 768px) {
   .header-controls { align-items: center; width: 100%; }
   .grid-metas-modern { grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -617,6 +618,8 @@
   .modal-content.modal-expanded {width: 95%; max-height: 85vh;}
   .header-content-wrapper { flex-direction: row; justify-content: space-between; }
   .metas-header { align-items: flex-start !important; text-align: left !important; }
+  .cat-title-area h1 {font-size: 1.5rem;}
+  
 }
 
 @media (max-width: 480px) {

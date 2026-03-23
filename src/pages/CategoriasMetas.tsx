@@ -284,8 +284,8 @@ const CategoriasMetas: React.FC = () => {
   return (
     <>
       <div className="cat-page-wrapper metas-container fade-in">
-        <header className="metas-header">
-          <div className="header-content-wrapper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <header className="metas-header" style={{ paddingBottom: '1rem' }}>
+          <div className="header-content-wrapper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'nowrap' }}>
             <div className="cat-title-area">
               <div className="titulo-secao">
                 <LucideIcons.Flag size={28} />
@@ -293,10 +293,7 @@ const CategoriasMetas: React.FC = () => {
               </div>
             </div>
 
-            {/* CONTAINER DA DIREITA COM OS DOIS PILLS EMPILHADOS */}
-            <div className="header-actions-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-              
-              {/* Pill 1: Seletor de Mês */}
+            <div className="header-actions-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', minWidth: 'fit-content' }}>
               <div className="seletor-periodo">
                 <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}>
                   <LucideIcons.ChevronLeft size={18} />
@@ -309,8 +306,7 @@ const CategoriasMetas: React.FC = () => {
                 </button>
               </div>
 
-              {/* Pill 2: Total Planejado (Movido para cá) */}
-              <div className="badge-planejado-modern" style={{ margin: 0 }}>
+              <div className="badge-planejado-modern" style={{ margin: 0, whiteSpace: 'nowrap' }}>
                 <div className={`badge-icon-wrapper ${activeTab === 'despesa' ? 'bg-red' : 'bg-green'}`}>
                   {activeTab === 'despesa' ? <LucideIcons.TrendingDown size={14} /> : <LucideIcons.TrendingUp size={14} />}
                 </div>
@@ -319,7 +315,6 @@ const CategoriasMetas: React.FC = () => {
                   <strong> {totalPlanejado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
                 </span>
               </div>
-
             </div>
           </div>
         </header>
@@ -390,10 +385,11 @@ const CategoriasMetas: React.FC = () => {
                     </h2>
                   </div>
 
-                  <div className="modal-header-actions">
+                  {/* AÇÕES DO MODAL - CORRIGIDO */}
+                  <div className="modal-header-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     {selectedItem && !isEditing && podeEditar(selectedItem) && (
                       <button type="button" className="btn-icon-action" onClick={() => setIsEditing(true)}>
-                        <LucideIcons.Settings2 size={32} color="#fff" />
+                        <LucideIcons.Settings2 size={24} color="#fff" />
                       </button>
                     )}
                     <button type="button" onClick={() => setIsModalOpen(false)} className="btn-icon-action">
@@ -431,17 +427,12 @@ const CategoriasMetas: React.FC = () => {
                          </div>
                        )}
 
-                       <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '5px', fontWeight: 'bold' }}>
-                          {searchTerm ? `Resultados da busca` : `Ícones em ${iconCategory}`}
-                       </div>
-
                        <div className="icon-grid-selector-inner">
                          {filteredIcons.map((name: string) => (
                            <button key={name} type="button" title={name} className={`icon-option-btn ${form.icone === name ? 'selected' : ''}`} onClick={() => setForm({...form, icone: name})}>
                              <RenderIcon name={name} size={30} />
                            </button>
                          ))}
-                         {filteredIcons.length === 0 && <div className="empty-state">Nenhum ícone encontrado.</div>}
                        </div>
                     </div>
                   )}
