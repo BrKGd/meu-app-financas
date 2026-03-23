@@ -182,7 +182,8 @@ const Listagem: React.FC = () => {
 
     const [pRes, cRes, cartRes, meuPerfilRes] = await Promise.all([
       supabase.from('profiles').select('id, nome, tipo_usuario'),
-      supabase.from('categorias').select('id, nome, cor').eq('tipo', 'despesa').order('nome'),
+      // AJUSTE: Agora busca categorias do tipo 'despesa' E 'pessoal'
+      supabase.from('categorias').select('id, nome, cor').in('tipo', ['despesa', 'pessoal']).order('nome'),
       supabase.from('cartoes').select('id, nome, dia_fechamento').order('nome'),
       supabase.from('profiles').select('*').eq('id', user.id).single()
     ]);

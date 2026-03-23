@@ -147,7 +147,7 @@ const Despesas: React.FC = () => {
       if (tipoFinal === 'comum') setFiltroResponsavel(user.id);
 
       const [catRes, profRes, cartRes, metasRes] = await Promise.all([
-        supabase.from('categorias').select('*').order('nome'),
+        supabase.from('categorias').select('*').in('tipo', ['despesa', 'pessoal']).order('nome'),
         supabase.from('profiles').select('id, nome').order('nome'),
         supabase.from('cartoes').select('*').order('nome'),
         supabase.from('metas').select('valor_meta, tipo_meta').eq('mes_referencia', mesAlvoNum).eq('ano_referencia', anoAlvoNum)

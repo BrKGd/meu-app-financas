@@ -103,7 +103,8 @@ const Lancamento: React.FC = () => {
       const [dC, dU, dCat] = await Promise.all([
         supabase.from('cartoes').select('id,nome,dia_fechamento,dia_vencimento').order('nome'),
         supabase.from('profiles').select('id,nome').order('nome'),
-        supabase.from('categorias').select('id,nome').eq('tipo', 'despesa').order('nome')
+        // AJUSTE AQUI: Agora busca categorias do tipo 'despesa' E 'pessoal'
+        supabase.from('categorias').select('id,nome').in('tipo', ['despesa', 'pessoal']).order('nome')
       ]);
 
       setCartoes((dC.data as Cartao[]) || []);
@@ -340,7 +341,6 @@ const Lancamento: React.FC = () => {
                 </select>
               </div>
 
-              {/* LÓGICA DE VISIBILIDADE: Só aparece N° de Parcelas se o tipo for 'parcelado' */}
               {form.tipo_lancamento === 'parcelado' ? (
                 <div className="input-group animate-in">
                   <label className="input-label">N° de Parcelas</label>
