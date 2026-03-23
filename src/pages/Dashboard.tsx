@@ -64,12 +64,7 @@ const Dashboard: React.FC = () => {
   });
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // --- Filtro de Data (Navegação) ---
-  const [filtroData, setFiltroData] = useState({ 
-    mes: new Date().getMonth(), 
-    ano: new Date().getFullYear() 
-  });
+  const [dataFiltro, setDataFiltro] = useState(new Date());
 
   const mesesNominais = useMemo(() => [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
@@ -77,8 +72,8 @@ const Dashboard: React.FC = () => {
   ], []);
 
   const mesReferenciaChave = useMemo(() => {
-    return `${filtroData.ano}-${String(filtroData.mes + 1).padStart(2, '0')}-01`;
-  }, [filtroData]);
+    return `${dataFiltro.getFullYear()}-${String(dataFiltro.getMonth() + 1).padStart(2, '0')}-01`;
+  }, [dataFiltro]);
 
   const diaAtualReal = new Date().getDate();
 
@@ -88,16 +83,6 @@ const Dashboard: React.FC = () => {
     accent2: '#4cc9f0',
     success: '#10b981',
     bg: '#f8fafc'
-  };
-
-  const mudarMes = (direcao: number) => {
-    setFiltroData(prev => {
-      let novoMes = prev.mes + direcao;
-      let novoAno = prev.ano;
-      if (novoMes < 0) { novoMes = 11; novoAno--; }
-      else if (novoMes > 11) { novoMes = 0; novoAno++; }
-      return { mes: novoMes, ano: novoAno };
-    });
   };
 
   const carregarDados = useCallback(async () => {
@@ -127,8 +112,6 @@ const Dashboard: React.FC = () => {
       });
 
       let query = supabase.from('compras').select('*');
-      
-      // Se não for admin/proprietário, filtra apenas as dele
       if (!isProprietario && perfilData?.tipo_usuario !== 'administrador') {
         query = query.eq('user_id', user.id);
       }
@@ -160,15 +143,12 @@ const Dashboard: React.FC = () => {
         const p = resumo.detalhesPorPessoa[responsavel];
         const dataCompraObj = new Date(item.data_compra + 'T00:00:00');
 
-        // 1. Lógica para o Mês Selecionado
         if (item.periodo_referencia === mesReferenciaChave) {
           resumo.qtdComprasMes++;
           p.qtdComprasMes++;
-
           if (!estaPago) {
             resumo.totalMes += valorParcela;
             p.valorNoMes += valorParcela;
-
             if (vencimento > 0 && vencimento <= 15) p.vencimentoAte15 += valorParcela;
             else if (vencimento > 15) p.vencimentoAte20 += valorParcela;
           } else {
@@ -176,7 +156,6 @@ const Dashboard: React.FC = () => {
           }
         }
 
-        // 2. Lógica para Dívida Futura (Relativo ao mês selecionado)
         if (item.periodo_referencia > mesReferenciaChave && !estaPago) {
           resumo.totalEmAbertoFuturo += valorParcela;
           p.totalRestanteFuturo += valorParcela;
@@ -213,31 +192,68 @@ const Dashboard: React.FC = () => {
   return (
     <div className="fade-in" style={{ padding: '25px', backgroundColor: colors.bg, minHeight: '100vh', paddingBottom: '100px' }}>
       
-      {/* HEADER COM NAVEGAÇÃO DE MÊS */}
+      {/* HEADER: TÍTULO À ESQUERDA | SELETOR À DIREITA EM LINHA ÚNICA */}
       <div style={{ 
         display: 'flex', 
+        flexDirection: 'row', 
         justifyContent: 'space-between', 
         alignItems: 'center', 
         marginBottom: '30px',
-        flexWrap: 'wrap',
-        gap: '20px'
+        gap: '10px',
+        width: '100%'
       }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, color: '#1e293b' }}>
-            {perfil?.tipo_usuario === 'proprietario' ? 'Dashboard Global' : 'Meu Resumo Financeiro'}
+        <div style={{ flex: 1 }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: 'clamp(1.1rem, 4vw, 1.8rem)', 
+            fontWeight: 800, 
+            color: '#1e293b',
+            whiteSpace: 'nowrap'
+          }}>
+            {perfil?.tipo_usuario === 'proprietario' ? 'Dashboard Global' : 'Meu Resumo'}
           </h2>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
-            Visualizando: <strong>{mesesNominais[filtroData.mes]} de {filtroData.ano}</strong>
+          <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '2px 0 0 0' }}>
+            Análise de gastos
           </p>
         </div>
 
-        <div className="modern-navigator">
-          <button onClick={() => mudarMes(-1)} className="nav-circle-btn"><ChevronLeft size={20} /></button>
-          <div className="nav-info">
-            <span className="nav-month">{mesesNominais[filtroData.mes]}</span>
-            <span className="nav-year">{filtroData.ano}</span>
-          </div>
-          <button onClick={() => mudarMes(1)} className="nav-circle-btn"><ChevronRight size={20} /></button>
+        {/* SELETOR DE MÊS - LINHA ÚNICA E NOME COMPLETO */}
+        <div className="mes-selector-badge" style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px', 
+          background: '#ffffff', 
+          padding: '8px 14px', 
+          borderRadius: '100px', 
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+          flexShrink: 0
+        }}>
+          <button 
+            onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() - 1, 1))} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}
+          >
+            <ChevronLeft size={18} />
+          </button>
+          
+          <span style={{ 
+            fontWeight: 800, 
+            fontSize: '0.75rem', 
+            color: '#1e293b', 
+            textTransform: 'capitalize',
+            whiteSpace: 'nowrap',
+            textAlign: 'center',
+            minWidth: '110px' 
+          }}>
+            {mesesNominais[dataFiltro.getMonth()]} de {dataFiltro.getFullYear()}
+          </span>
+
+          <button 
+            onClick={() => setDataFiltro(new Date(dataFiltro.getFullYear(), dataFiltro.getMonth() + 1, 1))} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
       </div>
 
@@ -278,12 +294,12 @@ const Dashboard: React.FC = () => {
                 <span className="person-name-tag">{nome}</span>
                 <div className="badges-right-wrapper">
                   {dados.vencimentoAte15 > 0 && (
-                    <div className={`badge-pay ${diaAtualReal >= 15 && filtroData.mes === new Date().getMonth() ? 'badge-status-alert' : 'badge-status-ok'}`}>
+                    <div className={`badge-pay ${diaAtualReal >= 15 && dataFiltro.getMonth() === new Date().getMonth() && dataFiltro.getFullYear() === new Date().getFullYear() ? 'badge-status-alert' : 'badge-status-ok'}`}>
                       <Banknote size={14} /> Até dia 15: {formatMoney(dados.vencimentoAte15)}
                     </div>
                   )}
                   {dados.vencimentoAte20 > 0 && (
-                    <div className={`badge-pay ${diaAtualReal >= 20 && filtroData.mes === new Date().getMonth() ? 'badge-status-alert' : 'badge-status-ok'}`}>
+                    <div className={`badge-pay ${diaAtualReal >= 20 && dataFiltro.getMonth() === new Date().getMonth() && dataFiltro.getFullYear() === new Date().getFullYear() ? 'badge-status-alert' : 'badge-status-ok'}`}>
                       <Banknote size={14} /> Até dia 20: {formatMoney(dados.vencimentoAte20)}
                     </div>
                   )}
@@ -296,14 +312,14 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div style={{ marginBottom: '15px' }}>
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'capitalize' }}>A Pagar ({mesesNominais[filtroData.mes]})</span>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'capitalize' }}>A Pagar ({mesesNominais[dataFiltro.getMonth()]})</span>
                 <div style={{ fontSize: '1.8rem', fontWeight: 900, color: dados.valorNoMes === 0 ? colors.success : '#1e293b' }}>
                     {formatMoney(dados.valorNoMes)}
                 </div>
               </div>
 
               <div style={{ padding: '10px', background: 'linear-gradient(to right, #f8fafc, #ffffff)', borderRadius: '16px', border: '1px solid #f1f5f9', marginBottom: '15px' }}>
-                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Dívida Restante (Pós {mesesNominais[filtroData.mes]})</span>
+                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Dívida Restante (Pós {mesesNominais[dataFiltro.getMonth()]})</span>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: colors.secondary }}>{formatMoney(dados.totalRestanteFuturo)}</div>
               </div>
 
