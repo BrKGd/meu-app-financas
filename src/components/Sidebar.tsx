@@ -5,7 +5,7 @@ import {
   LayoutDashboard, List, Home, 
   CreditCard, Wallet, LogOut, User, 
   ArrowUpCircle, ArrowDownCircle, Target,
-  PlusCircle, PieChart 
+  PlusCircle, PieChart, Flag 
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Sidebar.css';
@@ -111,8 +111,8 @@ const Sidebar: React.FC = () => {
           {temAcessoGestao && (
             <>
               <Link to="/categoriasMetas" className={`sidebar-nav-item ${isActive('/categoriasMetas') ? 'active' : ''}`}>
-                <Target size={20} />
-                <span>Planejamento</span>
+                <Flag size={20} />
+                <span>Categorias e Metas</span>
               </Link>
 
               <Link to="/orcamento" className={`sidebar-nav-item ${isActive('/orcamento') ? 'active' : ''}`}>

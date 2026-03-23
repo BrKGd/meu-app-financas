@@ -4,7 +4,7 @@ import {
   ShoppingBag, CreditCard, LayoutDashboard, Plus, TrendingUp, 
   ChevronRight, User as UserIcon, Users, Calendar, History, 
   PiggyBank, ArrowUpCircle, ArrowDownCircle, Target, Shield, LucideProps,
-  CheckCircle2, ClipboardList
+  CheckCircle2, ClipboardList, Flag, BarChart3, PieChart as PieChartLucide
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
@@ -249,13 +249,13 @@ const Menu: React.FC = () => {
       
       <div className="actions-grid-minimal">
         <QuickActionIcon to="/dashboard" icon={<LayoutDashboard />} label="Painel" color="#4361ee" />
-        {isGestor && <QuickActionIcon to="/categoriasMetas" icon={<Target />} label="Metas" color="#8b5cf6" />}
+        {isGestor && <QuickActionIcon to="/categoriasMetas" icon={<Flag />} label="Metas" color="#8b5cf6" />}
         {isGestor && <QuickActionIcon to="/orcamento" icon={<PiggyBank />} label="Gestão" color="#ff9900" />}
         {isGestor && <QuickActionIcon to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" color="#16a34a" />}
+        {isGestor && <QuickActionIcon to="/orcamento" icon={<PieChartLucide />} label="Orçamento" color="#2563EB" />}
         <QuickActionIcon to="/despesas" icon={<ArrowDownCircle />} label="Gastos" color="#ef4444" />
-        {<QuickActionIcon to="/cartoes" icon={<CreditCard />} label="Cartões" color="#7209b7" />}
+        <QuickActionIcon to="/cartoes" icon={<CreditCard />} label="Cartões" color="#7209b7" />
         <QuickActionIcon to="/listagem" icon={<ShoppingBag />} label="Extrato" color="#00cc66" />
-        <QuickActionIcon to="/orcamento" icon={<ClipboardList />} label="Planejamento" color="#2563EB" />
         <QuickActionIcon 
           to="/perfil" 
           icon={perfil.tipo === 'comum' ? <UserIcon /> : <Shield />} 
@@ -264,7 +264,7 @@ const Menu: React.FC = () => {
         />
         <QuickActionIcon to="/lancamento" icon={<Plus />} label="Novo" color="#4361ee" isPrimary />
       </div>
-      
+
       {/* SEÇÃO DO GRÁFICO DE ROSCA */}
       {gastosPorCategoria.length > 0 && (
       <div className="chart-section">
