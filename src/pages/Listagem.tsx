@@ -31,7 +31,7 @@ interface Cartao {
   id: number;
   nome: string;
   dia_fechamento: number;
-  user_id?: string; // ID do dono do cartão, se houver essa coluna
+  user_id?: string; 
 }
 
 interface ItemCompra {
@@ -48,9 +48,9 @@ interface ItemCompra {
   data_compra: string;
   data_vencimento?: string;
   periodo_referencia?: string; 
-  recorrencia_id?: string | null;     
+  recorrencia_id?: string | null;      
   cartao_id?: number | null; 
-  cartao_nome_exibicao?: string; // Campo virtual para a tabela
+  cartao_nome_exibicao?: string; 
   forma_pagamento: string;
   categoria_id: string;
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
@@ -97,7 +97,6 @@ const Listagem: React.FC = () => {
 
   const currentUserId = perfilLogado?.id;
 
-  // Lógica de Permissão
   const temPermissaoEscrita = useCallback((item: ItemCompra | null) => {
     if (!item || !currentUserId || !perfilLogado) return false;
     if (perfilLogado.tipo_usuario === 'proprietario') return true;
@@ -126,7 +125,6 @@ const Listagem: React.FC = () => {
     return apenasNumeros.padStart(9, '0').replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
   };
 
-  // --- BUSCA DE DESPESAS ---
   const fetchDespesas = useCallback(async (perfil: Perfil, mapaNomes: Record<string, string>, listaCartoes: Cartao[], mapaCats: Record<string, {nome: string, cor: string}>) => {
     const primeiroDia = `${filtroData.ano}-${String(filtroData.mes + 1).padStart(2, '0')}-01`;
     
@@ -143,7 +141,6 @@ const Listagem: React.FC = () => {
     const { data, error } = await query;
     if (error) return;
 
-    // Criar mapa para tradução de cartões (ID -> Nome)
     const mapaCartoes: Record<number, string> = {};
     listaCartoes.forEach(c => {
       mapaCartoes[c.id] = c.nome;
@@ -159,8 +156,7 @@ const Listagem: React.FC = () => {
       const nomeCriador = mapaNomes[item.usuario_criacao || ''] || 'Sistema'; 
       const infoCat = mapaCats[item.categoria_id] || { nome: 'Sem Categoria', cor: '#94a3b8' };
       
-      // Busca o nome do cartão no mapa. Se não achar o ID, exibe o ID ou traço.
-      const nomeDoCartao = item.cartao_id ? (mapaCartoes[item.cartao_id] || `Cartão ${item.cartao_id}`) : '-';
+      const nomeDoCartao = item.cartao_id ? (mapaCartoes[item.cartao_id] || `ID: ${item.cartao_id}`) : '-';
 
       formatadas.push({ 
         ...item, 
@@ -184,7 +180,6 @@ const Listagem: React.FC = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Buscamos TODOS os cartões para a listagem (para não dar "não encontrado")
     const [pRes, cRes, cartRes, meuPerfilRes] = await Promise.all([
       supabase.from('profiles').select('id, nome, tipo_usuario'),
       supabase.from('categorias').select('id, nome, cor').in('tipo', ['despesa', 'pessoal']).order('nome'),
@@ -279,18 +274,15 @@ const Listagem: React.FC = () => {
     });
   };
 
-  // --- FILTRO PARA O SELECT DE EDIÇÃO ---
-  // Aqui você pode limitar os cartões que aparecem no select para o usuário comum
   const cartoesFiltradosParaEdicao = useMemo(() => {
-    if (!perfilLogado) return [];
-    // Se quiser que todos vejam todos os cartões na hora de editar, deixe apenas return cartoes;
-    // Se quiser limitar para o usuário ver só os dele, use a lógica abaixo:
+    if (!perfilLogado || !cartoes) return [];
+    
+    // Proprietário vê todos os cartões para seleção
     if (perfilLogado.tipo_usuario === 'proprietario') return cartoes;
     
-    // Caso sua tabela cartoes tenha o campo user_id:
-    // return cartoes.filter(c => c.user_id === perfilLogado.id);
-    
-    return cartoes; // Por padrão, retornando todos para evitar erros de "sumir" opção selecionada
+    // Usuário comum vê os cartões disponíveis para ele via RLS 
+    // (O Banco agora deve permitir SELECT de todos via Policy para que o nome apareça)
+    return cartoes; 
   }, [cartoes, perfilLogado]);
 
   return (
@@ -367,7 +359,6 @@ const Listagem: React.FC = () => {
                   <td className="cell-nf">{completarNF(item.nota_fiscal)}</td>
                   <td className="cell-nf">{item.pedido ? `#${item.pedido}` : '-'}</td>
                   <td>{item.forma_pagamento}</td>
-                  {/* EXIBIÇÃO DO NOME DO CARTÃO NA TABELA */}
                   <td style={{ fontWeight: 500, color: '#475569' }}>{item.cartao_nome_exibicao}</td>
                   <td>
                     <span className={`badge-parcela ${item.tipo_lancamento !== 'unico' ? 'is-parcelado' : 'is-avista'}`}>
@@ -495,7 +486,7 @@ const Listagem: React.FC = () => {
                   {itemParaEditar.forma_pagamento === 'Crédito' && (
                     <>
                       <div className="form-group">
-                        <label><CreditCard size={12}/> Cartão (Edição)</label>
+                        <label><CreditCard size={12}/> Cartão</label>
                         <select 
                           className="form-control" 
                           disabled={!temPermissaoEscrita(itemParaEditar)} 
@@ -503,7 +494,14 @@ const Listagem: React.FC = () => {
                           onChange={e => setItemParaEditar({...itemParaEditar, cartao_id: e.target.value ? Number(e.target.value) : null})}
                         >
                           <option value="">Selecione...</option>
-                          {/* AQUI USAMOS A LISTA FILTRADA PARA QUEM ESTÁ EDITANDO */}
+                          
+                          {/* INJEÇÃO AUTOMÁTICA PARA CASOS ONDE O CARTÃO NÃO ESTÁ NA LISTA FILTRADA (GARANTE O NOME NO MODAL) */}
+                          {itemParaEditar.cartao_id && !cartoesFiltradosParaEdicao.find(c => c.id === itemParaEditar.cartao_id) && (
+                            <option key={itemParaEditar.cartao_id} value={itemParaEditar.cartao_id}>
+                              {itemParaEditar.cartao_nome_exibicao}
+                            </option>
+                          )}
+
                           {cartoesFiltradosParaEdicao.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                         </select>
                       </div>

@@ -101,7 +101,6 @@ const Cartoes: React.FC = () => {
       .single();
 
     if (data) {
-      // Regra Master para o seu email específico
       const isMaster = user.email === 'gleidson.fig@gmail.com';
       setPerfilLogado({
         id: data.id,
@@ -133,7 +132,6 @@ const Cartoes: React.FC = () => {
 
   const abrirModalCadastro = () => {
     setShowModalCadastro(true);
-    // Se não for proprietário, o responsável já nasce como sendo ele mesmo
     if (perfilLogado && perfilLogado.tipo_usuario !== 'proprietario') {
       setFormCartao(prev => ({ ...prev, id_responsavel: perfilLogado.id }));
     }
@@ -143,9 +141,12 @@ const Cartoes: React.FC = () => {
     const limNum = Number(limite);
     const totalComprometido = compras.reduce((acc, item) => {
       if (item.cartao_id !== cartao.id) return acc;
+      // Não abate do limite o que já foi pago
       if (item.status_pagamento === 'pago') return acc;
+      
+      // Considera compras futuras e do período atual que ainda não foram pagas
       if (item.periodo_referencia >= periodoAtual) {
-         return acc + Number(item.valor_total);
+          return acc + Number(item.valor_total);
       }
       return acc;
     }, 0);
@@ -214,43 +215,47 @@ const Cartoes: React.FC = () => {
         </button>
       </header>
 
-      <div className="cartoes-grid">
-        {cartoes.map(cartao => {
-          const disponivel = calcularDisponivel(cartao, cartao.limite);
-          const perc = Math.max(0, (disponivel / Number(cartao.limite)) * 100);
-          const responsavelObj = usuarios.find(u => u.id === cartao.id_responsavel);
+      {loading ? (
+        <div className="loading-state">Carregando seus cartões...</div>
+      ) : (
+        <div className="cartoes-grid">
+          {cartoes.map(cartao => {
+            const disponivel = calcularDisponivel(cartao, cartao.limite);
+            const perc = Math.max(0, (disponivel / Number(cartao.limite)) * 100);
+            const responsavelObj = usuarios.find(u => u.id === cartao.id_responsavel);
 
-          return (
-            <div key={cartao.id} className="card-cartao" 
-              onClick={() => setSelectedCartao(cartao)}
-              style={{ background: `linear-gradient(135deg, ${cartao.cor}, #0f172a)` }}>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div>
-                   <span className="card-label">
-                     {responsavelObj ? responsavelObj.nome : 'Crédito'}
-                   </span>
-                   <div className="card-bank-name">{cartao.nome}</div>
+            return (
+              <div key={cartao.id} className="card-cartao" 
+                onClick={() => setSelectedCartao(cartao)}
+                style={{ background: `linear-gradient(135deg, ${cartao.cor}, #0f172a)` }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div>
+                     <span className="card-label">
+                       {responsavelObj ? responsavelObj.nome : 'Crédito'}
+                     </span>
+                     <div className="card-bank-name">{cartao.nome}</div>
+                  </div>
+                  <CreditCard size={35} opacity={0.4} strokeWidth={1.5} />
                 </div>
-                <CreditCard size={35} opacity={0.4} strokeWidth={1.5} />
-              </div>
 
-              <div className="limit-info-wrapper">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                   <div>
-                      <small className="limit-available-label">DISPONÍVEL AGORA</small>
-                      <div className="limit-value">{formatMoney(disponivel)}</div>
-                   </div>
-                   <div style={{ fontWeight: 900, fontSize: '0.9rem', opacity: 0.8 }}>{Math.round(perc)}%</div>
-                </div>
-                <div className="progress-bar-bg">
-                  <div className="progress-bar-fill" style={{ width: `${perc}%` }} />
+                <div className="limit-info-wrapper">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                     <div>
+                        <small className="limit-available-label">DISPONÍVEL AGORA</small>
+                        <div className="limit-value">{formatMoney(disponivel)}</div>
+                     </div>
+                     <div style={{ fontWeight: 900, fontSize: '0.9rem', opacity: 0.8 }}>{Math.round(perc)}%</div>
+                  </div>
+                  <div className="progress-bar-bg">
+                    <div className="progress-bar-fill" style={{ width: `${perc}%` }} />
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {(selectedCartao || showModalCadastro) && (
         <div className="modal-overlay" onClick={fecharModais}>
@@ -315,6 +320,9 @@ const Cartoes: React.FC = () => {
                             <div className="fatura-item-valor">{formatMoney(item.valor_total)}</div>
                           </div>
                       ))}
+                    {compras.filter(c => c.cartao_id === selectedCartao?.id && c.periodo_referencia === periodoAtual).length === 0 && (
+                      <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>Nenhum lançamento neste mês.</p>
+                    )}
                   </div>
                   <div className="fatura-resumo">
                     <div>

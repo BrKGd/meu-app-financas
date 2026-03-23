@@ -103,7 +103,6 @@ const Lancamento: React.FC = () => {
       const [dC, dU, dCat] = await Promise.all([
         supabase.from('cartoes').select('id,nome,dia_fechamento,dia_vencimento').order('nome'),
         supabase.from('profiles').select('id,nome').order('nome'),
-        // AJUSTE AQUI: Agora busca categorias do tipo 'despesa' E 'pessoal'
         supabase.from('categorias').select('id,nome').in('tipo', ['despesa', 'pessoal']).order('nome')
       ]);
 
