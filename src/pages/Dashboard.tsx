@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   Users, Calendar, ShoppingCart, 
-  Clock, Banknote, Loader2, CheckCircle2 
+  Clock, Banknote, Loader2, CheckCircle2,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import '../styles/Dashboard.css';
 
@@ -32,7 +33,7 @@ interface Compra {
   cartao: string;
   cartao_id?: number;
   forma_pagamento: string;
-  status_pagamento?: string; // Adicionado para refletir o status
+  status_pagamento?: string;
 }
 
 interface DetalhePessoa {
@@ -42,7 +43,7 @@ interface DetalhePessoa {
   ultimaParcelaDate: Date;
   vencimentoAte15: number;
   vencimentoAte20: number;
-  pagoNoMes: number; // Novo: para controle visual opcional
+  pagoNoMes: number;
 }
 
 interface Stats {
@@ -64,12 +65,22 @@ const Dashboard: React.FC = () => {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const hoje = new Date();
-  const diaAtual = hoje.getDate();
-  const mesAtual = hoje.getMonth();
-  const anoAtual = hoje.getFullYear();
-  
-  const mesAtualChave = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-01`;
+  // --- Filtro de Data (Navegação) ---
+  const [filtroData, setFiltroData] = useState({ 
+    mes: new Date().getMonth(), 
+    ano: new Date().getFullYear() 
+  });
+
+  const mesesNominais = useMemo(() => [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ], []);
+
+  const mesReferenciaChave = useMemo(() => {
+    return `${filtroData.ano}-${String(filtroData.mes + 1).padStart(2, '0')}-01`;
+  }, [filtroData]);
+
+  const diaAtualReal = new Date().getDate();
 
   const colors = {
     primary: '#4361ee',
@@ -79,28 +90,46 @@ const Dashboard: React.FC = () => {
     bg: '#f8fafc'
   };
 
+  const mudarMes = (direcao: number) => {
+    setFiltroData(prev => {
+      let novoMes = prev.mes + direcao;
+      let novoAno = prev.ano;
+      if (novoMes < 0) { novoMes = 11; novoAno--; }
+      else if (novoMes > 11) { novoMes = 0; novoAno++; }
+      return { mes: novoMes, ano: novoAno };
+    });
+  };
+
   const carregarDados = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: perfilData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      const { data: cartoes } = await supabase.from('cartoes').select('*');
-      const { data: todosPerfis } = await supabase.from('profiles').select('id, nome');
+      const [pRes, cRes, perfRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('cartoes').select('*'),
+        supabase.from('profiles').select('id, nome')
+      ]);
+
+      const perfilData = pRes.data as Perfil;
+      const cartoes = cRes.data as Cartao[];
+      const todosPerfis = perfRes.data as any[];
       
-      setPerfil(perfilData as Perfil);
+      setPerfil(perfilData);
 
       const isMaster = user.email === 'gleidson.fig@gmail.com';
-      const isProprietario = (perfilData as Perfil)?.tipo_usuario === 'proprietario' || isMaster;
+      const isProprietario = perfilData?.tipo_usuario === 'proprietario' || isMaster;
 
       const mapaNomes: Record<string, string> = {};
-      (todosPerfis as any[])?.forEach(p => {
+      todosPerfis?.forEach(p => {
         mapaNomes[p.id] = p.nome.split(' ')[0];
       });
 
       let query = supabase.from('compras').select('*');
-      if (!isProprietario && (perfilData as Perfil)?.tipo_usuario !== 'administrador') {
+      
+      // Se não for admin/proprietário, filtra apenas as dele
+      if (!isProprietario && perfilData?.tipo_usuario !== 'administrador') {
         query = query.eq('user_id', user.id);
       }
       
@@ -117,7 +146,7 @@ const Dashboard: React.FC = () => {
         const responsavel = mapaNomes[item.user_id] || 'Outro';
         const estaPago = item.status_pagamento === 'pago';
         
-        const infoCartao = (cartoes as Cartao[])?.find(c => c.id === item.cartao_id || c.nome === item.cartao);
+        const infoCartao = cartoes?.find(c => c.id === item.cartao_id || c.nome === item.cartao);
         const vencimento = infoCartao?.dia_vencimento || 0;
 
         if (!resumo.detalhesPorPessoa[responsavel]) {
@@ -131,8 +160,8 @@ const Dashboard: React.FC = () => {
         const p = resumo.detalhesPorPessoa[responsavel];
         const dataCompraObj = new Date(item.data_compra + 'T00:00:00');
 
-        // 1. Lógica para o Mês Atual (Apenas o que NÃO está pago entra no total devedor)
-        if (item.periodo_referencia === mesAtualChave) {
+        // 1. Lógica para o Mês Selecionado
+        if (item.periodo_referencia === mesReferenciaChave) {
           resumo.qtdComprasMes++;
           p.qtdComprasMes++;
 
@@ -147,8 +176,8 @@ const Dashboard: React.FC = () => {
           }
         }
 
-        // 2. Lógica para Dívida Futura (Apenas o que NÃO está pago)
-        if (item.periodo_referencia > mesAtualChave && !estaPago) {
+        // 2. Lógica para Dívida Futura (Relativo ao mês selecionado)
+        if (item.periodo_referencia > mesReferenciaChave && !estaPago) {
           resumo.totalEmAbertoFuturo += valorParcela;
           p.totalRestanteFuturo += valorParcela;
         }
@@ -164,7 +193,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [mesAtualChave]);
+  }, [mesReferenciaChave]);
 
   useEffect(() => {
     carregarDados();
@@ -184,17 +213,54 @@ const Dashboard: React.FC = () => {
   return (
     <div className="fade-in" style={{ padding: '25px', backgroundColor: colors.bg, minHeight: '100vh', paddingBottom: '100px' }}>
       
-      <div style={{ marginBottom: '30px' }}>
-        <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, color: '#1e293b' }}>
-          {perfil?.tipo_usuario === 'proprietario' ? 'Dashboard Global' : 'Meu Resumo Financeiro'}
-        </h2>
-        <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Mês de Referência: {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(hoje)}</p>
+      {/* HEADER COM NAVEGAÇÃO DE MÊS */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '30px',
+        flexWrap: 'wrap',
+        gap: '20px'
+      }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, color: '#1e293b' }}>
+            {perfil?.tipo_usuario === 'proprietario' ? 'Dashboard Global' : 'Meu Resumo Financeiro'}
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+            Visualizando: <strong>{mesesNominais[filtroData.mes]} de {filtroData.ano}</strong>
+          </p>
+        </div>
+
+        <div className="modern-navigator">
+          <button onClick={() => mudarMes(-1)} className="nav-circle-btn"><ChevronLeft size={20} /></button>
+          <div className="nav-info">
+            <span className="nav-month">{mesesNominais[filtroData.mes]}</span>
+            <span className="nav-year">{filtroData.ano}</span>
+          </div>
+          <button onClick={() => mudarMes(1)} className="nav-circle-btn"><ChevronRight size={20} /></button>
+        </div>
       </div>
 
       <div className="dashboard-grid">
-        <Card title="Pendente Mês" icon={<Calendar size={20} />} value={formatMoney(stats.totalMes)} gradient={`linear-gradient(135deg, ${colors.primary}, #3f37c9)`} />
-        <Card title="Dívida Futura" icon={<Clock size={20} />} value={formatMoney(stats.totalEmAbertoFuturo)} gradient={`linear-gradient(135deg, ${colors.secondary}, #560bad)`} footer="Parcelas dos próximos meses" />
-        <Card title="Compras no Mês" icon={<ShoppingCart size={20} />} value={stats.qtdComprasMes.toString()} gradient={`linear-gradient(135deg, ${colors.accent2}, ${colors.primary})`} />
+        <Card 
+          title="Pendente Mês" 
+          icon={<Calendar size={20} />} 
+          value={formatMoney(stats.totalMes)} 
+          gradient={`linear-gradient(135deg, ${colors.primary}, #3f37c9)`} 
+        />
+        <Card 
+          title="Dívida Futura" 
+          icon={<Clock size={20} />} 
+          value={formatMoney(stats.totalEmAbertoFuturo)} 
+          gradient={`linear-gradient(135deg, ${colors.secondary}, #560bad)`} 
+          footer="Parcelas após o mês selecionado" 
+        />
+        <Card 
+          title="Compras no Mês" 
+          icon={<ShoppingCart size={20} />} 
+          value={stats.qtdComprasMes.toString()} 
+          gradient={`linear-gradient(135deg, ${colors.accent2}, ${colors.primary})`} 
+        />
       </div>
 
       <div style={{ margin: '45px 0 20px 0' }}>
@@ -212,12 +278,12 @@ const Dashboard: React.FC = () => {
                 <span className="person-name-tag">{nome}</span>
                 <div className="badges-right-wrapper">
                   {dados.vencimentoAte15 > 0 && (
-                    <div className={`badge-pay ${diaAtual >= 15 ? 'badge-status-alert' : 'badge-status-ok'}`}>
+                    <div className={`badge-pay ${diaAtualReal >= 15 && filtroData.mes === new Date().getMonth() ? 'badge-status-alert' : 'badge-status-ok'}`}>
                       <Banknote size={14} /> Até dia 15: {formatMoney(dados.vencimentoAte15)}
                     </div>
                   )}
                   {dados.vencimentoAte20 > 0 && (
-                    <div className={`badge-pay ${diaAtual >= 20 ? 'badge-status-alert' : 'badge-status-ok'}`}>
+                    <div className={`badge-pay ${diaAtualReal >= 20 && filtroData.mes === new Date().getMonth() ? 'badge-status-alert' : 'badge-status-ok'}`}>
                       <Banknote size={14} /> Até dia 20: {formatMoney(dados.vencimentoAte20)}
                     </div>
                   )}
@@ -230,14 +296,14 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div style={{ marginBottom: '15px' }}>
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'capitalize' }}>A Pagar (Mês)</span>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'capitalize' }}>A Pagar ({mesesNominais[filtroData.mes]})</span>
                 <div style={{ fontSize: '1.8rem', fontWeight: 900, color: dados.valorNoMes === 0 ? colors.success : '#1e293b' }}>
                     {formatMoney(dados.valorNoMes)}
                 </div>
               </div>
 
               <div style={{ padding: '10px', background: 'linear-gradient(to right, #f8fafc, #ffffff)', borderRadius: '16px', border: '1px solid #f1f5f9', marginBottom: '15px' }}>
-                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Dívida Restante</span>
+                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>Dívida Restante (Pós {mesesNominais[filtroData.mes]})</span>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: colors.secondary }}>{formatMoney(dados.totalRestanteFuturo)}</div>
               </div>
 
