@@ -371,39 +371,47 @@
 
 .fade-in { animation: fadeIn 0.5s ease-out; }
 
+/* ... (Mantenha todo o seu CSS anterior acima) ... */
+
 /* MEDIA QUERIES - FOCO MOBILE E COMPACTAÇÃO */
 @media (max-width: 768px) {
-  .listagem-container { padding: 20px; }
+  .listagem-container { padding: 15px; }
   
-  /* Um campo por linha no mobile */
+  /* Grid de um campo por linha */
   .grid-form { 
     grid-template-columns: 1fr; 
-    gap: 12px; /* Reduzido o espaço entre linhas */
+    gap: 10px; /* Redução drástica de espaço */
   }
   .full-width { grid-column: span 1; }
 
-  /* Compactação dos campos */
+  /* Redução de altura para compactação máxima */
   .form-control {
-    height: 46px; /* Altura reduzida */
-    padding: 0 15px;
+    height: 42px; 
+    padding: 0 12px;
     font-size: 0.9rem;
-    border-radius: 14px;
+    border-radius: 12px;
   }
 
   .form-group label {
-    margin-bottom: 6px; /* Menor espaço entre label e input */
-    font-size: 0.7rem;
+    margin-bottom: 4px; 
+    font-size: 0.65rem;
+    gap: 5px;
   }
 
-  .modal-fixed-header { padding: 20px 25px; }
-  .modal-scrollable-body { padding: 20px 25px; }
-  .modal-footer-icons { padding: 20px 25px; }
+  .modal-fixed-header { padding: 15px 20px; }
+  .modal-scrollable-body { padding: 15px 20px; }
+  .modal-footer-icons { padding: 15px 20px; }
+
+  .modal-fixed-header h3 { font-size: 1.2rem; }
 
   .edit-modal-content {
-    border-radius: 30px; /* Bordas um pouco menores para telas pequenas */
+    border-radius: 25px;
+    max-height: 95vh;
   }
 
-  .nav-info { min-width: 100px; }
-  .custom-table { min-width: 1100px; }
-  .btn-icon-action img { width: 40px; height: 40px; }
+  .nav-info { min-width: 90px; }
+  .nav-month { font-size: 0.95rem; }
+  
+  .custom-table { min-width: 1000px; }
+  .btn-icon-action img { width: 36px; height: 36px; }
 }

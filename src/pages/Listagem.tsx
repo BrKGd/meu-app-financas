@@ -31,6 +31,7 @@ interface Cartao {
   id: number;
   nome: string;
   dia_fechamento: number;
+  user_id?: string; // ID do dono do cartão, se houver essa coluna
 }
 
 interface ItemCompra {
@@ -48,8 +49,8 @@ interface ItemCompra {
   data_vencimento?: string;
   periodo_referencia?: string; 
   recorrencia_id?: string | null;     
-  cartao: string | null; 
   cartao_id?: number | null; 
+  cartao_nome_exibicao?: string; // Campo virtual para a tabela
   forma_pagamento: string;
   categoria_id: string;
   status_pagamento: 'pendente' | 'pago' | 'vencido' | 'cancelado';
@@ -96,15 +97,10 @@ const Listagem: React.FC = () => {
 
   const currentUserId = perfilLogado?.id;
 
-  // --- LÓGICA DE PERMISSÃO RESTRITA ---
+  // Lógica de Permissão
   const temPermissaoEscrita = useCallback((item: ItemCompra | null) => {
     if (!item || !currentUserId || !perfilLogado) return false;
-
-    // 1. Proprietário: Permissão Total
     if (perfilLogado.tipo_usuario === 'proprietario') return true;
-
-    // 2. Administrador ou Comum: Apenas se ele mesmo criou o registro
-    // Não basta ser o responsável (user_id), precisa ser o autor (usuario_criacao)
     return item.usuario_criacao === currentUserId;
   }, [perfilLogado, currentUserId]);
 
@@ -130,6 +126,7 @@ const Listagem: React.FC = () => {
     return apenasNumeros.padStart(9, '0').replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
   };
 
+  // --- BUSCA DE DESPESAS ---
   const fetchDespesas = useCallback(async (perfil: Perfil, mapaNomes: Record<string, string>, listaCartoes: Cartao[], mapaCats: Record<string, {nome: string, cor: string}>) => {
     const primeiroDia = `${filtroData.ano}-${String(filtroData.mes + 1).padStart(2, '0')}-01`;
     
@@ -139,7 +136,6 @@ const Listagem: React.FC = () => {
       .eq('periodo_referencia', primeiroDia)
       .order('data_compra', { ascending: false });
     
-    // Filtro de visualização: Comum vê só os seus. ADM e Proprietário veem tudo.
     if (perfil.tipo_usuario === 'comum') {
       query = query.eq('user_id', perfil.id);
     }
@@ -147,8 +143,11 @@ const Listagem: React.FC = () => {
     const { data, error } = await query;
     if (error) return;
 
+    // Criar mapa para tradução de cartões (ID -> Nome)
     const mapaCartoes: Record<number, string> = {};
-    listaCartoes.forEach(c => mapaCartoes[c.id] = c.nome);
+    listaCartoes.forEach(c => {
+      mapaCartoes[c.id] = c.nome;
+    });
 
     const formatadas: ItemCompra[] = [];
     const mapaTotais: Record<string, number> = {};
@@ -159,7 +158,9 @@ const Listagem: React.FC = () => {
       const nomeResp = mapaNomes[item.user_id] || '⚠️ Pendente';
       const nomeCriador = mapaNomes[item.usuario_criacao || ''] || 'Sistema'; 
       const infoCat = mapaCats[item.categoria_id] || { nome: 'Sem Categoria', cor: '#94a3b8' };
-      const nomeCartao = item.cartao_id ? mapaCartoes[item.cartao_id] : '-';
+      
+      // Busca o nome do cartão no mapa. Se não achar o ID, exibe o ID ou traço.
+      const nomeDoCartao = item.cartao_id ? (mapaCartoes[item.cartao_id] || `Cartão ${item.cartao_id}`) : '-';
 
       formatadas.push({ 
         ...item, 
@@ -167,7 +168,7 @@ const Listagem: React.FC = () => {
         nomeCriador: nomeCriador,
         nomeCategoria: infoCat.nome,
         corCategoria: infoCat.cor,
-        cartao: nomeCartao
+        cartao_nome_exibicao: nomeDoCartao
       });
 
       mapaTotais[nomeResp] = (mapaTotais[nomeResp] || 0) + valorLinha;
@@ -183,10 +184,11 @@ const Listagem: React.FC = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Buscamos TODOS os cartões para a listagem (para não dar "não encontrado")
     const [pRes, cRes, cartRes, meuPerfilRes] = await Promise.all([
       supabase.from('profiles').select('id, nome, tipo_usuario'),
       supabase.from('categorias').select('id, nome, cor').in('tipo', ['despesa', 'pessoal']).order('nome'),
-      supabase.from('cartoes').select('id, nome, dia_fechamento').order('nome'),
+      supabase.from('cartoes').select('*').order('nome'), 
       supabase.from('profiles').select('*').eq('id', user.id).single()
     ]);
 
@@ -221,11 +223,9 @@ const Listagem: React.FC = () => {
     if (!itemParaEditar) return;
 
     if (!temPermissaoEscrita(itemParaEditar)) {
-      setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Apenas o autor deste lançamento ou o proprietário podem editar.' });
+      setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Sem permissão para editar.' });
       return;
     }
-
-    const isCredito = itemParaEditar.forma_pagamento === 'Crédito';
 
     try {
         const { error: errorCompra } = await supabase.from('compras').update({
@@ -235,7 +235,7 @@ const Listagem: React.FC = () => {
           categoria_id: itemParaEditar.categoria_id,
           valor_total: itemParaEditar.valor_total,
           forma_pagamento: itemParaEditar.forma_pagamento,
-          cartao_id: isCredito ? itemParaEditar.cartao_id : null,
+          cartao_id: itemParaEditar.forma_pagamento === 'Crédito' ? itemParaEditar.cartao_id : null,
           data_compra: itemParaEditar.data_compra,
           status_pagamento: itemParaEditar.status_pagamento,
           tipo_lancamento: itemParaEditar.tipo_lancamento,
@@ -245,10 +245,10 @@ const Listagem: React.FC = () => {
         if (errorCompra) throw errorCompra;
         
         setItemParaEditar(null);
-        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Registro atualizado com sucesso.' });
+        setModal({ isOpen: true, type: 'success', title: 'Sucesso', message: 'Registro atualizado.' });
         carregarDadosIniciais();
     } catch (err: any) {
-        setModal({ isOpen: true, type: 'error', title: 'Erro', message: 'Falha: ' + (err.message || "Erro desconhecido") });
+        setModal({ isOpen: true, type: 'error', title: 'Erro', message: err.message });
     }
   };
 
@@ -256,17 +256,14 @@ const Listagem: React.FC = () => {
     setModal({
       isOpen: true,
       type: 'danger',
-      title: 'Remover Item?',
-      message: 'Tem certeza que deseja remover este lançamento? Esta ação não pode ser desfeita.',
+      title: 'Remover?',
+      message: 'Deseja excluir este lançamento?',
       onConfirm: async () => {
-        try {
-          const { error } = await supabase.from('compras').delete().eq('id', item.id);
-          if (error) throw error;
+        const { error } = await supabase.from('compras').delete().eq('id', item.id);
+        if (!error) {
           setItemParaEditar(null);
           setModal(prev => ({ ...prev, isOpen: false }));
           carregarDadosIniciais();
-        } catch (error: any) {
-          setModal({ isOpen: true, type: 'error', title: 'Erro ao excluir', message: error.message });
         }
       }
     });
@@ -281,6 +278,20 @@ const Listagem: React.FC = () => {
         return { mes: novoMes, ano: novoAno };
     });
   };
+
+  // --- FILTRO PARA O SELECT DE EDIÇÃO ---
+  // Aqui você pode limitar os cartões que aparecem no select para o usuário comum
+  const cartoesFiltradosParaEdicao = useMemo(() => {
+    if (!perfilLogado) return [];
+    // Se quiser que todos vejam todos os cartões na hora de editar, deixe apenas return cartoes;
+    // Se quiser limitar para o usuário ver só os dele, use a lógica abaixo:
+    if (perfilLogado.tipo_usuario === 'proprietario') return cartoes;
+    
+    // Caso sua tabela cartoes tenha o campo user_id:
+    // return cartoes.filter(c => c.user_id === perfilLogado.id);
+    
+    return cartoes; // Por padrão, retornando todos para evitar erros de "sumir" opção selecionada
+  }, [cartoes, perfilLogado]);
 
   return (
     <div className="listagem-container fade-in">
@@ -356,7 +367,8 @@ const Listagem: React.FC = () => {
                   <td className="cell-nf">{completarNF(item.nota_fiscal)}</td>
                   <td className="cell-nf">{item.pedido ? `#${item.pedido}` : '-'}</td>
                   <td>{item.forma_pagamento}</td>
-                  <td>{item.cartao || '-'}</td>
+                  {/* EXIBIÇÃO DO NOME DO CARTÃO NA TABELA */}
+                  <td style={{ fontWeight: 500, color: '#475569' }}>{item.cartao_nome_exibicao}</td>
                   <td>
                     <span className={`badge-parcela ${item.tipo_lancamento !== 'unico' ? 'is-parcelado' : 'is-avista'}`}>
                       {item.tipo_lancamento !== 'unico' ? `${item.parcela_numero}/${item.parcelas_total}` : 'À Vista'}
@@ -375,7 +387,7 @@ const Listagem: React.FC = () => {
             ) : (
               <tr>
                 <td colSpan={13} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                  Nenhum lançamento encontrado para este mês.
+                  Nenhum lançamento encontrado.
                 </td>
               </tr>
             )}
@@ -423,7 +435,6 @@ const Listagem: React.FC = () => {
                   <div className="form-group">
                     <label><Layers size={12}/> Período Referência</label>
                     <input type="date" className="form-control" disabled={true} value={itemParaEditar.periodo_referencia || ''} />
-                    <small style={{fontSize: '0.6rem', color: '#94a3b8'}}>Gerado automaticamente</small>
                   </div>
                   
                   <div className="form-group">
@@ -440,22 +451,6 @@ const Listagem: React.FC = () => {
                     </select>
                   </div>
 
-                  {itemParaEditar.tipo_lancamento !== 'unico' && (
-                    <>
-                      <div className="form-group">
-                        <label><Repeat size={12}/> Frequência</label>
-                        <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.intervalo_frequencia || ''} onChange={e => setItemParaEditar({...itemParaEditar, intervalo_frequencia: e.target.value as any})}>
-                          <option value="">Selecione...</option>
-                          {frequenciasRecorrencia.map(freq => <option key={freq} value={freq}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</option>)}
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label><CalendarDays size={12}/> Data Limite</label>
-                        <input type="date" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.data_fim || ''} onChange={e => setItemParaEditar({...itemParaEditar, data_fim: e.target.value})} />
-                      </div>
-                    </>
-                  )}
-
                   <div className="form-group">
                     <label><User size={12}/> Responsável</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.user_id ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, user_id: e.target.value})}>
@@ -466,7 +461,6 @@ const Listagem: React.FC = () => {
                   <div className="form-group">
                     <label><Tag size={12}/> Categoria</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.categoria_id ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, categoria_id: e.target.value})}>
-                      <option value="">Selecione...</option>
                       {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
                     </select>
                   </div>
@@ -475,12 +469,14 @@ const Listagem: React.FC = () => {
                     <label><ShoppingBag size={12}/> Loja</label>
                     <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.loja || ''} onChange={e => setItemParaEditar({...itemParaEditar, loja: e.target.value})} />
                   </div>
+
                   <div className="form-group full-width">
                     <label>Descrição</label>
                     <input className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.descricao} onChange={e => setItemParaEditar({...itemParaEditar, descricao: e.target.value})} />
                   </div>
+
                   <div className="form-group">
-                    <label>Valor {itemParaEditar.tipo_lancamento === 'parcelado' ? 'Total' : 'Mensal'}</label>
+                    <label>Valor Total</label>
                     <input type="text" className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.valorVisual || formatarMoedaVisual(itemParaEditar.valor_total)} 
                       onChange={e => {
                         const masked = mascaraMoedaInput(e.target.value);
@@ -488,6 +484,7 @@ const Listagem: React.FC = () => {
                       }} 
                     />
                   </div>
+
                   <div className="form-group">
                     <label><Landmark size={12}/> Pagamento</label>
                     <select className="form-control" disabled={!temPermissaoEscrita(itemParaEditar)} value={itemParaEditar.forma_pagamento ?? ''} onChange={e => setItemParaEditar({...itemParaEditar, forma_pagamento: e.target.value})}>
@@ -498,19 +495,16 @@ const Listagem: React.FC = () => {
                   {itemParaEditar.forma_pagamento === 'Crédito' && (
                     <>
                       <div className="form-group">
-                        <label><CreditCard size={12}/> Cartão</label>
+                        <label><CreditCard size={12}/> Cartão (Edição)</label>
                         <select 
                           className="form-control" 
                           disabled={!temPermissaoEscrita(itemParaEditar)} 
                           value={itemParaEditar.cartao_id ?? ''} 
-                          onChange={e => {
-                            const selectedId = e.target.value ? Number(e.target.value) : null;
-                            const cartaoObj = cartoes.find(c => c.id === selectedId);
-                            setItemParaEditar({...itemParaEditar, cartao_id: selectedId, cartao: cartaoObj?.nome || null});
-                          }}
+                          onChange={e => setItemParaEditar({...itemParaEditar, cartao_id: e.target.value ? Number(e.target.value) : null})}
                         >
                           <option value="">Selecione...</option>
-                          {cartoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                          {/* AQUI USAMOS A LISTA FILTRADA PARA QUEM ESTÁ EDITANDO */}
+                          {cartoesFiltradosParaEdicao.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                         </select>
                       </div>
                       <div className="form-group">
@@ -523,30 +517,20 @@ const Listagem: React.FC = () => {
               </form>
             </div>
 
-            {/* BOTÕES DE AÇÃO COM VALIDAÇÃO DE AUTOR */}
             {temPermissaoEscrita(itemParaEditar) ? (
               <div className="modal-footer-icons">
-                <button type="button" className="btn-icon-action btn-delete" title='Excluir' onClick={() => confirmDelete(itemParaEditar)}>
+                <button type="button" className="btn-icon-action btn-delete" onClick={() => confirmDelete(itemParaEditar)}>
                   <img src={iconExcluir} alt="Excluir" />
                 </button>
-
                 <div className="footer-right-actions">
-                  <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
-                    <img src={iconCancelar} alt="Cancelar" />
-                  </button>
-                  <button type="submit" form="edit-form" className="btn-icon-action" title='Salvar'>
-                    <img src={iconConfirme} alt="Salvar" />
-                  </button>
+                  <button type="button" className="btn-icon-action" onClick={() => setItemParaEditar(null)}><img src={iconCancelar} alt="Cancelar" /></button>
+                  <button type="submit" form="edit-form" className="btn-icon-action"><img src={iconConfirme} alt="Salvar" /></button>
                 </div>
               </div>
             ) : (
-                <div className="modal-footer-icons" style={{justifyContent: 'center', backgroundColor: '#f8fafc', padding: '15px', borderTop: '1px solid #e2e8f0'}}>
-                    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px'}}>
-                        <div style={{display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600}}>
-                            <Lock size={14} style={{marginRight: '8px'}} /> Somente Visualização
-                        </div>
-                        <span style={{fontSize: '0.7rem', color: '#94a3b8'}}>Inserido por: {itemParaEditar.nomeCriador}</span>
-                        <span style={{fontSize: '0.6rem', color: '#cbd5e1'}}>Apenas o autor pode alterar este registro.</span>
+                <div className="modal-footer-icons" style={{justifyContent: 'center', backgroundColor: '#f8fafc', padding: '15px'}}>
+                    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+                        <Lock size={14} /> <span style={{fontSize: '0.85rem'}}>Somente Visualização (Autor: {itemParaEditar.nomeCriador})</span>
                     </div>
                 </div>
             )}

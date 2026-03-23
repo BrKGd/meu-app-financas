@@ -253,7 +253,7 @@ const Menu: React.FC = () => {
         {isGestor && <QuickActionIcon to="/orcamento" icon={<PiggyBank />} label="Gestão" color="#ff9900" />}
         {isGestor && <QuickActionIcon to="/proventos" icon={<ArrowUpCircle />} label="Ganhos" color="#16a34a" />}
         <QuickActionIcon to="/despesas" icon={<ArrowDownCircle />} label="Fixos" color="#ef4444" />
-        {perfil.tipo === 'proprietario' && <QuickActionIcon to="/cartoes" icon={<CreditCard />} label="Cartões" color="#7209b7" />}
+        {<QuickActionIcon to="/cartoes" icon={<CreditCard />} label="Cartões" color="#7209b7" />}
         <QuickActionIcon to="/listagem" icon={<ShoppingBag />} label="Extrato" color="#00cc66" />
         <QuickActionIcon 
           to="/perfil" 
