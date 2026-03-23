@@ -12,7 +12,12 @@ import iconFechar from '../assets/fechar.png';
 // --- Interfaces ---
 interface Perfil {
   id: string;
-  nome: string; // Ajustado para bater com seu JSON
+  nome: string;
+}
+
+interface PerfilLogado {
+  id: string;
+  tipo_usuario: string;
 }
 
 interface Cartao {
@@ -44,6 +49,7 @@ const Cartoes: React.FC = () => {
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
   const [usuarios, setUsuarios] = useState<Perfil[]>([]);
+  const [perfilLogado, setPerfilLogado] = useState<PerfilLogado | null>(null);
   const [showModalCadastro, setShowModalCadastro] = useState<boolean>(false);
   const [selectedCartao, setSelectedCartao] = useState<Cartao | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -82,7 +88,27 @@ const Cartoes: React.FC = () => {
   useEffect(() => {
     fetchDados();
     fetchUsuarios();
+    fetchPerfilLogado();
   }, []);
+
+  async function fetchPerfilLogado() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase.from('profiles')
+      .select('id, tipo_usuario')
+      .eq('id', user.id)
+      .single();
+
+    if (data) {
+      // Regra Master para o seu email específico
+      const isMaster = user.email === 'gleidson.fig@gmail.com';
+      setPerfilLogado({
+        id: data.id,
+        tipo_usuario: isMaster ? 'proprietario' : data.tipo_usuario
+      });
+    }
+  }
 
   async function fetchUsuarios() {
     const { data } = await supabase.from('profiles').select('id, nome').order('nome');
@@ -104,6 +130,14 @@ const Cartoes: React.FC = () => {
       setLoading(false);
     }
   }
+
+  const abrirModalCadastro = () => {
+    setShowModalCadastro(true);
+    // Se não for proprietário, o responsável já nasce como sendo ele mesmo
+    if (perfilLogado && perfilLogado.tipo_usuario !== 'proprietario') {
+      setFormCartao(prev => ({ ...prev, id_responsavel: perfilLogado.id }));
+    }
+  };
 
   const calcularDisponivel = (cartao: Cartao, limite: number | string) => {
     const limNum = Number(limite);
@@ -175,7 +209,7 @@ const Cartoes: React.FC = () => {
           <h1>Minha Carteira</h1>
           <p style={{ color: '#94a3b8', fontWeight: 600 }}>Gestão inteligente de crédito.</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowModalCadastro(true)}>
+        <button className="btn-primary" onClick={abrirModalCadastro}>
           <Plus size={20} /> Novo Cartão
         </button>
       </header>
@@ -261,7 +295,7 @@ const Cartoes: React.FC = () => {
             <div style={{ padding: '35px' }}>
               {isEditing || showModalCadastro ? (
                 <form id="card-form" onSubmit={handleSave}>
-                  <FormFields form={formCartao} setForm={setFormCartao} usuarios={usuarios} />
+                  <FormFields form={formCartao} setForm={setFormCartao} usuarios={usuarios} perfilLogado={perfilLogado} />
                 </form>
               ) : (
                 <>
@@ -320,49 +354,65 @@ const Cartoes: React.FC = () => {
   );
 };
 
-const FormFields = ({ form, setForm, usuarios }: any) => (
-  <div className= "modal-form" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-    <div className="form-group">
-      <label>Responsável</label>
-      <select 
-        className="form-control" 
-        value={form.id_responsavel} 
-        onChange={e => setForm({...form, id_responsavel: e.target.value})}
-        required
-      >
-        <option value="">Selecione quem usará este cartão</option>
-        {usuarios.map((u: any) => (
-          <option key={u.id} value={u.id}>{u.nome}</option>
-        ))}
-      </select>
-    </div>
+const FormFields = ({ form, setForm, usuarios, perfilLogado }: any) => {
+  const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
 
-    <div className="form-group">
-      <label>Instituição Financeira</label>
-      <input className="form-control" placeholder="Ex: Nubank, Inter..." required value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} />
-    </div>
-
-    <div className="form-group">
-      <label>Limite de Crédito</label>
-      <input className="form-control" type="number" step="0.01" required value={form.limite} onChange={e => setForm({...form, limite: e.target.value})} />
-    </div>
-
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+  return (
+    <div className= "modal-form" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <div className="form-group">
-         <label>Dia Fechamento</label>
-         <input className="form-control" type="number" min="1" max="31" value={form.dia_fechamento} onChange={e => setForm({...form, dia_fechamento: e.target.value})} />
+        <label>Responsável</label>
+        <select 
+          className="form-control" 
+          value={form.id_responsavel} 
+          onChange={e => setForm({...form, id_responsavel: e.target.value})}
+          required
+          disabled={!isProprietario}
+          style={!isProprietario ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed', opacity: 0.8 } : {}}
+        >
+          {isProprietario ? (
+            <>
+              <option value="">Selecione quem usará este cartão</option>
+              {usuarios.map((u: any) => (
+                <option key={u.id} value={u.id}>{u.nome}</option>
+              ))}
+            </>
+          ) : (
+            usuarios
+              .filter((u: any) => u.id === perfilLogado?.id)
+              .map((u: any) => (
+                <option key={u.id} value={u.id}>{u.nome}</option>
+              ))
+          )}
+        </select>
       </div>
-      <div className="form-group">
-         <label>Dia Vencimento</label>
-         <input className="form-control" type="number" min="1" max="31" value={form.dia_vencimento} onChange={e => setForm({...form, dia_vencimento: e.target.value})} />
-      </div>
-    </div>
 
-    <div className="form-group">
-      <label>Cor de Identificação</label>
-      <input type="color" className="form-control" value={form.cor} onChange={e => setForm({...form, cor: e.target.value})} style={{ height: '50px', padding: '5px' }} />
+      <div className="form-group">
+        <label>Instituição Financeira</label>
+        <input className="form-control" placeholder="Ex: Nubank, Inter..." required value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} />
+      </div>
+
+      <div className="form-group">
+        <label>Limite de Crédito</label>
+        <input className="form-control" type="number" step="0.01" required value={form.limite} onChange={e => setForm({...form, limite: e.target.value})} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+        <div className="form-group">
+           <label>Dia Fechamento</label>
+           <input className="form-control" type="number" min="1" max="31" value={form.dia_fechamento} onChange={e => setForm({...form, dia_fechamento: e.target.value})} />
+        </div>
+        <div className="form-group">
+           <label>Dia Vencimento</label>
+           <input className="form-control" type="number" min="1" max="31" value={form.dia_vencimento} onChange={e => setForm({...form, dia_vencimento: e.target.value})} />
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label>Cor de Identificação</label>
+        <input type="color" className="form-control" value={form.cor} onChange={e => setForm({...form, cor: e.target.value})} style={{ height: '50px', padding: '5px' }} />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default Cartoes;
