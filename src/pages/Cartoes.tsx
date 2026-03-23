@@ -408,8 +408,32 @@ const FormFields = ({ form, setForm, usuarios, perfilLogado }: any) => {
       </div>
 
       <div className="form-group">
-        <label>Cor de Identificação</label>
-        <input type="color" className="form-control" value={form.cor} onChange={e => setForm({...form, cor: e.target.value})} style={{ height: '50px', padding: '5px' }} />
+        <label>Cor de Identificação (Hexadecimal)</label>
+        <div style={{ display: 'grid', gap: '10px', alignItems: 'center', gridTemplateColumns: '1.4fr 0.66fr'}}>
+          <input 
+            type="color" 
+            className="color-picker-input" 
+            value={form.cor.startsWith('#') && form.cor.length === 7 ? form.cor : '#4361ee'} 
+            onChange={e => setForm({...form, cor: e.target.value})} 
+            style={{ 
+              width: 'auto', 
+              height: '45px', 
+              padding: '2px', 
+              border: '2px solid #f1f5f9', 
+              borderRadius: '12px',
+              cursor: 'pointer'
+            }} 
+          />
+          <input 
+            type="text" 
+            className="form-control" 
+            placeholder="#000000"
+            value={form.cor} 
+            onChange={e => setForm({...form, cor: e.target.value})}
+            maxLength={7}
+            style={{ flex: 1 }}
+          />
+        </div>
       </div>
     </div>
   );
