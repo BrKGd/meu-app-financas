@@ -170,7 +170,8 @@ const Lancamento: React.FC = () => {
       forma_pagamento: form.forma_pagamento,
       tipo_lancamento: form.tipo_lancamento,
       pedido: form.pedido || null,
-      nota_fiscal: completarNF(form.nota_fiscal) || null
+      nota_fiscal: completarNF(form.nota_fiscal) || null,
+      usuario_criacao: perfilLogado?.id
     };
 
     if (isRecorrente) {

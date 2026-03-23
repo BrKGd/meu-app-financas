@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, 
   Hash, Receipt, CreditCard, User, Calendar, 
   Tag, ShoppingBag, Landmark, Lock, UserPlus,
-  CheckCircle2, Clock, RefreshCw, Repeat, Layers, CalendarDays
+  CheckCircle2, Clock, RefreshCw, Repeat, Layers, CalendarDays, Save
 } from 'lucide-react';
 import ModalFeedback from '../components/ModalFeedback';
 import '../styles/Listagem.css';
@@ -48,7 +48,7 @@ interface ItemCompra {
   data_vencimento?: string;
   periodo_referencia?: string; 
   recorrencia_id?: string | null;     
-  cartao: string | null; // Usado para exibição visual (derivado do cartao_id)
+  cartao: string | null; 
   cartao_id?: number | null; 
   forma_pagamento: string;
   categoria_id: string;
@@ -94,14 +94,23 @@ const Listagem: React.FC = () => {
   const frequenciasRecorrencia = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
   const statusPagamento = ["pendente", "pago", "vencido", "cancelado"];
 
-  const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
   const currentUserId = perfilLogado?.id;
 
+  // --- NOVA LÓGICA DE PERMISSÃO ATUALIZADA ---
   const temPermissaoEscrita = useCallback((item: ItemCompra | null) => {
-    if (!item || !currentUserId) return false;
-    if (isProprietario) return true; 
-    return item.usuario_criacao === currentUserId || item.user_id === currentUserId; 
-  }, [isProprietario, currentUserId]);
+    if (!item || !currentUserId || !perfilLogado) return false;
+
+    // 1. Proprietário tem poder total
+    if (perfilLogado.tipo_usuario === 'proprietario') return true;
+
+    // 2. Outros usuários (ADM ou Comum) podem editar se:
+    // - Eles criaram o registro (usuario_criacao)
+    // - OU eles são o responsável pelo gasto (user_id)
+    const eOCriador = item.usuario_criacao === currentUserId;
+    const eOResponsavel = item.user_id === currentUserId;
+
+    return eOCriador || eOResponsavel;
+  }, [perfilLogado, currentUserId]);
 
   const formatarMoedaVisual = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
@@ -134,14 +143,15 @@ const Listagem: React.FC = () => {
       .eq('periodo_referencia', primeiroDia)
       .order('data_compra', { ascending: false });
     
-    if (perfil.tipo_usuario !== 'proprietario' && perfil.tipo_usuario !== 'administrador') {
+    // AJUSTE: Apenas o usuário comum fica restrito ao seu próprio ID na visualização
+    // Administradores e Proprietários veem a lista completa para poderem gerenciar o que criaram
+    if (perfil.tipo_usuario === 'comum') {
       query = query.eq('user_id', perfil.id);
     }
     
     const { data, error } = await query;
     if (error) return;
 
-    // Criar um mapa de cartões para busca rápida por ID
     const mapaCartoes: Record<number, string> = {};
     listaCartoes.forEach(c => mapaCartoes[c.id] = c.nome);
 
@@ -154,8 +164,6 @@ const Listagem: React.FC = () => {
       const nomeResp = mapaNomes[item.user_id] || '⚠️ Pendente';
       const nomeCriador = mapaNomes[item.usuario_criacao || ''] || 'Sistema'; 
       const infoCat = mapaCats[item.categoria_id] || { nome: 'Sem Categoria', cor: '#94a3b8' };
-      
-      // Resolvemos o nome do cartão via relacionamento local usando o cartao_id
       const nomeCartao = item.cartao_id ? mapaCartoes[item.cartao_id] : '-';
 
       formatadas.push({ 
@@ -164,7 +172,7 @@ const Listagem: React.FC = () => {
         nomeCriador: nomeCriador,
         nomeCategoria: infoCat.nome,
         corCategoria: infoCat.cor,
-        cartao: nomeCartao // Atribuímos o nome resolvido para a coluna visual
+        cartao: nomeCartao
       });
 
       mapaTotais[nomeResp] = (mapaTotais[nomeResp] || 0) + valorLinha;
@@ -182,7 +190,6 @@ const Listagem: React.FC = () => {
 
     const [pRes, cRes, cartRes, meuPerfilRes] = await Promise.all([
       supabase.from('profiles').select('id, nome, tipo_usuario'),
-      // AJUSTE: Agora busca categorias do tipo 'despesa' E 'pessoal'
       supabase.from('categorias').select('id, nome, cor').in('tipo', ['despesa', 'pessoal']).order('nome'),
       supabase.from('cartoes').select('id, nome, dia_fechamento').order('nome'),
       supabase.from('profiles').select('*').eq('id', user.id).single()
@@ -233,7 +240,6 @@ const Listagem: React.FC = () => {
           categoria_id: itemParaEditar.categoria_id,
           valor_total: itemParaEditar.valor_total,
           forma_pagamento: itemParaEditar.forma_pagamento,
-          // Removemos a coluna 'cartao' do update, mantemos apenas 'cartao_id'
           cartao_id: isCredito ? itemParaEditar.cartao_id : null,
           data_compra: itemParaEditar.data_compra,
           status_pagamento: itemParaEditar.status_pagamento,
@@ -252,6 +258,11 @@ const Listagem: React.FC = () => {
   };
 
   const confirmDelete = (item: ItemCompra) => {
+    if (!temPermissaoEscrita(item)) {
+        setModal({ isOpen: true, type: 'error', title: 'Bloqueado', message: 'Você não tem permissão para excluir este registro.' });
+        return;
+    }
+
     setModal({
       isOpen: true,
       type: 'danger',
@@ -522,21 +533,31 @@ const Listagem: React.FC = () => {
               </form>
             </div>
 
+            {/* RODAPÉ DO MODAL COM REGRAS DE VISIBILIDADE */}
             {temPermissaoEscrita(itemParaEditar) ? (
-              <div className="modal-footer-icons">
-                <button type="button" className="btn-icon-action btn-delete" title='Excluir' onClick={() => confirmDelete(itemParaEditar)}>
-                  <img src={iconExcluir} alt="Excluir" />
-                </button>
-
-                <div className="footer-right-actions">
-                  <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
-                    <img src={iconCancelar} alt="Cancelar" />
-                  </button>
-                  <button type="submit" form="edit-form" className="btn-icon-action" title='Salvar'>
-                    <img src={iconConfirme} alt="Salvar" />
-                  </button>
+              <>
+                <div style={{ padding: '0 25px', textAlign: 'center' }}>
+                    {perfilLogado?.tipo_usuario !== 'proprietario' && (
+                        <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: 600 }}>
+                           {itemParaEditar.usuario_criacao === currentUserId ? "✨ Você criou este lançamento" : "👤 Você é o responsável"}
+                        </span>
+                    )}
                 </div>
-              </div>
+                <div className="modal-footer-icons">
+                  <button type="button" className="btn-icon-action btn-delete" title='Excluir' onClick={() => confirmDelete(itemParaEditar)}>
+                    <img src={iconExcluir} alt="Excluir" />
+                  </button>
+
+                  <div className="footer-right-actions">
+                    <button type="button" className="btn-icon-action" title='Cancelar' onClick={() => setItemParaEditar(null)}>
+                      <img src={iconCancelar} alt="Cancelar" />
+                    </button>
+                    <button type="submit" form="edit-form" className="btn-icon-action" title='Salvar'>
+                      <img src={iconConfirme} alt="Salvar" />
+                    </button>
+                  </div>
+                </div>
+              </>
             ) : (
                 <div className="modal-footer-icons" style={{justifyContent: 'center', backgroundColor: '#f8fafc', padding: '15px', borderTop: '1px solid #e2e8f0'}}>
                     <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px'}}>
