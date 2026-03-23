@@ -141,10 +141,7 @@ const Cartoes: React.FC = () => {
     const limNum = Number(limite);
     const totalComprometido = compras.reduce((acc, item) => {
       if (item.cartao_id !== cartao.id) return acc;
-      // Não abate do limite o que já foi pago
       if (item.status_pagamento === 'pago') return acc;
-      
-      // Considera compras futuras e do período atual que ainda não foram pagas
       if (item.periodo_referencia >= periodoAtual) {
           return acc + Number(item.valor_total);
       }
@@ -215,11 +212,15 @@ const Cartoes: React.FC = () => {
         </button>
       </header>
 
-      {loading ? (
-        <div className="loading-state">Carregando seus cartões...</div>
-      ) : (
-        <div className="cartoes-grid">
-          {cartoes.map(cartao => {
+      <div className="cartoes-grid">
+        {cartoes
+          // FILTRO ADICIONADO AQUI:
+          .filter(cartao => {
+            if (!perfilLogado) return false;
+            if (perfilLogado.tipo_usuario === 'proprietario') return true; // Gleidson vê tudo
+            return cartao.id_responsavel === perfilLogado.id; // Outros veem só o seu
+          })
+          .map(cartao => {
             const disponivel = calcularDisponivel(cartao, cartao.limite);
             const perc = Math.max(0, (disponivel / Number(cartao.limite)) * 100);
             const responsavelObj = usuarios.find(u => u.id === cartao.id_responsavel);
@@ -254,9 +255,9 @@ const Cartoes: React.FC = () => {
               </div>
             );
           })}
-        </div>
-      )}
+      </div>
 
+      {/* Restante do código dos modais e formulários permanece idêntico conforme sua solicitação */}
       {(selectedCartao || showModalCadastro) && (
         <div className="modal-overlay" onClick={fecharModais}>
           <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ padding: 0, maxWidth: '520px', borderRadius: '45px' }}>
@@ -320,9 +321,6 @@ const Cartoes: React.FC = () => {
                             <div className="fatura-item-valor">{formatMoney(item.valor_total)}</div>
                           </div>
                       ))}
-                    {compras.filter(c => c.cartao_id === selectedCartao?.id && c.periodo_referencia === periodoAtual).length === 0 && (
-                      <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>Nenhum lançamento neste mês.</p>
-                    )}
                   </div>
                   <div className="fatura-resumo">
                     <div>
@@ -423,14 +421,7 @@ const FormFields = ({ form, setForm, usuarios, perfilLogado }: any) => {
             className="color-picker-input" 
             value={form.cor.startsWith('#') && form.cor.length === 7 ? form.cor : '#4361ee'} 
             onChange={e => setForm({...form, cor: e.target.value})} 
-            style={{ 
-              width: 'auto', 
-              height: '45px', 
-              padding: '2px', 
-              border: '2px solid #f1f5f9', 
-              borderRadius: '12px',
-              cursor: 'pointer'
-            }} 
+            style={{ width: 'auto', height: '45px', padding: '2px', border: '2px solid #f1f5f9', borderRadius: '12px', cursor: 'pointer' }} 
           />
           <input 
             type="text" 

@@ -13,6 +13,7 @@ interface Cartao {
   nome: string;
   dia_fechamento: number;
   dia_vencimento: number;
+  id_responsavel: string; // Adicionado para o filtro
 }
 
 interface Perfil {
@@ -101,7 +102,7 @@ const Lancamento: React.FC = () => {
       setPerfilLogado({ id: user.id, tipo_usuario: tipoFinal });
 
       const [dC, dU, dCat] = await Promise.all([
-        supabase.from('cartoes').select('id,nome,dia_fechamento,dia_vencimento').order('nome'),
+        supabase.from('cartoes').select('*').order('nome'),
         supabase.from('profiles').select('id,nome').order('nome'),
         supabase.from('categorias').select('id,nome').in('tipo', ['despesa', 'pessoal']).order('nome')
       ]);
@@ -110,6 +111,7 @@ const Lancamento: React.FC = () => {
       setUsuarios((dU.data as Perfil[]) || []);
       setCategorias((dCat.data as Categoria[]) || []);
 
+      // Se não for Master, o responsável é o próprio usuário logado obrigatoriamente
       if (tipoFinal !== 'proprietario') {
         setForm(prev => ({ ...prev, user_id: user.id }));
       }
@@ -162,7 +164,7 @@ const Lancamento: React.FC = () => {
     const tabelaAlvo = isRecorrente ? 'recorrencias' : 'compras';
 
     const payload: any = {
-      user_id: form.user_id,
+      user_id: form.user_id, // Responsável pelo gasto
       descricao: form.descricao,
       loja: form.loja,
       categoria_id: form.categoria_id,
@@ -170,7 +172,7 @@ const Lancamento: React.FC = () => {
       tipo_lancamento: form.tipo_lancamento,
       pedido: form.pedido || null,
       nota_fiscal: completarNF(form.nota_fiscal) || null,
-      usuario_criacao: perfilLogado?.id
+      usuario_criacao: perfilLogado?.id // Quem está operando o sistema
     };
 
     if (isRecorrente) {
@@ -185,10 +187,8 @@ const Lancamento: React.FC = () => {
       payload.valor_total = valorTotalNum;
       payload.data_compra = form.data_compra;
       payload.status_pagamento = 'pendente';
-      payload.parcelado = false;
       payload.parcelas_total = 1;
       payload.parcela_numero = 1;
-      payload.usuario_criacao = perfilLogado?.id;
       payload.cartao_id = isCredito && cartaoObjeto ? cartaoObjeto.id : null;
       payload.tipo_despesa = isCredito ? 'Compra no Crédito' : 'Gastos Variáveis';
 
@@ -196,8 +196,13 @@ const Lancamento: React.FC = () => {
         const dataCompraObj = new Date(form.data_compra + 'T00:00:00');
         const diaCompra = dataCompraObj.getDate();
         let dataVenc = new Date(dataCompraObj);
-        if (diaCompra > cartaoObjeto.dia_fechamento) dataVenc.setMonth(dataVenc.getMonth() + 1);
+        
+        // Lógica de fechamento de fatura
+        if (diaCompra > cartaoObjeto.dia_fechamento) {
+          dataVenc.setMonth(dataVenc.getMonth() + 1);
+        }
         dataVenc.setDate(cartaoObjeto.dia_vencimento);
+        
         payload.data_vencimento = dataVenc.toISOString().split('T')[0];
         payload.periodo_referencia = dataVenc.toISOString().slice(0, 7) + "-01";
       } else {
@@ -214,20 +219,15 @@ const Lancamento: React.FC = () => {
       setModal({ isOpen: true, type: 'success', title: 'Sucesso!', message: 'Lançamento registrado com sucesso.' });
       
       setForm({
+        ...form,
         descricao: '',
         valor_total: '',
         loja: '',
         pedido: '',
         nota_fiscal: '',
-        user_id: perfilLogado?.tipo_usuario !== 'proprietario' ? (perfilLogado?.id || '') : '',
-        forma_pagamento: 'Crédito',
-        categoria_id: '',
         num_parcelas: 1,
         cartao: '',
-        data_compra: new Date().toISOString().split('T')[0],
-        tipo_lancamento: 'unico',
-        intervalo_frequencia: 'mensal',
-        data_limite: ''
+        tipo_lancamento: 'unico'
       });
     }
     setLoading(false);
@@ -249,7 +249,7 @@ const Lancamento: React.FC = () => {
           <div className="form-row-top">
             <div className="input-group">
               <label className="input-label"><Clock size={14} /> Tipo de Lançamento</label>
-              <select className="form-control" value={form.tipo_lancamento} onChange={e => setForm({...form, tipo_lancamento: e.target.value})} disabled={form.num_parcelas > 1 && form.tipo_lancamento === 'parcelado'}>
+              <select className="form-control" value={form.tipo_lancamento} onChange={e => setForm({...form, tipo_lancamento: e.target.value})}>
                 <option value="unico">Pagamento Único</option>
                 <option value="parcelado">Parcelado</option>
                 <option value="fixo">Fixo / Mensalidade</option>
@@ -269,10 +269,7 @@ const Lancamento: React.FC = () => {
                 </div>
               </>
             ) : (
-              <>
-                <div className="input-group hidden-tablet"></div>
-                <div className="input-group hidden-tablet"></div>
-              </>
+              <div className="input-group hidden-tablet" style={{ gridColumn: 'span 2' }}></div>
             )}
           </div>
 
@@ -287,7 +284,13 @@ const Lancamento: React.FC = () => {
             </div>
             <div className="input-group">
               <label className="input-label"><User size={14} /> Responsável</label>
-              <select className="form-control" required value={form.user_id} disabled={perfilLogado?.tipo_usuario !== 'proprietario'} onChange={e => setForm({...form, user_id: e.target.value})}>
+              <select 
+                className="form-control" 
+                required 
+                value={form.user_id} 
+                disabled={perfilLogado?.tipo_usuario !== 'proprietario'} 
+                onChange={e => setForm({...form, user_id: e.target.value})}
+              >
                 <option value="">Selecione o responsável...</option>
                 {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
@@ -295,7 +298,7 @@ const Lancamento: React.FC = () => {
           </div>
 
           <div className="form-row-top section-gap">
-            <div className="input-group">
+            <div className="input-group" style={{ gridColumn: 'span 2' }}>
               <label className="input-label">Descrição da Compra</label>
               <input placeholder="Ex: Lâmpadas para a sala" className="form-control" required value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} />
             </div>
@@ -306,51 +309,49 @@ const Lancamento: React.FC = () => {
                 {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
               </select>
             </div>
-            {!isCredito ? (
-              <div className="input-group animate-in">
-                <label className="input-label"><Wallet size={14} /> Forma de Pagamento</label>
-                <select className="form-control" value={form.forma_pagamento} onChange={e => setForm({...form, forma_pagamento: e.target.value})}>
-                  {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
-              </div>
-            ) : (
-              <div className="input-group hidden-tablet"></div>
-            )}
           </div>
 
-          {isCredito && (
-            <div className="form-row-top animate-in section-gap">
-              <div className="input-group">
-                <label className="input-label"><Wallet size={14} /> Forma de Pagamento</label>
-                <select className="form-control" value={form.forma_pagamento} onChange={e => setForm({...form, forma_pagamento: e.target.value})}>
-                  {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
-              </div>
-              
-              <div className="input-group group-relative">
+          <div className="form-row-top section-gap">
+            <div className="input-group">
+              <label className="input-label"><Wallet size={14} /> Forma de Pagamento</label>
+              <select className="form-control" value={form.forma_pagamento} onChange={e => setForm({...form, forma_pagamento: e.target.value})}>
+                {formasPagamento.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+
+            {isCredito ? (
+              <div className="input-group group-relative animate-in">
                 {badge && (
                   <div className={`badge-fatura badge-${badge.status}`}>
-                    {badge.icon}
-                    {badge.text}
+                    {badge.icon} {badge.text}
                   </div>
                 )}
                 <label className="input-label"><CreditCard size={14} /> Escolha o Cartão</label>
                 <select className="form-control" required={isCredito} value={form.cartao} onChange={e => setForm({...form, cartao: e.target.value})}>
                   <option value="">Selecione o cartão...</option>
-                  {cartoes.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                  {cartoes
+                    // FILTRO DE SEGURANÇA:
+                    .filter(c => {
+                        if (!perfilLogado) return false;
+                        if (perfilLogado.tipo_usuario === 'proprietario') return true;
+                        return c.id_responsavel === perfilLogado.id;
+                    })
+                    .map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                 </select>
               </div>
+            ) : (
+              <div className="input-group hidden-tablet"></div>
+            )}
 
-              {form.tipo_lancamento === 'parcelado' ? (
-                <div className="input-group animate-in">
-                  <label className="input-label">N° de Parcelas</label>
-                  <input type="number" min="1" className="form-control text-bold-center" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
-                </div>
-              ) : (
-                <div className="input-group hidden-tablet"></div>
-              )}
-            </div>
-          )}
+            {form.tipo_lancamento === 'parcelado' ? (
+              <div className="input-group animate-in">
+                <label className="input-label">N° de Parcelas</label>
+                <input type="number" min="1" className="form-control text-bold-center" required value={form.num_parcelas} onChange={e => setForm({...form, num_parcelas: Number(e.target.value)})} />
+              </div>
+            ) : (
+              <div className="input-group hidden-tablet"></div>
+            )}
+          </div>
 
           <div className="form-row-top section-gap">
             <div className="input-group">

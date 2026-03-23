@@ -31,7 +31,7 @@ interface Cartao {
   id: number;
   nome: string;
   dia_fechamento: number;
-  user_id?: string; 
+  id_responsavel?: string; 
 }
 
 interface ItemCompra {
@@ -92,7 +92,6 @@ const Listagem: React.FC = () => {
 
   const formasPagamento = useMemo(() => ["Boleto", "Crédito", "Débito", "Dinheiro", "Pix", "Transferência"].sort(), []);
   const tiposLancamento = ["unico", "parcelado", "fixo"];
-  const frequenciasRecorrencia = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
   const statusPagamento = ["pendente", "pago", "vencido", "cancelado"];
 
   const currentUserId = perfilLogado?.id;
@@ -276,13 +275,9 @@ const Listagem: React.FC = () => {
 
   const cartoesFiltradosParaEdicao = useMemo(() => {
     if (!perfilLogado || !cartoes) return [];
-    
-    // Proprietário vê todos os cartões para seleção
     if (perfilLogado.tipo_usuario === 'proprietario') return cartoes;
-    
-    // Usuário comum vê os cartões disponíveis para ele via RLS 
-    // (O Banco agora deve permitir SELECT de todos via Policy para que o nome apareça)
-    return cartoes; 
+    // Usuário comum só vê no dropdown os cartões em que ele é o id_responsavel
+    return cartoes.filter(c => c.id_responsavel === perfilLogado.id);
   }, [cartoes, perfilLogado]);
 
   return (
@@ -331,7 +326,7 @@ const Listagem: React.FC = () => {
                        <span>{item.data_compra.split('-').reverse().slice(0,2).join('/')}</span>
                        {item.periodo_referencia && (
                          <span style={{fontSize: '0.65rem', color: '#6366f1', fontWeight: 600}}>
-                            Ref: {item.periodo_referencia.split('-')[1]}/{item.periodo_referencia.split('-')[0].slice(-2)}
+                           Ref: {item.periodo_referencia.split('-')[1]}/{item.periodo_referencia.split('-')[0].slice(-2)}
                          </span>
                        )}
                     </div>
@@ -495,10 +490,10 @@ const Listagem: React.FC = () => {
                         >
                           <option value="">Selecione...</option>
                           
-                          {/* INJEÇÃO AUTOMÁTICA PARA CASOS ONDE O CARTÃO NÃO ESTÁ NA LISTA FILTRADA (GARANTE O NOME NO MODAL) */}
+                          {/* INJEÇÃO PARA VISUALIZAÇÃO: Se o cartão atual não estiver na lista filtrada (ex: cartão de outro usuário), mostra mas bloqueia */}
                           {itemParaEditar.cartao_id && !cartoesFiltradosParaEdicao.find(c => c.id === itemParaEditar.cartao_id) && (
-                            <option key={itemParaEditar.cartao_id} value={itemParaEditar.cartao_id}>
-                              {itemParaEditar.cartao_nome_exibicao}
+                            <option key={itemParaEditar.cartao_id} value={itemParaEditar.cartao_id} disabled>
+                              {itemParaEditar.cartao_nome_exibicao} (Somente Visualização)
                             </option>
                           )}
 
