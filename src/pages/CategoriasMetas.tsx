@@ -48,7 +48,6 @@ interface FormState {
   valor_meta: string | number;
 }
 
-// --- Mapeamento de Categorias de Ícones (Alinhado ao Lucide.dev) ---
 const ICON_CATEGORIES: Record<string, string[]> = {
   "Finanças": ["Wallet", "PiggyBank", "DollarSign", "CreditCard", "Banknote", "Coins", "Receipt", "ChartBar", "TrendingUp", "TrendingDown", "Landmark", "Calculator", "HandCoins", "CircleDollarSign", "Percent"],
   "Transporte": ["Car", "Bus", "Bike", "Plane", "Train", "Fuel", "MapPin", "Navigation", "Truck", "Ship", "TramFront"],
@@ -62,7 +61,6 @@ const ICON_CATEGORIES: Record<string, string[]> = {
   "Natureza": ["Leaf", "TreePine", "Flower2", "Sprout", "Wind", "Flame", "Bird", "PawPrint"]
 };
 
-// Extração Dinâmica Segura de todos os ícones disponíveis
 const ALL_LUCIDE_KEYS: string[] = Object.keys(LucideIcons).filter((key) => {
   const item = (LucideIcons as any)[key];
   return /^[A-Z]/.test(key) && 
@@ -287,31 +285,41 @@ const CategoriasMetas: React.FC = () => {
     <>
       <div className="cat-page-wrapper metas-container fade-in">
         <header className="metas-header">
-          <div className="cat-title-area">
-            <div className="titulo-secao">
-              <LucideIcons.Flag className="w-7 h-7" />
-              <h1>Planejamento</h1>
-            </div>
-            <p className="subtitulo-metas">Gerencie suas categorias e orçamentos</p>
-          </div>
-
-          <div className="header-controls">
-            <div className="seletor-periodo">
-              <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}><LucideIcons.ChevronLeft /></button>
-              <span className="periodo-display">
-                {new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(ano, mes - 1))} {ano}
-              </span>
-              <button onClick={() => setMes(m => m === 12 ? 1 : m + 1)}><LucideIcons.ChevronRight /></button>
+          <div className="header-content-wrapper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="cat-title-area">
+              <div className="titulo-secao">
+                <LucideIcons.Flag size={28} />
+                <h1>Planejamento</h1>
+              </div>
             </div>
 
-            <div className="badge-planejado-modern">
+            {/* CONTAINER DA DIREITA COM OS DOIS PILLS EMPILHADOS */}
+            <div className="header-actions-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+              
+              {/* Pill 1: Seletor de Mês */}
+              <div className="seletor-periodo">
+                <button onClick={() => setMes(m => m === 1 ? 12 : m - 1)}>
+                  <LucideIcons.ChevronLeft size={18} />
+                </button>
+                <div className="periodo-display">
+                  {new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(ano, mes - 1))} {ano}
+                </div>
+                <button onClick={() => setMes(m => m === 12 ? 1 : m + 1)}>
+                  <LucideIcons.ChevronRight size={18} />
+                </button>
+              </div>
+
+              {/* Pill 2: Total Planejado (Movido para cá) */}
+              <div className="badge-planejado-modern" style={{ margin: 0 }}>
                 <div className={`badge-icon-wrapper ${activeTab === 'despesa' ? 'bg-red' : 'bg-green'}`}>
-                  {activeTab === 'despesa' ? <LucideIcons.TrendingDown /> : <LucideIcons.Wallet />}
+                  {activeTab === 'despesa' ? <LucideIcons.TrendingDown size={14} /> : <LucideIcons.TrendingUp size={14} />}
                 </div>
                 <span className="badge-text">
                   Total {activeTab === 'despesa' ? 'Planejado' : 'Esperado'}: 
                   <strong> {totalPlanejado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
                 </span>
+              </div>
+
             </div>
           </div>
         </header>

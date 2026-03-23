@@ -8,7 +8,7 @@ import {
 import '../styles/Orcamento.css';
 import { useNavigate } from 'react-router-dom';
 
-// Importação dos ícones de ação para o modal (mesmo padrão do Cartoes.tsx)
+// Importação dos ícones de ação para o modal
 import iconFechar from '../assets/fechar.png';
 
 // --- Interfaces para Tipagem ---
@@ -171,21 +171,53 @@ const Orcamento: React.FC = () => {
   return (
     <div className="orcamento-container">
       <header className="orcamento-header">
-        <div className="header-content-wrapper">
-          <h2>Gestão Estratégica</h2>
+        <div className="header-content-wrapper" style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          width: '100%' 
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontWeight: 800, color: '#1e293b', fontSize: '1.4rem' }}>Gestão Estratégica</h2>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>Análise de fluxo</p>
+          </div>
           
-          <div className="prov-month-selector">
-            <button onClick={() => alterarMes(-1)} className="prov-nav-btn">
-              <ChevronLeft size={20} />
+          {/* SELETOR DE MÊS ATUALIZADO */}
+          <div className="mes-selector-badge" style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            background: '#ffffff', 
+            padding: '8px 14px', 
+            borderRadius: '100px', 
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+            flexShrink: 0
+          }}>
+            <button 
+              onClick={() => alterarMes(-1)} 
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}
+            >
+              <ChevronLeft size={18} />
             </button>
-            <div className="prov-current-month">
-              <Calendar size={18} style={{ color: 'var(--primary)' }} />
-              <span>
-                {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(dataFiltro)}
-              </span>
-            </div>
-            <button onClick={() => alterarMes(1)} className="prov-nav-btn">
-              <ChevronRight size={20} />
+            
+            <span style={{ 
+              fontWeight: 800, 
+              fontSize: '0.75rem', 
+              color: '#1e293b', 
+              textTransform: 'capitalize',
+              whiteSpace: 'nowrap',
+              textAlign: 'center',
+              minWidth: '110px' 
+            }}>
+              {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(dataFiltro)}
+            </span>
+
+            <button 
+              onClick={() => alterarMes(1)} 
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}
+            >
+              <ChevronRight size={18} />
             </button>
           </div>
         </div>
@@ -307,14 +339,13 @@ const Orcamento: React.FC = () => {
         </>
       )}
 
-      {/* --- MODAL ATUALIZADO (DINÂMICO: VERMELHO/VERDE) --- */}
+      {/* --- MODAL --- */}
       {modalDetalhe.aberto && (
         <div className="modal-overlay" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
           <div className=
           {`modal-content-premium ${modalDetalhe.tipo === 'Receitas' ? 'receitas' : 'despesas'}`}
           onClick={e => e.stopPropagation()}>
             
-            {/* Header com classe dinâmica para cor de fundo */}
             <div className={`modal-header-premium ${modalDetalhe.tipo === 'Receitas' ? 'header-receitas' : 'header-despesas'}`}>
               <div className="header-info">
                 <h3>{modalDetalhe.tipo}</h3>
@@ -353,7 +384,7 @@ const Orcamento: React.FC = () => {
 
             <div className="modal-footer-icons">
                <div style={{ fontSize: '1.75rem', color: '#1e293b', fontWeight: 600 }}>
-                  Total
+                 Total
                </div>
                <div className={`modal-footer-icons ${modalDetalhe.tipo === 'Receitas' ? 'footer-receitas' : 'footer-despesas'}`} 
                style={{ fontSize: '1.2rem', fontWeight: 900}}>

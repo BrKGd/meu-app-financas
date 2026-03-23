@@ -112,7 +112,7 @@ const Sidebar: React.FC = () => {
             <>
               <Link to="/categoriasMetas" className={`sidebar-nav-item ${isActive('/categoriasMetas') ? 'active' : ''}`}>
                 <Flag size={20} />
-                <span>Categorias e Metas</span>
+                <span>Metas</span>
               </Link>
 
               <Link to="/orcamento" className={`sidebar-nav-item ${isActive('/orcamento') ? 'active' : ''}`}>

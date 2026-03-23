@@ -13,11 +13,13 @@
 
 /* --- LAYOUT GERAL --- */
 .orcamento-container {
-  padding: 40px 20px;
+  padding: 25px; /* Ajustado para padrão dashboard */
   max-width: 1200px;
   margin: 0 auto;
   font-family: 'Inter', sans-serif;
   padding-bottom: 120px;
+  background-color: var(--bg-body);
+  min-height: 100vh;
 }
 
 .loading-state { 
@@ -29,73 +31,71 @@
   color: var(--primary); 
 }
 
-/* --- HEADER (Alinhamento Horizontal Estratégico) --- */
+/* --- HEADER (Título à esquerda e Seletor à direita) --- */
 .orcamento-header {
-  margin-bottom: 35px;
+  margin-bottom: 30px;
   width: 100%;
 }
 
 .header-content-wrapper {
   display: flex;
-  justify-content: space-between; /* Título à esquerda, Seletor à direita */
-  align-items: center;           /* Alinhamento vertical centralizado */
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
   width: 100%;
 }
 
 .header-content-wrapper h2 {
-  font-size: 2.5rem;
-  font-weight: 950;
-  color: #0f172a;
   margin: 0;
-  letter-spacing: -1px;
+  font-size: clamp(1.1rem, 4vw, 1.8rem); /* Responsivo igual dashboard */
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
 }
 
-/* SELETOR DE MÊS */
+/* SELETOR DE MÊS (Padrão Badge em Linha Única) */
+.mes-selector-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  padding: 8px 14px;
+  border-radius: 100px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  flex-shrink: 0;
+}
+
+.mes-selector-badge span {
+  font-weight: 800;
+  font-size: 0.75rem;
+  color: #1e293b;
+  text-transform: capitalize;
+  white-space: nowrap;
+  text-align: center;
+  min-width: 110px;
+}
+
+.mes-selector-badge button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  padding: 2px;
+  transition: color 0.2s;
+}
+
+.mes-selector-badge button:hover {
+  color: var(--primary);
+}
+
+/* Compatibilidade com classes legadas do seletor */
 .prov-month-selector {
   display: flex;
   align-items: center;
-  gap: 15px;
-  background: white;
-  padding: 8px 18px;
-  border-radius: 20px;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-  width: fit-content;
-}
-
-.prov-current-month {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  color: #0f172a;
-  text-transform: capitalize;
-  min-width: 160px;
-  justify-content: center;
-}
-
-.prov-current-month span {
-  font-size: 0.9rem;
-  letter-spacing: -0.2px;
-}
-
-.prov-nav-btn {
-  background: #f8fafc;
-  border: 1px solid #f1f5f9;
-  color: #64748b;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.prov-nav-btn:hover {
-  background: var(--primary);
-  color: white;
-  transform: translateY(-1px);
+  gap: 8px;
 }
 
 /* --- FAB (BOTÃO FLUTUANTE) --- */
@@ -238,7 +238,7 @@
 .modal-content-premium {
   background: #f8fafc;
   width: 100%;
-  max-width: 100%;
+  max-width: 450px; /* Ajustado para não ocupar tela cheia em desktop */
   border-radius: 35px;
   position: relative;
   animation: modalPop 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -300,10 +300,8 @@
   box-sizing: border-box;
 }
 
-/* Quando estiver sobre o fundo colorido, o ícone fica branco */
 .header-despesas .btn-close-clean img,
 .header-receitas .btn-close-clean img {
-  border: 3px;
   border-color: white;
 }
 
@@ -345,18 +343,18 @@
 
 /* --- RESPONSIVIDADE --- */
 @media (max-width: 768px) {
-  .orcamento-container { padding: 10px 5px 50px; }
-  .header-content-wrapper { flex-direction: column; align-items: flex-start; gap: 15px; }
-  .prov-month-selector { width: 100%; justify-content: space-between; }
-  .header-content-wrapper h2 { font-size: 1.8rem; }
+  .orcamento-container { padding: 15px 15px 100px; }
+  .header-content-wrapper { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+  .header-content-wrapper h2 { font-size: 1.2rem; }
+  .mes-selector-badge { padding: 6px 10px; }
+  .mes-selector-badge span { min-width: 90px; font-size: 0.7rem; }
   .summary-grid-objectives { grid-template-columns: 1fr; }
   .alocacao-grid-3-col { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .aloc-mini-card { padding: 12px 8px; }
   .aloc-valor { font-size: 0.85rem; }
   .stats-values h3 { font-size: 1.75rem; }
   .status-badges-stack { right: 15px; bottom: 10px; }
-  .btn-ajuste-premium { bottom: 90px; right: 20px; }
-  .modal-body-premium {max-height: 500px;}
+  .btn-ajuste-premium { bottom: 90px; right: 20px; width: 50px; height: 50px; }
 }
 
 /* --- ANIMAÇÕES --- */
