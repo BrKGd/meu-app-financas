@@ -102,6 +102,10 @@ const Sidebar: React.FC = () => {
             <ArrowDownCircle size={20} />
             <span>Saídas</span>
           </Link>
+          <Link to="/cartoes" className={`sidebar-nav-item ${isActive('/cartoes') ? 'active' : ''}`}>
+            <CreditCard size={20} />
+            <span>Cartões</span>
+          </Link>
 
           {/* Planejamento e Orçamento: Restritos a Gestores */}
           {temAcessoGestao && (
@@ -116,14 +120,6 @@ const Sidebar: React.FC = () => {
                 <span>Orçamento</span>
               </Link>
             </>
-          )}
-
-          {/* Cartões: Apenas Proprietário */}
-          {isProprietario && (
-            <Link to="/cartoes" className={`sidebar-nav-item ${isActive('/cartoes') ? 'active' : ''}`}>
-              <CreditCard size={20} />
-              <span>Cartões</span>
-            </Link>
           )}
 
           <Link to="/listagem" className={`sidebar-nav-item ${isActive('/listagem') ? 'active' : ''}`}>
