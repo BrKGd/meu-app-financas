@@ -31,9 +31,9 @@ interface DadosOrcamento {
   objetivosPessoais: CategoriaConsolidada[];
   proventosDetalhados: any[];
   resumo503020: {
-    essenciais: { valor: number; limite: number };
-    estiloVida: { valor: number; limite: number };
-    prioridades: { valor: number; limite: number };
+    essenciais: { valor: number; limite: number; categorias: CategoriaConsolidada[] };
+    estiloVida: { valor: number; limite: number; categorias: CategoriaConsolidada[] };
+    prioridades: { valor: number; limite: number; categorias: CategoriaConsolidada[] };
   };
 }
 
@@ -44,8 +44,9 @@ const Orcamento: React.FC = () => {
   // --- Estados de Data ---
   const [dataFiltro, setDataFiltro] = useState(new Date());
 
-  const [modalDetalhe, setModalDetalhe] = useState<{aberto: boolean, tipo: string, dados: any[]}>({ 
-    aberto: false, tipo: '', dados: [] 
+  // Adicionado 'limite' ao estado do modal para cálculos internos
+  const [modalDetalhe, setModalDetalhe] = useState<{aberto: boolean, tipo: string, dados: any[], limite?: number}>({ 
+    aberto: false, tipo: '', dados: [], limite: 0 
   });
   
   const [dados, setDados] = useState<DadosOrcamento>({
@@ -57,9 +58,9 @@ const Orcamento: React.FC = () => {
     objetivosPessoais: [],
     proventosDetalhados: [],
     resumo503020: {
-      essenciais: { valor: 0, limite: 0 },
-      estiloVida: { valor: 0, limite: 0 },
-      prioridades: { valor: 0, limite: 0 }
+      essenciais: { valor: 0, limite: 0, categorias: [] },
+      estiloVida: { valor: 0, limite: 0, categorias: [] },
+      prioridades: { valor: 0, limite: 0, categorias: [] }
     }
   });
 
@@ -72,21 +73,25 @@ const Orcamento: React.FC = () => {
     setDataFiltro(novaData);
   };
 
-  const calcular503020 = (receita: number, categorias: CategoriaConsolidada[]) => {
+  const calcular503020 = (receitaBase: number, categorias: CategoriaConsolidada[]) => {
     const res = {
-      essenciais: { valor: 0, limite: receita * 0.5 },
-      estiloVida: { valor: 0, limite: receita * 0.3 },
-      prioridades: { valor: 0, limite: receita * 0.2 }
+      essenciais: { valor: 0, limite: receitaBase * 0.5, categorias: [] as CategoriaConsolidada[] },
+      estiloVida: { valor: 0, limite: receitaBase * 0.3, categorias: [] as CategoriaConsolidada[] },
+      prioridades: { valor: 0, limite: receitaBase * 0.2, categorias: [] as CategoriaConsolidada[] }
     };
-    const essenciaisLista = ['Aluguel', 'Saúde', 'Educação', 'Mercado', 'Transporte', 'Água', 'Luz', 'Moradia'];
+    
+    const essenciaisLista = ['Aluguel', 'Saúde', 'Educação', 'Mercado', 'Combustível', 'Água', 'Luz', 'Moradia','Alimentação','Seguros'];
 
     categorias.forEach(cat => {
       if (cat.tipoMeta === 'pessoal') {
         res.prioridades.valor += cat.gastoReal;
+        res.prioridades.categorias.push(cat);
       } else if (cat.regra_50_30_20 === 'Essencial' || essenciaisLista.some(e => cat.nome.includes(e))) {
         res.essenciais.valor += cat.gastoReal;
+        res.essenciais.categorias.push(cat);
       } else if (cat.tipo === 'despesa') {
         res.estiloVida.valor += cat.gastoReal;
+        res.estiloVida.categorias.push(cat);
       }
     });
     return res;
@@ -125,6 +130,13 @@ const Orcamento: React.FC = () => {
 
       const totalReceitaReal = proventos?.reduce((acc: number, cur: any) => acc + Number(cur.valor), 0) || 0;
 
+      const receitaParaRegra = proventos?.reduce((acc: number, cur: any) => {
+        if (cur.categoria === 'Salários' || cur.categoria === 'Renda extra') {
+          return acc + Number(cur.valor);
+        }
+        return acc;
+      }, 0) || 0;
+
       const todasCategoriasConsolidadas: CategoriaConsolidada[] = (cats || []).map((cat: any) => {
         const metaEncontrada = metasData?.find((m: any) => m.categoria_id === cat.id);
         return {
@@ -143,7 +155,7 @@ const Orcamento: React.FC = () => {
         categoriasDespesa: todasCategoriasConsolidadas.filter(c => c.tipo === 'despesa' && c.tipoMeta !== 'pessoal'),
         objetivosPessoais: todasCategoriasConsolidadas.filter(c => c.tipoMeta === 'pessoal'),
         proventosDetalhados: proventos || [],
-        resumo503020: calcular503020(totalReceitaReal, todasCategoriasConsolidadas)
+        resumo503020: calcular503020(receitaParaRegra, todasCategoriasConsolidadas)
       });
 
     } catch (err) {
@@ -168,6 +180,64 @@ const Orcamento: React.FC = () => {
     return { label: 'Deu ruim, gastou demais!', class: 'status-bad', color: '#ef4444', icon: <AlertCircle size={14} /> };
   }, [porcGastoOrcamento, dados]);
 
+  // --- Cores Dinâmicas para o Modal ---
+  const getModalColor = () => {
+    if (modalDetalhe.tipo === 'Gastos Fixos') return '#3b82f6';
+    if (modalDetalhe.tipo === 'Gastos Variáveis') return '#f59e0b';
+    if (modalDetalhe.tipo === 'Investimentos') return '#8b5cf6';
+    if (modalDetalhe.tipo === 'Receitas') return '#10b981';
+    if (modalDetalhe.tipo === 'Despesas') return '#ef4444';
+    return '#1e293b';
+  };
+
+  // --- Lógica de Agrupamento para o Modal ---
+  const renderConteudoModal = () => {
+    if (modalDetalhe.tipo === 'Receitas') {
+      return modalDetalhe.dados.map((p, i) => (
+        <div key={p.id || i} className="fatura-item">
+          <div className="fatura-item-info">
+            <span className="fatura-item-desc">{p.descricao}</span>
+            <span className="fatura-item-sub">Recebido em {new Date(p.data_recebimento).toLocaleDateString()}</span>
+          </div>
+          <span className="fatura-item-valor" style={{ color: '#10b981' }}>+ {formatMoney(p.valor)}</span>
+        </div>
+      ));
+    }
+
+    const agrupado: Record<string, any[]> = {};
+    modalDetalhe.dados.forEach(item => {
+      const catNome = item.nome || 'Outros';
+      if (!agrupado[catNome]) agrupado[catNome] = [];
+      agrupado[catNome].push(item);
+    });
+
+    return Object.keys(agrupado).map((categoria) => (
+      <div key={categoria} className="categoria-grupo-modal" style={{ marginBottom: '16px' }}>
+        <div style={{ 
+          fontSize: '0.7rem', 
+          fontWeight: 800, 
+          color: getModalColor(), 
+          textTransform: 'uppercase', 
+          letterSpacing: '0.5px',
+          marginBottom: '8px',
+          borderBottom: '1px solid #f1f5f9',
+          paddingBottom: '4px'
+        }}>
+          {categoria}
+        </div>
+        {agrupado[categoria].map((c, i) => (
+          <div key={c.id || i} className="fatura-item" style={{ paddingLeft: '8px' }}>
+            <div className="fatura-item-info">
+              <span className="fatura-item-desc">{c.nome}</span>
+              <span className="fatura-item-sub">Consolidado no mês</span>
+            </div>
+            <span className="fatura-item-valor">{formatMoney(c.gastoReal)}</span>
+          </div>
+        ))}
+      </div>
+    ));
+  };
+
   return (
     <div className="orcamento-container">
       <header className="orcamento-header">
@@ -181,8 +251,6 @@ const Orcamento: React.FC = () => {
             <h2 style={{ margin: 0, fontWeight: 800, color: '#1e293b', fontSize: '1.4rem' }}>Gestão Estratégica</h2>
             <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>Análise de fluxo</p>
           </div>
-          
-          {/* SELETOR DE MÊS ATUALIZADO */}
           <div className="mes-selector-badge" style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -194,8 +262,7 @@ const Orcamento: React.FC = () => {
             boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
             flexShrink: 0
           }}>
-            <button 
-              onClick={() => alterarMes(-1)} 
+            <button onClick={() => alterarMes(-1)} 
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}
             >
               <ChevronLeft size={18} />
@@ -264,7 +331,7 @@ const Orcamento: React.FC = () => {
           </section>
 
           <div className="summary-grid-objectives">
-            <div className="objective-card-premium clickable" onClick={() => setModalDetalhe({ aberto: true, tipo: 'Receitas', dados: dados.proventosDetalhados })}>
+            <div className="objective-card-premium clickable" onClick={() => setModalDetalhe({ aberto: true, tipo: 'Receitas', dados: dados.proventosDetalhados, limite: dados.metaReceita })}>
               <div className="obj-header">
                 <span className="obj-name"><ArrowUpCircle size={16} color="#10b981" /> Soma de Proventos</span>
                 <span className="obj-percent" style={{color: '#10b981'}}>{porcReceita.toFixed(0)}%</span>
@@ -278,7 +345,7 @@ const Orcamento: React.FC = () => {
               </div>
             </div>
 
-            <div className="objective-card-premium clickable" onClick={() => setModalDetalhe({ aberto: true, tipo: 'Despesas', dados: dados.categoriasDespesa })}>
+            <div className="objective-card-premium clickable" onClick={() => setModalDetalhe({ aberto: true, tipo: 'Despesas', dados: dados.categoriasDespesa, limite: dados.metaGasto })}>
               <div className="obj-header">
                 <span className="obj-name"><ArrowDownCircle size={16} color="#ef4444" /> Total Gasto</span>
                 <span className="obj-percent" style={{color: '#ef4444'}}>{porcGasto.toFixed(0)}%</span>
@@ -294,15 +361,32 @@ const Orcamento: React.FC = () => {
           </div>
 
           <section className="alocacao-503020">
-            <h3 className="premium-section-title">Equilíbrio 50-30-20 (Real)</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '10px' }}>
+                <h3 className="premium-section-title" style={{ margin: 0 }}>Equilíbrio 50-30-20 (Real)</h3>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>Base: Salários + Renda extra</span>
+            </div>
             <div className="alocacao-grid-3-col">
               {(['essenciais', 'estiloVida', 'prioridades'] as const).map((key) => {
                 const colors = { essenciais: '#3b82f6', estiloVida: '#f59e0b', prioridades: '#8b5cf6' };
+                const labels = { essenciais: 'Gastos Fixos', estiloVida: 'Gastos Variáveis', prioridades: 'Investimentos' };
                 const valor = dados.resumo503020[key].valor;
                 const limite = dados.resumo503020[key].limite;
                 const porcLocal = limite > 0 ? (valor / limite) * 100 : 0;
+
+                // Lógica do Badge Excedido
+                const excedeu = valor > limite && limite > 0;
+                const diferenca = valor - limite;
+                const badgeClass = key === 'prioridades' ? 'badge-green' : 'badge-red';
+
                 return (
-                  <div key={key} className="aloc-mini-card">
+                  <div key={key} className="aloc-mini-card clickable" style={{borderColor: colors[key], position: 'relative'}} onClick={() => setModalDetalhe({ aberto: true, tipo: labels[key], dados: dados.resumo503020[key].categorias, limite: limite})}>
+                    
+                    {excedeu && (
+                      <div className={`badge-pill-excedido ${badgeClass}`}>
+                        + {formatMoney(diferenca)}
+                      </div>
+                    )}
+
                     <span className="aloc-label">
                       {key === 'essenciais' ? '50%' : key === 'estiloVida' ? '30%' : '20%'} 
                       <span className="aloc-sub">{key === 'essenciais' ? 'Fixos' : key === 'estiloVida' ? 'Desejos' : 'Futuro'}</span>
@@ -321,7 +405,7 @@ const Orcamento: React.FC = () => {
           <h3 className="premium-section-title"><TrendingUp size={18} /> Objetivos Ativos</h3>
           <div className="summary-grid-objectives">
             {dados.objetivosPessoais.map(meta => (
-              <div key={meta.id} className="objective-card-premium clickable" onClick={() => setModalDetalhe({ aberto: true, tipo: 'Objetivos', dados: [meta] })}>
+              <div key={meta.id} className="objective-card-premium clickable" onClick={() => setModalDetalhe({ aberto: true, tipo: 'Objetivos', dados: [meta], limite: meta.metaValor })}>
                 <div className="obj-header">
                   <span className="obj-name">{meta.nome}</span>
                   <span className="obj-percent">{(meta.metaValor > 0 ? (meta.gastoReal/meta.metaValor)*100 : 0).toFixed(0)}%</span>
@@ -339,17 +423,34 @@ const Orcamento: React.FC = () => {
         </>
       )}
 
-      {/* --- MODAL --- */}
+      {/* --- MODAL ATUALIZADO COM BADGE --- */}
       {modalDetalhe.aberto && (
         <div className="modal-overlay" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
-          <div className=
-          {`modal-content-premium ${modalDetalhe.tipo === 'Receitas' ? 'receitas' : 'despesas'}`}
-          onClick={e => e.stopPropagation()}>
+          <div className="modal-content-premium" onClick={e => e.stopPropagation()}>
             
-            <div className={`modal-header-premium ${modalDetalhe.tipo === 'Receitas' ? 'header-receitas' : 'header-despesas'}`}>
+            <div className="modal-header-premium" style={{ backgroundColor: getModalColor() }}>
               <div className="header-info">
-                <h3>{modalDetalhe.tipo}</h3>
-                <p>Confira os lançamentos deste mês</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <h3 style={{ color: '#fff' }}>{modalDetalhe.tipo}</h3>
+                  
+                  {/* Badge de Valor dentro do Modal */}
+                  {(() => {
+                    const total = modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0);
+                    const limite = modalDetalhe.limite || 0;
+                    if (total > limite && limite > 0) {
+                      const diff = total - limite;
+                      const badgeClass = modalDetalhe.tipo === 'Investimentos' ? 'badge-green' : 'badge-red';
+                      return (
+                        <span className={`badge-pill-excedido ${badgeClass}`} 
+                              style={{ position: 'static', fontSize: '0.6rem', padding: '2px 10px' }}>
+                          + {formatMoney(diff)}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.8)' }}>Confira os lançamentos deste mês</p>
               </div>
               <button className="btn-close-clean" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
                 <img src={iconFechar} alt="Fechar" />
@@ -358,27 +459,7 @@ const Orcamento: React.FC = () => {
 
             <div className="modal-body-premium">
               <div className="fatura-lista">
-                {modalDetalhe.tipo === 'Receitas' ? (
-                  modalDetalhe.dados.map((p, i) => (
-                    <div key={p.id || i} className="fatura-item">
-                      <div className="fatura-item-info">
-                        <span className="fatura-item-desc">{p.descricao}</span>
-                        <span className="fatura-item-sub">Recebido em {new Date(p.data_recebimento).toLocaleDateString()}</span>
-                      </div>
-                      <span className="fatura-item-valor" style={{ color: '#10b981' }}>+ {formatMoney(p.valor)}</span>
-                    </div>
-                  ))
-                ) : (
-                  modalDetalhe.dados.map((c, i) => (
-                    <div key={c.id || i} className="fatura-item">
-                      <div className="fatura-item-info">
-                        <span className="fatura-item-desc">{c.nome}</span>
-                        <span className="fatura-item-sub">Consolidado no mês</span>
-                      </div>
-                      <span className="fatura-item-valor">{formatMoney(c.gastoReal)}</span>
-                    </div>
-                  ))
-                )}
+                {renderConteudoModal()}
               </div>
             </div>
 
@@ -386,8 +467,7 @@ const Orcamento: React.FC = () => {
                <div style={{ fontSize: '1.75rem', color: '#1e293b', fontWeight: 600 }}>
                  Total
                </div>
-               <div className={`modal-footer-icons ${modalDetalhe.tipo === 'Receitas' ? 'footer-receitas' : 'footer-despesas'}`} 
-               style={{ fontSize: '1.2rem', fontWeight: 900}}>
+               <div style={{ fontSize: '1.2rem', fontWeight: 900, color: getModalColor() }}>
                   {formatMoney(
                     modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0)
                   )}
