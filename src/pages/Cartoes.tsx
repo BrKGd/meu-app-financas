@@ -214,11 +214,10 @@ const Cartoes: React.FC = () => {
 
       <div className="cartoes-grid">
         {cartoes
-          // FILTRO ADICIONADO AQUI:
           .filter(cartao => {
             if (!perfilLogado) return false;
-            if (perfilLogado.tipo_usuario === 'proprietario') return true; // Gleidson vê tudo
-            return cartao.id_responsavel === perfilLogado.id; // Outros veem só o seu
+            if (perfilLogado.tipo_usuario === 'proprietario') return true;
+            return cartao.id_responsavel === perfilLogado.id;
           })
           .map(cartao => {
             const disponivel = calcularDisponivel(cartao, cartao.limite);
@@ -257,17 +256,23 @@ const Cartoes: React.FC = () => {
           })}
       </div>
 
-      {/* Restante do código dos modais e formulários permanece idêntico conforme sua solicitação */}
       {(selectedCartao || showModalCadastro) && (
         <div className="modal-overlay" onClick={fecharModais}>
-          <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ padding: 0, maxWidth: '520px', borderRadius: '45px' }}>
+          <div 
+            className="modal-content fade-in" 
+            onClick={e => e.stopPropagation()}
+            style={{ 
+              padding: 0, 
+              border: `2px solid ${isEditing || showModalCadastro ? '#1e293b' : selectedCartao?.cor}` 
+            }}
+          >
             
             <div className="modal-details-header" style={{ background: isEditing || showModalCadastro ? '#1e293b' : selectedCartao?.cor }}>
-               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h2 style={{ margin: 0 }}>
                     {showModalCadastro ? 'Novo Cartão' : isEditing ? 'Editar Configurações' : selectedCartao?.nome}
                   </h2>
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '15px' }}>
                     {!isEditing && !showModalCadastro && (
                       <button onClick={() => { 
                           setIsEditing(true); 
@@ -290,22 +295,22 @@ const Cartoes: React.FC = () => {
                       <img src={iconFechar} alt="Fechar" style={{ width: '32px', height: '32px' }} />
                     </button>
                   </div>
-               </div>
-               {!isEditing && !showModalCadastro && (
-                 <div style={{ marginTop: '10px', fontWeight: 700, opacity: 0.9 }}>
-                   Limite Total: {formatMoney(selectedCartao!.limite)}
-                 </div>
-               )}
+                </div>
+                {!isEditing && !showModalCadastro && (
+                  <div style={{ marginTop: '10px', fontWeight: 700, opacity: 0.9 }}>
+                    Limite Total: {formatMoney(selectedCartao!.limite)}
+                  </div>
+                )}
             </div>
 
-            <div style={{ padding: '35px' }}>
+            <div className="modal-body-scroll">
               {isEditing || showModalCadastro ? (
-                <form id="card-form" onSubmit={handleSave}>
+                <form id="card-form" onSubmit={handleSave} style={{ padding: '35px' }}>
                   <FormFields form={formCartao} setForm={setFormCartao} usuarios={usuarios} perfilLogado={perfilLogado} />
                 </form>
               ) : (
                 <>
-                  <div className="listagem-lancamentos">
+                  <div className="listagem-lancamentos" style={{ padding: '35px' }}>
                     <h4 style={{ color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.1em' }}>Lançamentos do Mês</h4>
                     {compras
                       .filter(c => c.cartao_id === selectedCartao?.id && c.periodo_referencia === periodoAtual)
@@ -322,7 +327,7 @@ const Cartoes: React.FC = () => {
                           </div>
                       ))}
                   </div>
-                  <div className="fatura-resumo">
+                  <div className="fatura-resumo" style={{ margin: '0 35px 35px 35px' }}>
                     <div>
                       <span className="resumo-label">TOTAL DA FATURA</span>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Vence dia {selectedCartao?.dia_vencimento}</span>
@@ -353,6 +358,7 @@ const Cartoes: React.FC = () => {
                 </div>
               </div>
             )}
+            
           </div>
         </div>
       )}
@@ -364,7 +370,7 @@ const FormFields = ({ form, setForm, usuarios, perfilLogado }: any) => {
   const isProprietario = perfilLogado?.tipo_usuario === 'proprietario';
 
   return (
-    <div className= "modal-form" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <div className="modal-form">
       <div className="form-group">
         <label>Responsável</label>
         <select 
@@ -413,15 +419,14 @@ const FormFields = ({ form, setForm, usuarios, perfilLogado }: any) => {
         </div>
       </div>
 
-      <div className="form-group">
-        <label>Cor de Identificação (Hexadecimal)</label>
-        <div className ="seletor-cor" style={{ display: 'flex', gap: '10px', alignItems: 'center'}}>
+      <div className="form-group" style={{ marginBottom: '20px' }}>
+        <label>Cor de Identificação</label>
+        <div className="seletor-cor">
           <input 
             type="color" 
-            className="color-picker-input" 
+            className="color-picker-input form-control" 
             value={form.cor.startsWith('#') && form.cor.length === 7 ? form.cor : '#4361ee'} 
             onChange={e => setForm({...form, cor: e.target.value})} 
-            style={{ width: 'auto', height: '45px', padding: '2px', border: '2px solid #f1f5f9', borderRadius: '12px', cursor: 'pointer' }} 
           />
           <input 
             type="text" 
@@ -430,7 +435,6 @@ const FormFields = ({ form, setForm, usuarios, perfilLogado }: any) => {
             value={form.cor} 
             onChange={e => setForm({...form, cor: e.target.value})}
             maxLength={7}
-            style={{ flex: 1 }}
           />
         </div>
       </div>

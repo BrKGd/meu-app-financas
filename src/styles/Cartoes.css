@@ -92,12 +92,42 @@
   box-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
 }
 
+/* Overlay do Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 5px; /* Mantendo seu padding original */
+}
+
+/* Estilos do Modal Atualizados */
+.modal-content {
+  width: 100%; 
+  background: white;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-width: 520px;
+  border-radius: 45px; /* Mantém arredondamento grande */
+  height: auto;
+  max-height: 650px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Correção: Esconde conteúdo que sai das bordas arredondadas */
+  position: relative;
+}
+
 .modal-details-header { 
-  padding: 40px; 
+  padding: 25px !important; /* Reduzido para alinhar lateralmente */
   color: white; 
   position: relative;
-  border-radius: 45px 45px 0 0;
-  max-width: 100%;
+  /* border-radius removido aqui, controlado pelo pai overflow:hidden */
 }
 
 .modal-details-header h2 {
@@ -106,9 +136,41 @@
   margin-bottom: 5px;
 }
 
+/* Scrollbar do Corpo do Modal */
+.modal-body-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.modal-body-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.modal-body-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Conteúdo interno do corpo com padding para esticar */
+.modal-form,
+.listagem-lancamentos {
+  padding: 20px 35px; /* Spacing lateral interno */
+}
+
 .fatura-resumo {
-  margin-top: 25px;
-  padding: 10px;
+  margin: 0 35px 35px 35px; /* Margens laterais para acompanhar largura e bottom */
+  padding: 15px 20px;
   border-radius: 28px;
   background: #f8fafc;
   border: 1px solid #f1f5f9;
@@ -143,13 +205,13 @@
 
 /* CONTAINER DE ÍCONES (AÇÃO) */
 .modal-footer-icons {
-  padding: 30px 45px;
+  padding: 15px 25px; /* Reduzido para alinhar lateralmente */
   background: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-top: 1px solid #f1f5f9;
-  border-radius: 0 0 45px 45px;
+  /* border-radius removido aqui, controlado pelo pai overflow:hidden */
 }
 
 .footer-right-actions {
@@ -182,16 +244,6 @@
   transform: scale(0.9);
 }
 
-/* Scrollbar */
-.listagem-lancamentos {
-  max-height: 280px;
-  overflow-y: auto;
-  padding: 0 10px;
-}
-
-.listagem-lancamentos::-webkit-scrollbar { width: 5px; }
-.listagem-lancamentos::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-
 /* Ajuste para o container do input de cor */
 .color-picker-input {
   appearance: none;
@@ -211,19 +263,14 @@
   border: none;
 }
 
-.seletor-cor{
+.seletor-cor {
   display: grid !important;
   grid-template-columns: 1.4fr 0.66fr !important;
+  gap: 10px;
+  align-items: center;
 }
 
-@media (max-width: 768px) {
-  .cartoes-header { flex-direction: column; align-items: flex-start; gap: 20px; }
-  .cartoes-grid { grid-template-columns: 1fr; }
-  .modal-footer-icons { padding: 20px 30px; }
-}
-.modal-content > div[style*="padding: 35px"] {
-  padding: 20px 35px !important;
-}
+/* Formulário e Inputs */
 .form-group label {
   font-size: 0.75rem;
   font-weight: 700;
@@ -232,6 +279,7 @@
   text-transform: uppercase;
   letter-spacing: 0.025em;
 }
+
 .form-control {
   height: auto !important;
   padding: 12px 16px !important;
@@ -251,15 +299,29 @@
   box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
 }
 
-/* Especial para o campo de cor manter uma altura mínima estética */
-input[type="color"].form-control {
+input[type="color"].form-control,
+.color-picker-input {
   min-height: 45px;
   cursor: pointer;
 }
 
-.modal-details-header {
-  padding: 25px 40px !important;
+@media (max-width: 768px) {
+  .cartoes-container { padding: 20px; }
+  .cartoes-header { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .cartoes-grid { grid-template-columns: 1fr; }
+  .modal-footer-icons { padding: 15px 20px; }
+  .modal-content {
+    height: 90vh !important;
+    max-width: 100%;
+  }
 }
-.modal-form {
-  gap: 5px !important;
+
+/* Utilitários */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
