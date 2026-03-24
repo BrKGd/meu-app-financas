@@ -138,11 +138,6 @@
     opacity: 1 !important;
 }
 
-/* Aplicamos o fade apenas no texto do label quando pago */
-.status-pago-opacidade .mini-card-label {
-    color: rgba(255, 255, 255, 0.4); 
-}
-
 /* Garante que o ícone ignore o fade do texto pai */
 .status-pago-opacidade .mini-card-label svg {
     color: #10b981 !important;

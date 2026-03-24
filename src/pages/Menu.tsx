@@ -334,7 +334,7 @@ const Menu: React.FC = () => {
                   <div key={idx} className={`history-item-card ${tudoPago ? 'status-pago-opacidade' : ''}`}>
                     <div className="history-item-main">
                       <div className="history-item-info">
-                        <Calendar size={18} color={tudoPago ? '#10b981' : '#64748b'} />
+                        <Calendar size={20} color={tudoPago ? '#10b981' : '#64748b'} />
                         <span className="history-item-date">{dataFormatada}</span>
                         {tudoPago && (
                           <div className="badge-pago-mini">PAGO</div>
