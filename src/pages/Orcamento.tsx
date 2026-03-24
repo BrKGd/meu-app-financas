@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
+import * as LucideIcons from 'lucide-react';
 import { 
   PiggyBank, AlertCircle, ArrowUpCircle, 
   TrendingUp, ArrowDownCircle, CheckCircle2, Info, Settings,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, HelpCircle
 } from 'lucide-react';
 import '../styles/Orcamento.css';
 import { useNavigate } from 'react-router-dom';
 
-// Importação dos ícones de ação para o modal
 import iconFechar from '../assets/fechar.png';
 
 // --- Interfaces para Tipagem ---
@@ -20,6 +20,8 @@ interface CategoriaConsolidada {
   gastoReal: number;
   metaValor: number;
   tipoMeta: string;
+  icone?: string; 
+  cor?: string; // Coluna cor da tabela categorias
 }
 
 interface DadosOrcamento {
@@ -37,14 +39,17 @@ interface DadosOrcamento {
   };
 }
 
+// Componente para Renderizar Ícone Dinâmico com a cor do banco
+const IconeCategoria = ({ nomeIcone, size = 20, color }: { nomeIcone?: string, size?: number, color?: string }) => {
+  const Icon = (LucideIcons as any)[nomeIcone || ''] || HelpCircle;
+  return <Icon size={size} color={color || 'currentColor'} />;
+};
+
 const Orcamento: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  
-  // --- Estados de Data ---
   const [dataFiltro, setDataFiltro] = useState(new Date());
 
-  // Estado do modal com limite para cálculos internos
   const [modalDetalhe, setModalDetalhe] = useState<{aberto: boolean, tipo: string, dados: any[], limite?: number}>({ 
     aberto: false, tipo: '', dados: [], limite: 0 
   });
@@ -80,12 +85,7 @@ const Orcamento: React.FC = () => {
       prioridades: { valor: 0, limite: receitaBase * 0.2, categorias: [] as CategoriaConsolidada[] }
     };
     
-    // Lista de categorias essenciais atualizada
-    const essenciaisLista = [
-      'Aluguel', 'Saúde', 'Educação', 'Mercado', 'Combustível',
-      'Água', 'Luz', 'Moradia','Alimentação','Seguros'
-    ];
-
+    const essenciaisLista = ['Aluguel', 'Saúde', 'Educação', 'Mercado', 'Combustível', 'Água', 'Luz', 'Moradia','Alimentação','Seguros'];
 
     categorias.forEach(cat => {
       if (cat.tipoMeta === 'pessoal') {
@@ -161,7 +161,7 @@ const Orcamento: React.FC = () => {
       });
 
     } catch (err) {
-      console.error("Erro ao consolidar valores no Orcamento:", err);
+      console.error("Erro ao buscar dados:", err);
     } finally {
       setLoading(false);
     }
@@ -171,8 +171,8 @@ const Orcamento: React.FC = () => {
     buscarDadosCompletos();
   }, [buscarDadosCompletos]);
 
-  const porcGasto = useMemo(() => dados.metaGasto > 0 ? (dados.gastoReal / dados.metaGasto) * 100 : 0, [dados]);
   const porcGastoOrcamento = useMemo(() => dados.receitaReal > 0 ? (dados.gastoReal / dados.receitaReal) * 100 : 0, [dados]);
+  const porcGasto = useMemo(() => dados.metaGasto > 0 ? (dados.gastoReal / dados.metaGasto) * 100 : 0, [dados]);
   const porcReceita = useMemo(() => dados.metaReceita > 0 ? (dados.receitaReal / dados.metaReceita) * 100 : 0, [dados]);
 
   const statusConfig = useMemo(() => {
@@ -195,9 +195,14 @@ const Orcamento: React.FC = () => {
     if (modalDetalhe.tipo === 'Receitas') {
       return modalDetalhe.dados.map((p, i) => (
         <div key={p.id || i} className="fatura-item">
-          <div className="fatura-item-info">
-            <span className="fatura-item-desc">{p.descricao}</span>
-            <span className="fatura-item-sub">Recebido em {new Date(p.data_recebimento).toLocaleDateString()}</span>
+          <div className="fatura-item-info" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: '#f0fdf4', padding: '8px', borderRadius: '12px' }}>
+              <ArrowUpCircle size={20} color="#10b981" />
+            </div>
+            <div>
+              <span className="fatura-item-desc">{p.descricao}</span>
+              <span className="fatura-item-sub">Recebido em {new Date(p.data_recebimento).toLocaleDateString()}</span>
+            </div>
           </div>
           <span className="fatura-item-valor" style={{ color: '#10b981' }}>+ {formatMoney(p.valor)}</span>
         </div>
@@ -211,22 +216,26 @@ const Orcamento: React.FC = () => {
       agrupado[catNome].push(item);
     });
 
-    return Object.keys(agrupado).map((categoria) => (
-      <div key={categoria} className="categoria-grupo-modal" style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: getModalColor(), textTransform: 'uppercase', marginBottom: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
-          {categoria}
-        </div>
-        {agrupado[categoria].map((c, i) => (
-          <div key={c.id || i} className="fatura-item" style={{ paddingLeft: '8px' }}>
-            <div className="fatura-item-info">
-              <span className="fatura-item-desc">{c.nome}</span>
-              <span className="fatura-item-sub">Consolidado no mês</span>
-            </div>
-            <span className="fatura-item-valor">{formatMoney(c.gastoReal)}</span>
+    return Object.keys(agrupado).map((categoriaNome) => {
+      const primeiraCat = agrupado[categoriaNome][0];
+      return (
+        <div key={categoriaNome} className="categoria-grupo-modal" style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <IconeCategoria nomeIcone={primeiraCat.icone} size={14} color={primeiraCat.cor} />
+            {categoriaNome}
           </div>
-        ))}
-      </div>
-    ));
+          {agrupado[categoriaNome].map((c, i) => (
+            <div key={c.id || i} className="fatura-item" style={{ paddingLeft: '8px' }}>
+              <div className="fatura-item-info">
+                <span className="fatura-item-desc">{c.nome}</span>
+                <span className="fatura-item-sub">Consolidado no mês</span>
+              </div>
+              <span className="fatura-item-valor" style={{ fontWeight: 700 }}>{formatMoney(c.gastoReal)}</span>
+            </div>
+          ))}
+        </div>
+      );
+    });
   };
 
   return (
@@ -237,12 +246,10 @@ const Orcamento: React.FC = () => {
             <h2 style={{ margin: 0, fontWeight: 800, color: '#1e293b', fontSize: '1.4rem' }}>Gestão Estratégica</h2>
             <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>Análise de fluxo</p>
           </div>
-          <div className="mes-selector-badge" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ffffff', padding: '8px 14px', borderRadius: '100px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', flexShrink: 0 }}>
-            <button onClick={() => alterarMes(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}><ChevronLeft size={18} /></button>
-            <span style={{ fontWeight: 800, fontSize: '0.75rem', color: '#1e293b', textTransform: 'capitalize', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '110px' }}>
-              {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(dataFiltro)}
-            </span>
-            <button onClick={() => alterarMes(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}><ChevronRight size={18} /></button>
+          <div className="mes-selector-badge">
+            <button onClick={() => alterarMes(-1)}><ChevronLeft size={18} /></button>
+            <span>{new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(dataFiltro)}</span>
+            <button onClick={() => alterarMes(1)}><ChevronRight size={18} /></button>
           </div>
         </div>
       </header>
@@ -319,26 +326,13 @@ const Orcamento: React.FC = () => {
                 const labels = { essenciais: 'Gastos Fixos', estiloVida: 'Gastos Variáveis', prioridades: 'Investimentos' };
                 const valor = dados.resumo503020[key].valor;
                 const limite = dados.resumo503020[key].limite;
-                const porcLocal = limite > 0 ? (valor / limite) * 100 : 0;
                 const excedeu = valor > limite && limite > 0;
-                const diferenca = valor - limite;
-                const badgeClass = key === 'prioridades' ? 'badge-green' : 'badge-red';
-
                 return (
-                  <div key={key} className="aloc-mini-card clickable" style={{borderColor: colors[key], position: 'relative'}} onClick={() => setModalDetalhe({ aberto: true, tipo: labels[key], dados: dados.resumo503020[key].categorias, limite: limite })}>
-                    {excedeu && (
-                      <div className={`badge-pill-excedido ${badgeClass}`}>
-                        + {formatMoney(diferenca)}
-                      </div>
-                    )}
-                    <span className="aloc-label">
-                      {key === 'essenciais' ? '50%' : key === 'estiloVida' ? '30%' : '20%'} 
-                      <span className="aloc-sub">{key === 'essenciais' ? 'Fixos' : key === 'estiloVida' ? 'Desejos' : 'Futuro'}</span>
-                    </span>
+                  <div key={key} className="aloc-mini-card clickable" style={{borderColor: colors[key]}} onClick={() => setModalDetalhe({ aberto: true, tipo: labels[key], dados: dados.resumo503020[key].categorias, limite: limite })}>
+                    {excedeu && <div className={`badge-pill-excedido ${key === 'prioridades' ? 'badge-green' : 'badge-red'}`}>+ {formatMoney(valor - limite)}</div>}
+                    <span className="aloc-label">{key === 'essenciais' ? '50%' : key === 'estiloVida' ? '30%' : '20%'} <span className="aloc-sub">{key === 'essenciais' ? 'Fixos' : key === 'estiloVida' ? 'Desejos' : 'Futuro'}</span></span>
                     <span className="aloc-valor">{formatMoney(valor)}</span>
-                    <div className="aloc-progress-bg">
-                      <div className="aloc-progress-fill" style={{ width: `${Math.min(porcLocal, 100)}%`, backgroundColor: colors[key] }} />
-                    </div>
+                    <div className="aloc-progress-bg"><div className="aloc-progress-fill" style={{ width: `${Math.min(limite > 0 ? (valor / limite) * 100 : 0, 100)}%`, backgroundColor: colors[key] }} /></div>
                     <small>Limite {formatMoney(limite)}</small>
                   </div>
                 );
@@ -351,11 +345,14 @@ const Orcamento: React.FC = () => {
             {dados.objetivosPessoais.map(meta => (
               <div key={meta.id} className="objective-card-premium clickable" onClick={() => setModalDetalhe({ aberto: true, tipo: 'Objetivos', dados: [meta], limite: meta.metaValor })}>
                 <div className="obj-header">
-                  <span className="obj-name">{meta.nome}</span>
+                  <span className="obj-name" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <IconeCategoria nomeIcone={meta.icone} size={18} color={meta.cor || '#8b5cf6'} />
+                    {meta.nome}
+                  </span>
                   <span className="obj-percent">{(meta.metaValor > 0 ? (meta.gastoReal/meta.metaValor)*100 : 0).toFixed(0)}%</span>
                 </div>
                 <div className="obj-progress-container">
-                  <div className="obj-progress-fill" style={{ width: `${Math.min(meta.metaValor > 0 ? (meta.gastoReal/meta.metaValor)*100 : 0, 100)}%`, backgroundColor: '#8b5cf6' }} />
+                  <div className="obj-progress-fill" style={{ width: `${Math.min(meta.metaValor > 0 ? (meta.gastoReal/meta.metaValor)*100 : 0, 100)}%`, backgroundColor: meta.cor || '#8b5cf6' }} />
                 </div>
                 <div className="obj-footer">
                   <span className="obj-real">{formatMoney(meta.gastoReal)}</span>
@@ -367,10 +364,14 @@ const Orcamento: React.FC = () => {
         </>
       )}
 
-      {/* --- MODAL COM BADGE NO RODAPÉ CONFORME SOLICITADO --- */}
+      {/* --- MODAL COM BORDA DE 2PX E CORES DINÂMICAS --- */}
       {modalDetalhe.aberto && (
         <div className="modal-overlay" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
-          <div className="modal-content-premium" onClick={e => e.stopPropagation()}>
+          <div 
+            className="modal-content-premium" 
+            onClick={e => e.stopPropagation()}
+            style={{ border: `2px solid ${getModalColor()}` }} // Borda de 2px com a cor do tipo
+          >
             <div className="modal-header-premium" style={{ backgroundColor: getModalColor() }}>
               <div className="header-info">
                 <h3 style={{ color: '#fff' }}>{modalDetalhe.tipo}</h3>
@@ -386,28 +387,21 @@ const Orcamento: React.FC = () => {
             </div>
 
             <div className="modal-footer-icons" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '20px', borderTop: '1px solid #f1f5f9' }}>
-               <div style={{ fontSize: '1.75rem', color: '#1e293b', fontWeight: 600 }}>Total</div>
-               
-               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                  {(() => {
-                    const total = modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0);
-                    const limite = modalDetalhe.limite || 0;
-                    if (total > limite && limite > 0) {
-                      const diff = total - limite;
-                      const badgeClass = modalDetalhe.tipo === 'Receitas' || modalDetalhe.tipo === 'Investimentos'? 'badge-green' : 'badge-red';
-                      return (
-                        <div className={`badge-pill-excedido ${badgeClass}`} style={{ position: 'static', marginBottom: '6px', fontSize: '0.65rem', padding: '1px 10px' }}>
-                          + {formatMoney(diff)}
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                  
-                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: getModalColor() }}>
-                    {formatMoney(modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0))}
-                  </div>
-               </div>
+                <div style={{ fontSize: '1.75rem', color: '#1e293b', fontWeight: 600 }}>Total</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                   {(() => {
+                     const total = modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0);
+                     const limite = modalDetalhe.limite || 0;
+                     if (total > limite && limite > 0) {
+                       const badgeClass = modalDetalhe.tipo === 'Receitas' || modalDetalhe.tipo === 'Investimentos'? 'badge-green' : 'badge-red';
+                       return <div className={`badge-pill-excedido ${badgeClass}`} style={{ position: 'static', marginBottom: '6px', fontSize: '0.65rem', padding: '1px 10px' }}>+ {formatMoney(total - limite)}</div>;
+                     }
+                     return null;
+                   })()}
+                   <div style={{ fontSize: '1.2rem', fontWeight: 900, color: getModalColor() }}>
+                     {formatMoney(modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0))}
+                   </div>
+                </div>
             </div>
           </div>
         </div>

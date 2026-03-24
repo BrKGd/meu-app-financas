@@ -206,8 +206,19 @@
 .aloc-progress-bg { height: 8px; background: #e2e8f0; border-radius: 10px; margin: 10px 0; overflow: hidden; }
 .aloc-progress-fill { height: 100%; border-radius: 10px; transition: 0.8s; }
 
-.summary-grid-objectives { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 35px; }
-.objective-card-premium { background: white; padding: 22px; border-radius: 26px; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+.summary-grid-objectives { 
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+.objective-card-premium {
+  background: white; 
+  padding: 22px;
+  border-radius: 26px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+}
 .clickable { cursor: pointer; transition: 0.3s; }
 .clickable:hover { transform: translateY(-5px); box-shadow: 0 12px 24px rgba(0,0,0,0.06); }
 
@@ -236,7 +247,7 @@
 .modal-content-premium {
   background: #f8fafc;
   width: 100%;
-  max-width: 450px;
+  max-width: 100%;
   border-radius: 35px;
   position: relative;
   animation: modalPop 0.4s cubic-bezier(0.4, 0, 0.2, 1);

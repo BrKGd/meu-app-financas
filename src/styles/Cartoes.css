@@ -97,6 +97,7 @@
   color: white; 
   position: relative;
   border-radius: 45px 45px 0 0;
+  max-width: 100%;
 }
 
 .modal-details-header h2 {
