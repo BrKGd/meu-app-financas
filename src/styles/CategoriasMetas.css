@@ -575,8 +575,8 @@
   position: fixed;
   bottom: 40px;
   right: 40px;
-  width: 65px;
-  height: 65px;
+  width: 55px;
+  height: 55px;
   border-radius: 22px;
   background: #4361ee;
   color: white;
@@ -606,7 +606,7 @@
   .header-controls { align-items: center; width: 100%; }
   .grid-metas-modern { grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .icon-grid-selector-inner { grid-template-columns: repeat(6, 1fr); }
-  .cat-fab { bottom: 90px; right: 20px; width: 60px; height: 60px; }
+  .cat-fab { bottom: 90px; right: 20px;}
   .card-value-display { font-size: 1rem; }
   .card-label-top { font-size: 0.75rem; }
   .card-bg-icon svg {width: 100px;height: 100px; }
