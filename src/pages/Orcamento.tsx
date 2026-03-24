@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { 
   PiggyBank, AlertCircle, ArrowUpCircle, 
-  Calendar, TrendingUp, X, ArrowDownCircle, CheckCircle2, Info, Settings,
+  TrendingUp, ArrowDownCircle, CheckCircle2, Info, Settings,
   ChevronLeft, ChevronRight
 } from 'lucide-react';
 import '../styles/Orcamento.css';
@@ -44,7 +44,7 @@ const Orcamento: React.FC = () => {
   // --- Estados de Data ---
   const [dataFiltro, setDataFiltro] = useState(new Date());
 
-  // Adicionado 'limite' ao estado do modal para cálculos internos
+  // Estado do modal com limite para cálculos internos
   const [modalDetalhe, setModalDetalhe] = useState<{aberto: boolean, tipo: string, dados: any[], limite?: number}>({ 
     aberto: false, tipo: '', dados: [], limite: 0 
   });
@@ -80,7 +80,12 @@ const Orcamento: React.FC = () => {
       prioridades: { valor: 0, limite: receitaBase * 0.2, categorias: [] as CategoriaConsolidada[] }
     };
     
-    const essenciaisLista = ['Aluguel', 'Saúde', 'Educação', 'Mercado', 'Combustível', 'Água', 'Luz', 'Moradia','Alimentação','Seguros'];
+    // Lista de categorias essenciais atualizada
+    const essenciaisLista = [
+      'Aluguel', 'Saúde', 'Educação', 'Mercado', 'Combustível',
+      'Água', 'Luz', 'Moradia','Alimentação','Seguros'
+    ];
+
 
     categorias.forEach(cat => {
       if (cat.tipoMeta === 'pessoal') {
@@ -129,11 +134,8 @@ const Orcamento: React.FC = () => {
       });
 
       const totalReceitaReal = proventos?.reduce((acc: number, cur: any) => acc + Number(cur.valor), 0) || 0;
-
       const receitaParaRegra = proventos?.reduce((acc: number, cur: any) => {
-        if (cur.categoria === 'Salários' || cur.categoria === 'Renda extra') {
-          return acc + Number(cur.valor);
-        }
+        if (cur.categoria === 'Salários' || cur.categoria === 'Renda extra') return acc + Number(cur.valor);
         return acc;
       }, 0) || 0;
 
@@ -180,7 +182,6 @@ const Orcamento: React.FC = () => {
     return { label: 'Deu ruim, gastou demais!', class: 'status-bad', color: '#ef4444', icon: <AlertCircle size={14} /> };
   }, [porcGastoOrcamento, dados]);
 
-  // --- Cores Dinâmicas para o Modal ---
   const getModalColor = () => {
     if (modalDetalhe.tipo === 'Gastos Fixos') return '#3b82f6';
     if (modalDetalhe.tipo === 'Gastos Variáveis') return '#f59e0b';
@@ -190,7 +191,6 @@ const Orcamento: React.FC = () => {
     return '#1e293b';
   };
 
-  // --- Lógica de Agrupamento para o Modal ---
   const renderConteudoModal = () => {
     if (modalDetalhe.tipo === 'Receitas') {
       return modalDetalhe.dados.map((p, i) => (
@@ -213,16 +213,7 @@ const Orcamento: React.FC = () => {
 
     return Object.keys(agrupado).map((categoria) => (
       <div key={categoria} className="categoria-grupo-modal" style={{ marginBottom: '16px' }}>
-        <div style={{ 
-          fontSize: '0.7rem', 
-          fontWeight: 800, 
-          color: getModalColor(), 
-          textTransform: 'uppercase', 
-          letterSpacing: '0.5px',
-          marginBottom: '8px',
-          borderBottom: '1px solid #f1f5f9',
-          paddingBottom: '4px'
-        }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: getModalColor(), textTransform: 'uppercase', marginBottom: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
           {categoria}
         </div>
         {agrupado[categoria].map((c, i) => (
@@ -241,51 +232,17 @@ const Orcamento: React.FC = () => {
   return (
     <div className="orcamento-container">
       <header className="orcamento-header">
-        <div className="header-content-wrapper" style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          width: '100%' 
-        }}>
+        <div className="header-content-wrapper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div>
             <h2 style={{ margin: 0, fontWeight: 800, color: '#1e293b', fontSize: '1.4rem' }}>Gestão Estratégica</h2>
             <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>Análise de fluxo</p>
           </div>
-          <div className="mes-selector-badge" style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px', 
-            background: '#ffffff', 
-            padding: '8px 14px', 
-            borderRadius: '100px', 
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-            flexShrink: 0
-          }}>
-            <button onClick={() => alterarMes(-1)} 
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            
-            <span style={{ 
-              fontWeight: 800, 
-              fontSize: '0.75rem', 
-              color: '#1e293b', 
-              textTransform: 'capitalize',
-              whiteSpace: 'nowrap',
-              textAlign: 'center',
-              minWidth: '110px' 
-            }}>
+          <div className="mes-selector-badge" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ffffff', padding: '8px 14px', borderRadius: '100px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', flexShrink: 0 }}>
+            <button onClick={() => alterarMes(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}><ChevronLeft size={18} /></button>
+            <span style={{ fontWeight: 800, fontSize: '0.75rem', color: '#1e293b', textTransform: 'capitalize', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '110px' }}>
               {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(dataFiltro)}
             </span>
-
-            <button 
-              onClick={() => alterarMes(1)} 
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}
-            >
-              <ChevronRight size={18} />
-            </button>
+            <button onClick={() => alterarMes(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: '2px' }}><ChevronRight size={18} /></button>
           </div>
         </div>
       </header>
@@ -307,23 +264,14 @@ const Orcamento: React.FC = () => {
                 <PiggyBank size={32} />
               </div>
             </div>
-            
             <div className="premium-progress-bg">
               <div className="premium-progress-fill" style={{ width: `${Math.min(porcGastoOrcamento, 100)}%`, backgroundColor: statusConfig.color }} />
             </div>
-            
             <div className="progress-details">
-              <span className="perc-text" style={{ color: statusConfig.color }}>
-                {porcGastoOrcamento.toFixed(1)}% do que você ganhou, já foi gasto.
-              </span>
+              <span className="perc-text" style={{ color: statusConfig.color }}>{porcGastoOrcamento.toFixed(1)}% do que você ganhou, já foi gasto.</span>
             </div>
-
             <div className="status-badges-stack">
-              {porcGastoOrcamento > 100 && (
-                <div className="critical-alert-badge">
-                  Limite excedido
-                </div>
-              )}
+              {porcGastoOrcamento > 100 && <div className="critical-alert-badge">Limite excedido</div>}
               <div className={`status-floating-badge ${statusConfig.class}`} style={{ backgroundColor: statusConfig.color }}>
                 {statusConfig.icon} {statusConfig.label}
               </div>
@@ -372,21 +320,17 @@ const Orcamento: React.FC = () => {
                 const valor = dados.resumo503020[key].valor;
                 const limite = dados.resumo503020[key].limite;
                 const porcLocal = limite > 0 ? (valor / limite) * 100 : 0;
-
-                // Lógica do Badge Excedido
                 const excedeu = valor > limite && limite > 0;
                 const diferenca = valor - limite;
                 const badgeClass = key === 'prioridades' ? 'badge-green' : 'badge-red';
 
                 return (
-                  <div key={key} className="aloc-mini-card clickable" style={{borderColor: colors[key], position: 'relative'}} onClick={() => setModalDetalhe({ aberto: true, tipo: labels[key], dados: dados.resumo503020[key].categorias, limite: limite})}>
-                    
+                  <div key={key} className="aloc-mini-card clickable" style={{borderColor: colors[key], position: 'relative'}} onClick={() => setModalDetalhe({ aberto: true, tipo: labels[key], dados: dados.resumo503020[key].categorias, limite: limite })}>
                     {excedeu && (
                       <div className={`badge-pill-excedido ${badgeClass}`}>
                         + {formatMoney(diferenca)}
                       </div>
                     )}
-
                     <span className="aloc-label">
                       {key === 'essenciais' ? '50%' : key === 'estiloVida' ? '30%' : '20%'} 
                       <span className="aloc-sub">{key === 'essenciais' ? 'Fixos' : key === 'estiloVida' ? 'Desejos' : 'Futuro'}</span>
@@ -423,33 +367,13 @@ const Orcamento: React.FC = () => {
         </>
       )}
 
-      {/* --- MODAL ATUALIZADO COM BADGE --- */}
+      {/* --- MODAL COM BADGE NO RODAPÉ CONFORME SOLICITADO --- */}
       {modalDetalhe.aberto && (
         <div className="modal-overlay" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
           <div className="modal-content-premium" onClick={e => e.stopPropagation()}>
-            
             <div className="modal-header-premium" style={{ backgroundColor: getModalColor() }}>
               <div className="header-info">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <h3 style={{ color: '#fff' }}>{modalDetalhe.tipo}</h3>
-                  
-                  {/* Badge de Valor dentro do Modal */}
-                  {(() => {
-                    const total = modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0);
-                    const limite = modalDetalhe.limite || 0;
-                    if (total > limite && limite > 0) {
-                      const diff = total - limite;
-                      const badgeClass = modalDetalhe.tipo === 'Investimentos' ? 'badge-green' : 'badge-red';
-                      return (
-                        <span className={`badge-pill-excedido ${badgeClass}`} 
-                              style={{ position: 'static', fontSize: '0.6rem', padding: '2px 10px' }}>
-                          + {formatMoney(diff)}
-                        </span>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
+                <h3 style={{ color: '#fff' }}>{modalDetalhe.tipo}</h3>
                 <p style={{ color: 'rgba(255,255,255,0.8)' }}>Confira os lançamentos deste mês</p>
               </div>
               <button className="btn-close-clean" onClick={() => setModalDetalhe({ ...modalDetalhe, aberto: false })}>
@@ -458,30 +382,38 @@ const Orcamento: React.FC = () => {
             </div>
 
             <div className="modal-body-premium">
-              <div className="fatura-lista">
-                {renderConteudoModal()}
-              </div>
+              <div className="fatura-lista">{renderConteudoModal()}</div>
             </div>
 
-            <div className="modal-footer-icons">
-               <div style={{ fontSize: '1.75rem', color: '#1e293b', fontWeight: 600 }}>
-                 Total
-               </div>
-               <div style={{ fontSize: '1.2rem', fontWeight: 900, color: getModalColor() }}>
-                  {formatMoney(
-                    modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0)
-                  )}
+            <div className="modal-footer-icons" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '20px', borderTop: '1px solid #f1f5f9' }}>
+               <div style={{ fontSize: '1.75rem', color: '#1e293b', fontWeight: 600 }}>Total</div>
+               
+               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  {(() => {
+                    const total = modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0);
+                    const limite = modalDetalhe.limite || 0;
+                    if (total > limite && limite > 0) {
+                      const diff = total - limite;
+                      const badgeClass = modalDetalhe.tipo === 'Receitas' || modalDetalhe.tipo === 'Investimentos'? 'badge-green' : 'badge-red';
+                      return (
+                        <div className={`badge-pill-excedido ${badgeClass}`} style={{ position: 'static', marginBottom: '6px', fontSize: '0.65rem', padding: '1px 10px' }}>
+                          + {formatMoney(diff)}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
+                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: getModalColor() }}>
+                    {formatMoney(modalDetalhe.dados.reduce((acc, curr) => acc + (curr.valor || curr.gastoReal || 0), 0))}
+                  </div>
                </div>
             </div>
           </div>
         </div>
       )}
 
-      <button 
-        className="btn-ajuste-premium" 
-        onClick={() => navigate('/CategoriasMetas')}
-        title="Configurar Metas"
-      >
+      <button className="btn-ajuste-premium" onClick={() => navigate('/CategoriasMetas')} title="Configurar Metas">
         <Settings size={26} />
       </button>
     </div>
