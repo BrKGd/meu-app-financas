@@ -485,7 +485,7 @@ const CategoriasMetas: React.FC = () => {
           onClick={() => openModal()} 
           style={{ background: activeTab === 'provento' ? '#00AB59' : activeTab === 'pessoal' ? '#8b5cf6' : '#4361ee' }}
         >
-          <LucideIcons.Plus size={32} color="#fff" />
+          <LucideIcons.Plus size={30} color="#fff" />
         </button>
       )}
     </>
